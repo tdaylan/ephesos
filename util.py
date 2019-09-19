@@ -48,12 +48,11 @@ def init(tici, dictsett=None, dictpara=None, strgtarg=None, pathfold=None, patht
             manifest = astroquery.mast.Observations.download_products(dataProducts[want], download_dir=pathtarg)
         
         if len(obsTable) == 0:
-            #print 'No TESS light curve has been found.'
             return
         else:
-            print 'Found TESS SPOC data.'
+            print('Found TESS SPOC data.')
     elif 'QLOP' in liststrgdata:
-        print 'Reading the QLP data on the target...'
+        print('Reading the QLP data on the target...')
         catalogData = astroquery.mast.Catalogs.query_object(tici, catalog="TIC")
         rasc = catalogData[0]['ra']
         decl = catalogData[0]['dec']
@@ -79,37 +78,44 @@ def init(tici, dictsett=None, dictpara=None, strgtarg=None, pathfold=None, patht
         pathalle += '_' + strgalleextn
     pathalle += '/'
     cmnd = 'mkdir -p %s %s' % (pathtarg, pathalle)
-    print cmnd
     os.system(cmnd)
     
     sing_alle(pathalle, dictsett=dictsett, dictpara=dictpara, pathtmpt=pathtmpt)
 
 
-def read_qlop(path, stdvcons=1e-3):
+def read_qlop(path, pathcsvv=None, stdvcons=None):
     
-    print 'Reading QLP light curve...'
+    print('Reading QLP light curve from %s...' % path)
     objtfile = h5py.File(path, 'r')
     time = objtfile['LightCurve/BJD'][()] + 2457000.
     tmag = objtfile['LightCurve/AperturePhotometry/Aperture_002/RawMagnitude'][()]
-    flux = 10**(-(tmag - np.median(tmag)) / 2.5)
-    flux /= np.median(flux) 
+    flux = 10**(-(tmag - np.nanmedian(tmag)) / 2.5)
+    flux /= np.nanmedian(flux) 
     arry = np.empty((flux.size, 3))
     arry[:, 0] = time
     arry[:, 1] = flux
-    print 'Assuming a constant photometric precision of %g for the QLP light curve.' % stdvcons
+    if stdvcons is None:
+        stdvcons = 1e-3
+        print('Assuming a constant photometric precision of %g for the QLP light curve.' % stdvcons)
     stdv = np.zeros_like(flux) + stdvcons
     arry[:, 2] = stdv
-   
+    
     # filter out bad data
-    indx = np.where(objtfile['LightCurve/QFLAG'][()] == 0)[0]
-    print 'arry'
-    summgene(arry)
-    
+    indx = np.where((objtfile['LightCurve/QFLAG'][()] == 0) & np.isfinite(flux) & np.isfinite(time) & np.isfinite(stdv))[0]
     arry = arry[indx, :]
-    
-    print 'arry'
-    summgene(arry)
-    
+    if not np.isfinite(arry).all():
+        print('arry')
+        summgene(arry)
+        raise Exception('Light curve is not finite')
+    if arry.shape[0] == 0:
+        print('arry')
+        summgene(arry)
+        raise Exception('Light curve has no data points')
+
+    if pathcsvv is not None:
+        print('Writing to %s...' % pathcsvv)
+        np.savetxt(pathcsvv, arry, delimiter=',')
+
     return arry
 
 
@@ -128,13 +134,12 @@ def sing_alle(pathalle, dictsett=None, dictpara=None, pathtmpt=None):
         
         pathfile = pathalle + strgfile
         
-        print 'Working on %s...' % strgfile
+        print('Working on %s...' % strgfile)
         
         if not os.path.exists(pathfile):
             # settings.csv or params.csv has not been created before. Initializing them based on the input dictsett or dictpara
-            print '%s does not exist at %s%s.' % (strgfile, pathalle, strgfile)
+            print('%s does not exist at %s%s.' % (strgfile, pathalle, strgfile))
             cmnd = 'cp %s%s %s' % (pathtmpt, strgfile, pathalle)
-            print cmnd
             os.system(cmnd)
             if a == 0:
                 dicttemp = dictsett
@@ -142,7 +147,7 @@ def sing_alle(pathalle, dictsett=None, dictpara=None, pathtmpt=None):
                 dicttemp = dictpara
             booldoit = dicttemp is not None
         else:
-            print 'Found previously existing %s%s...' % (pathalle, strgfile)
+            print('Found previously existing %s%s...' % (pathalle, strgfile))
             if a == 0:
                 booldoit = False 
             if a == 1:
@@ -231,8 +236,6 @@ def flbn(arry, epoc, peri, numbbins, indxtimeflag=None):
     phas = (((time - epoc) % peri) / peri + 0.25) % 1.
     binsphas = np.linspace(0., 1., numbbins + 1)
     meanphas = (binsphas[:-1] + binsphas[1:]) / 2.
-    #for k in range(time.size):
-    #    print '%d %15f %15g %10g' % (k, time[k], phas[k], arry[k, 1])
     if indxtimeflag is None:
         numbtime = time.size
         indxtimeflag = np.array([])
@@ -317,11 +320,7 @@ def read_tesskplr_fold(pathfold, pathwrit, typeinst='tess', strgtype='PDCSAP_FLU
     Reads all TESS or Kepler light curves in a folder and returns a data cube with time, flux and flux error
     '''
 
-    print 'pathfold'
-    print pathfold
     listpath = fnmatch.filter(os.listdir(pathfold), '%s*' % typeinst)
-    print 'listpath'
-    print listpath
     listarry = []
     for path in listpath:
         arry = read_tesskplr_file(pathfold + path + '/' + path + '_lc.fits', typeinst=typeinst, strgtype=strgtype)
@@ -381,4 +380,17 @@ def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmask=T
     else:
         return arry, indxgood
 
+
+def retr_fracrtsa(fracrprs, fracsars):
+    
+    fracrtsa = (fracrprs + 1.) / fracsars
+    
+    return fracrtsa
+
+
+def retr_fracsars(fracrprs, fracrtsa):
+    
+    fracsars = (fracrprs + 1.) / fracrtsa
+    
+    return fracsars
 
