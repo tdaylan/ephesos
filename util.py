@@ -119,6 +119,17 @@ def read_qlop(path, pathcsvv=None, stdvcons=None):
     return arry
 
 
+def down_spoclcur(strgobjt, pathdown):
+    
+    obsTable = astroquery.mast.Observations.query_criteria(obs_collection='TESS', dataproduct_type='timeseries', objectname=strgobjt)
+    dataProducts = astroquery.mast.Observations.get_product_list(obsTable[0])
+    want = dataProducts['description'] == 'Light curves'
+    manifest = astroquery.mast.Observations.download_products(dataProducts[want], download_dir=pathdown)
+    pathdown = manifest['Local Path'][0]
+    
+    return pathdown
+
+
 def sing_alle(pathalle, dictsett=None, dictpara=None, pathtmpt=None):
     
     '''
