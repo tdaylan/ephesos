@@ -15,74 +15,6 @@ import astroquery
 import astroquery.mast
 
 
-def init(tici, dictsett=None, dictpara=None, strgtarg=None, pathfold=None, pathtmpt=None, liststrgdata=['SPOC'], strgalleextn=None):
-    
-    '''
-    Creates folders, downloads TESS (SPOC or QLP) data, edits settings.csv and params.csv as required and runs allesfitter
-    '''
-
-    if pathfold is None:
-        pathfold = os.environ['TESSTARG_DATA_PATH'] + '/'
-    if pathtmpt is None:
-        pathtmpt = os.environ['TESSTARG_DATA_PATH'] + '/tmpt/'
-    if strgtarg is None:
-        strgtarg = 'tici_%d' % tici
-
-    pathtarg = pathfold + strgtarg + '/'
-    
-    if 'SPOC' in liststrgdata:
-        
-        # download data
-        obsTable = astroquery.mast.Observations.query_criteria(target_name=tici, \
-                                                               obs_collection='TESS', \
-                                                               dataproduct_type='timeseries', \
-                                               )
-        listpath = []
-        for k in range(len(obsTable)):
-            dataProducts = astroquery.mast.Observations.get_product_list(obsTable[k])
-            want = (dataProducts['obs_collection'] == 'TESS') * (dataProducts['dataproduct_type'] == 'timeseries')
-            for k in range(len(dataProducts['productFilename'])):
-                if not dataProducts['productFilename'][k].endswith('_lc.fits'):
-                    want[k] = 0
-            listpath.append(pathtarg + dataProducts[want]['productFilename'].data[0]) 
-            manifest = astroquery.mast.Observations.download_products(dataProducts[want], download_dir=pathtarg)
-        
-        if len(obsTable) == 0:
-            return
-        else:
-            print('Found TESS SPOC data.')
-    elif 'QLOP' in liststrgdata:
-        print('Reading the QLP data on the target...')
-        catalogData = astroquery.mast.Catalogs.query_object(tici, catalog="TIC")
-        rasc = catalogData[0]['ra']
-        decl = catalogData[0]['dec']
-        sector_table = astroquery.mast.Tesscut.get_sectors(SkyCoord(rasc, decl, unit="deg"))
-        listisec = sector_table['sector'].data
-        listicam = sector_table['camera'].data
-        listiccd = sector_table['ccd'].data
-        for m, sect in enumerate(listisec):
-            path = '/pdo/qlp-data/orbit-%d/ffi/cam%d/ccd%d/LC/' % (listisec[m], listicam[m], strgiccd[m])
-            pathqlop = path + str(tici) + '.h5'
-            time, flux, stdvflux = read_qlop(pathqlop)
-
-    # read the files to make the CSV file
-    if 'SPOC' in liststrgdata:
-        pathdown = pathtarg + 'mastDownload/TESS/'
-        arry = read_tesskplr_fold(pathdown, pathalle)
-        pathoutp = '%sTESS.csv' % pathalle
-        np.savetxt(pathoutp, arry, delimiter=',')
-    
-    # construct target folder structure
-    pathalle = pathtarg + 'allesfit'
-    if strgalleextn is not None:
-        pathalle += '_' + strgalleextn
-    pathalle += '/'
-    cmnd = 'mkdir -p %s %s' % (pathtarg, pathalle)
-    os.system(cmnd)
-    
-    sing_alle(pathalle, dictsett=dictsett, dictpara=dictpara, pathtmpt=pathtmpt)
-
-
 def read_qlop(path, pathcsvv=None, stdvcons=None):
     
     print('Reading QLP light curve from %s...' % path)
@@ -119,111 +51,34 @@ def read_qlop(path, pathcsvv=None, stdvcons=None):
     return arry
 
 
-def down_spoclcur(strgobjt, pathdown):
+def retr_indxtimetran(time, epoc, peri, duramask):
+    
+    listindxtimemask = []
+    for n in range(-20000, 20000):
+        timeinit = epoc + n * peri - duramask / 2.
+        timefinl = epoc + n * peri + duramask / 2.
+        indxtimemask = np.where((time > timeinit) & (time < timefinl))[0]
+        listindxtimemask.append(indxtimemask)
+        
+    indxtimemask = np.concatenate(listindxtimemask)
+    numbtime = time.size
+    indxtime = np.arange(numbtime)
+    
+    return indxtimemask
+    
+
+def down_spoclcur(strgobjt, pathdown, boollcuronly=True):
     
     obsTable = astroquery.mast.Observations.query_criteria(obs_collection='TESS', dataproduct_type='timeseries', objectname=strgobjt)
     dataProducts = astroquery.mast.Observations.get_product_list(obsTable[0])
-    want = dataProducts['description'] == 'Light curves'
+    if boollcuronly:
+        want = dataProducts['description'] == 'Light curves'
+    else:
+        want = np.arange(len(dataProducts))
     manifest = astroquery.mast.Observations.download_products(dataProducts[want], download_dir=pathdown)
     pathdown = manifest['Local Path'][0]
     
     return pathdown
-
-
-def sing_alle(pathalle, dictsett=None, dictpara=None, pathtmpt=None):
-    
-    '''
-    Edits settings.csv and params.csv as required and runs allesfitter
-    '''
-
-    # make the changes to params.csv and settings.csv
-    for a in range(2):
-        if a == 0:
-            strgfile = 'settings.csv'
-        if a == 1:
-            strgfile = 'params.csv'
-        
-        pathfile = pathalle + strgfile
-        
-        print('Working on %s...' % strgfile)
-        
-        if not os.path.exists(pathfile):
-            # settings.csv or params.csv has not been created before. Initializing them based on the input dictsett or dictpara
-            print('%s does not exist at %s%s.' % (strgfile, pathalle, strgfile))
-            cmnd = 'cp %s%s %s' % (pathtmpt, strgfile, pathalle)
-            os.system(cmnd)
-            if a == 0:
-                dicttemp = dictsett
-            if a == 1:
-                dicttemp = dictpara
-            booldoit = dicttemp is not None
-        else:
-            print('Found previously existing %s%s...' % (pathalle, strgfile))
-            if a == 0:
-                booldoit = False 
-            if a == 1:
-                pathfilepost = pathalle + 'results/mcmc_table.csv'
-                if os.path.exists(pathfilepost):
-                    # read median values of the previous posterior and write them to the initial value of the params.csv
-                    booldoit = True
-                    dicttemp = {}
-                    objtfilepost = open(pathfilepost, 'r')
-                    listlinepost = []
-                    for linepost in objtfilepost:
-                        listlinepost.append(linepost)
-                    objtfilepost.close()
-                    objtfile = open(pathfile, 'r')
-                    for line in objtfile:
-                        linesplt = line.split(',')
-                        for linepost in listlinepost:
-                            linespltpost = linepost.split(',')
-                            if linespltpost[0] == linesplt[0]:
-                                dicttemp[linespltpost[0]] = [linespltpost[1]] + linesplt[2:]
-                    objtfile.close()
-                else:
-                    booldoit = False
-        
-        if booldoit:
-            # edit settings.csv or params.csv with those specified in dictsett or dictpara
-            ## replace lines that already exist
-            objtfile = open(pathfile, 'r')
-            listline = []
-            for line in objtfile:
-                listline.append(line)
-            objtfile.close()
-            os.system('rm %s' % pathfile)
-            objtfile = open(pathfile, 'w')
-            numbstrg = len(dicttemp)
-            numbline = len(listline)
-            numbfond = np.zeros((numbline, numbstrg))
-            for m, line in enumerate(listline):
-                linesplt = line.split(',')
-                for k, strgtemp in enumerate(dicttemp):
-                    if linesplt[0] == strgtemp:
-                        numbfond[m, k] += 1
-                indx = np.where(numbfond[m, :] > 0)[0]
-                if indx.size > 1:
-                    raise Exception('')
-                if indx.size > 0:
-                    strgtemp = dicttemp.keys()[np.asscalar(indx)]
-                    lineneww = ','.join([strgtemp] + dicttemp[strgtemp])# + '\n'
-                else:
-                    lineneww = line
-                objtfile.write(lineneww)
-                    
-            ## add lines that do not already exist
-            for k, strgtemp in enumerate(dicttemp):
-                if np.sum(numbfond[:, k], 0) > 1:
-                    raise Exception('')
-                if np.sum(numbfond[:, k], 0) == 0:
-                    objtfile.write(','.join([strgtemp] + dicttemp[strgtemp]) + '\n')
-            objtfile.close()
-    allesfitter.show_initial_guess(pathalle)
-    allesfitter.mcmc_fit(pathalle)
-    allesfitter.mcmc_output(pathalle)
-    objtalle = allesfitter.allesclass(pathalle)
-    
-    return objtalle
 
 
 def fold(arry, epoc, peri):
@@ -268,63 +123,6 @@ def flbn(arry, epoc, peri, numbbins, indxtimeflag=None):
     return arryflbn
 
     
-def call_alle():
-    '''
-    Convenience routine for calling allesfitter
-    argument 1:
-        plotnest -- calls allesfitter.ns_output()
-        sampnest -- calls allesfitter.ns_fit()
-        plotmcmc -- calls allesfitter.mcmc_output()
-        sampmcmc -- calls allesfitter.mcmc_fit()
-    argument 2: name of the planet
-    argument 3: kind of the run
-        global
-        occultation
-        eccentricity
-    argument 4: type of the run
-        wouttess
-        withtess
-        onlytess
-        
-    If only the first two arguments are provided, remakes all plots of the given planet
-    '''
-
-    if sys.argv[1] == 'plotnest':
-        func = allesfitter.ns_output
-    if sys.argv[1] == 'plotmcmc':
-        func = allesfitter.mcmc_output
-    if sys.argv[1] == 'sampprio':
-        func = estimate_noise_wrap
-    if sys.argv[1] == 'sampnest':
-        func = allesfitter.ns_fit
-    if sys.argv[1] == 'sampmcmc':
-        func = allesfitter.mcmc_fit
-    
-    pathbase = os.environ['TESSTARG_DATA_PATH'] + '/'
-    
-    if sys.argv[1] == 'plot' and len(sys.argv) == 3:
-        # make plotting automatic
-        for strgkind in ['global', 'occulation', 'eccentricity']:
-            for strgtype in ['wouttess', 'withtess', 'onlytes']:
-                path = pathbase + sys.argv[2] + '/allesfit_' + strgkind + '/allesfit_' + strgtype
-                if sys.argv[1].endswith('nest'):
-                    path += '_ns/'
-                else:
-                    path += '_mc/'
-                func(path)
-    elif sys.argv[1] == 'viol':
-        path = pathbase + sys.argv[2] + '/allesfit_' + sys.argv[3] + '/'
-        allesfitter.postprocessing.plot_viol.proc_post(path)
-    else:
-        path = pathbase + sys.argv[2] + '/' + sys.argv[3] + '/'
-        #path = pathbase + sys.argv[2] + '/allesfit_' + sys.argv[3] + '/allesfit_' + sys.argv[4]
-        #if sys.argv[1].endswith('nest'):
-        #    path += '_ns/'
-        #else:
-        #    path += '_mc/'
-        func(path)
-
-
 def read_tesskplr_fold(pathfold, pathwrit, typeinst='tess', strgtype='PDCSAP_FLUX'):
     
     '''
