@@ -1,3 +1,5 @@
+import tcat.main
+
 import numpy as np
 
 import sys, os, h5py, fnmatch
@@ -94,7 +96,7 @@ def retr_timeedge(time):
     return timeedge
 
 
-def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=1):
+def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=1, timedetr=None):
     
     if verbtype > 0:
         print('Detrending the light curve...')
@@ -104,12 +106,6 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
     numbedge = len(timeedge)
     numbregi = numbedge - 1
     
-    if verbtype > 0:
-        print('numbregi')
-        print(numbregi)
-        print('timeedge')
-        print(timeedge)
-
     indxregi = np.arange(numbregi)
     lcurdetrregi = [[] for i in indxregi]
     indxtimeregi = [[] for i in indxregi]
@@ -133,46 +129,52 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
             indxtimeregioutt[i] = np.arange(timeregi.size)
         
         # fit the spline
-        objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]])
-        lcurdetrregi[i] = lcurregi - objtspln(timeregi) + 1.
-        listobjtspln[i] = objtspln
+        if lcurregi[indxtimeregioutt[i]].size > 0:
+            objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], s=indxtimeregioutt[i].size/100)
+            lcurdetrregi[i] = lcurregi - objtspln(timeregi) + 1.
+            listobjtspln[i] = objtspln
+        else:
+            lcurdetrregi[i] = lcurregi
     
     return lcurdetrregi, indxtimeregi, indxtimeregioutt, listobjtspln
 
 
-def retr_data(strgdata, strgmast, pathdata, boolsapp):
+def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=None, ticitarg=None):
     
     # download data
-    if strgdata != 'tcat':
+    if datatype != 'tcat':
         pathlcurspoc = pathdata + 'mastDownload/TESS/'
         if not os.path.exists(pathlcurspoc):
             print('Trying to download SPOC data with keyword: %s' % strgmast)
-            listpathdown = tesstarg.util.down_spoclcur(pathdata, strgmast)
+            listpathdown = down_spoclcur(pathdata, strgmast)
             print('listpathdown')
             print(listpathdown)
         else:
             print('SPOC folder already exists at %s. Will not attempt at downloading SPOC data...' % pathlcurspoc)
    
     # determine type of data to be used for allesfitter analysis
-    if strgdata is None:
+    if datatype is None:
         if os.path.exists(pathlcurspoc):
             if boolsapp:
-                strgdata = 'sapp'
+                datatype = 'sapp'
             else:
-                strgdata = 'pdcc' 
+                datatype = 'pdcc' 
         else:
-            strgdata = 'qlop'
+            datatype = 'tcat'
     
-    if strgdata != 'tcat':
+    print('datatype')
+    print(datatype)
+
+    if datatype != 'tcat':
         listpathlcur = []
-        if strgdata == 'sapp' or strgdata == 'pdcc':
+        if datatype == 'sapp' or datatype == 'pdcc':
             listpathlcurinte = []
             for extn in os.listdir(pathlcurspoc):
                 pathlcurinte = pathlcurspoc + extn + '/'
                 listpathlcurinte.append(pathlcurinte)
                 pathlcur = pathlcurinte + fnmatch.filter(os.listdir(pathlcurinte), '*_lc.fits')[0]
                 listpathlcur.append(pathlcur)
-        if strgdata == 'qlop':
+        if datatype == 'qlop':
             pathlcurqlop = pathdata + 'qlop/'
             print('Searching for QLP light curve(s) in %s...' % pathlcurqlop)
             os.system('mkdir -p %s' % pathlcurqlop)
@@ -182,44 +184,54 @@ def retr_data(strgdata, strgmast, pathdata, boolsapp):
                 print('Found QLP light curves:')
                 for temp in listtemp:
                     print(temp)
+
+        ## make sure the list of paths to sector files are time-sorted
+        listpathlcur.sort()
+        
+        listpathsapp = []
+        listpathpdcc = []
+   
+        # merge light curves from different sectors
+        numbsect = len(listpathlcur)
+        indxsect = np.arange(numbsect)
+        listarrylcursapp = [[] for o in indxsect] 
+        listarrylcurpdcc = [[] for o in indxsect] 
+        listarrylcur = []
+        for o, pathlcur in enumerate(listpathlcur):
+            if datatype == 'tcat':
+                arrylcur = np.loadtxt(pathdata + 'band.csv', delimiter=',', skiprows=9)
+            elif datatype == 'qlop':
+                arrylcur = read_qlop(pathlcur, typeinst='tess', boolmask=True)
+            else:
+                listarrylcursapp[o], indxtimequalgood, indxtimenanngood = read_tesskplr_file(pathlcur, typeinst='tess', strgtype='SAP_FLUX')
+                listarrylcurpdcc[o], indxtimequalgood, indxtimenanngood = read_tesskplr_file(pathlcur, typeinst='tess', strgtype='PDCSAP_FLUX')
+                if datatype == 'sapp':
+                    arrylcur = listarrylcursapp[o]
+                else:
+                    arrylcur = listarrylcurpdcc[o]
+            listarrylcur.append(arrylcur)
+        print('%d sectors of data retrieved.' % numbsect)
+        arrylcur = np.concatenate(listarrylcur, 0)
+        arrylcursapp = np.concatenate(listarrylcursapp, 0)
+        arrylcurpdcc = np.concatenate(listarrylcurpdcc, 0)
+    
     else:
         print('Will run TCAT on the object...')
-        tcat.main.main( \
-             ticitarg=int(strgmast), \
-             labltarg=strgtarg, \
-             strgtarg=strgtarg, \
-            )
-    ## make sure the list of paths to sector files are time-sorted
-    listpathlcur.sort()
-    
-    listpathsapp = []
-    listpathpdcc = []
-   
-    # merge light curves from different sectors
-    numbsect = len(listpathlcur)
-    indxsect = np.arange(numbsect)
-    listarrylcursapp = [[] for o in indxsect] 
-    listarrylcurpdcc = [[] for o in indxsect] 
-    listarrylcur = []
-    for o, pathlcur in enumerate(listpathlcur):
-        if strgdata == 'tcat':
-            arrylcur = np.loadtxt(pathdata + 'band.csv', delimiter=',', skiprows=9)
-        elif strgdata == 'qlop':
-            arrylcur = read_qlop(pathlcur, typeinst='tess', boolmask=True)
-        else:
-            listarrylcursapp[o], indxtimequalgood, indxtimenanngood = read_tesskplr_file(pathlcur, typeinst='tess', strgtype='SAP_FLUX')
-            listarrylcurpdcc[o], indxtimequalgood, indxtimenanngood = read_tesskplr_file(pathlcur, typeinst='tess', strgtype='PDCSAP_FLUX')
-            if strgdata == 'sapp':
-                arrylcur = listarrylcursapp[o]
-            else:
-                arrylcur = listarrylcurpdcc[o]
-        listarrylcur.append(arrylcur)
-    print('%d sectors of data retrieved.' % numbsect)
-    arrylcur = np.concatenate(listarrylcur, 0)
-    arrylcursapp = np.concatenate(listarrylcursapp, 0)
-    arrylcurpdcc = np.concatenate(listarrylcurpdcc, 0)
-    
-    return arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc
+        listarrylcur = tcat.main.main( \
+                                       ticitarg=ticitarg, \
+                                       labltarg=labltarg, \
+                                       strgtarg=strgtarg, \
+                                      )
+        print('listarrylcur') 
+        print(listarrylcur)
+        print('listarrylcur[0]')
+        summgene(listarrylcur[0])
+        arrylcur = np.concatenate(listarrylcur, 0) 
+        arrylcursapp = None
+        arrylcurpdcc = None
+        listarrylcursapp = None
+        listarrylcurpdcc = None
+    return datatype, arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc
    
 
 def down_spoclcur(pathdownbase, strgmast, boollcuronly=True):
@@ -233,7 +245,7 @@ def down_spoclcur(pathdownbase, strgmast, boollcuronly=True):
     rasc = catalogData[0]['ra']
     decl = catalogData[0]['dec']
     strgtici = '%s' % catalogData[0]['ID']
-
+    
     listpathdown = []
     for tabl in obsTable:
         #for keys in tabl:
@@ -241,8 +253,6 @@ def down_spoclcur(pathdownbase, strgmast, boollcuronly=True):
         #    print(tabl)
         #    print('keys')
         #    print(keys)
-        print('tabl[target_name]')
-        print(tabl['target_name'])
         if tabl['target_name'] == '%s' % strgtici:
             dataProducts = astroquery.mast.Observations.get_product_list(tabl)
             #for strg in dataProducts:
@@ -251,22 +261,15 @@ def down_spoclcur(pathdownbase, strgmast, boollcuronly=True):
             #print('dataProducts')
             #print(dataProducts)
             #print(dataProducts.keys())
-            print('dataProducts[description]')
             #print(astropy.table.Table.read(dataProducts))
             
             print(type(dataProducts['description']))
             desc = np.array([dataProducts['description'][a] for a in range(len(dataProducts['description']))])
-            print('boollcuronly')
-            print(boollcuronly)
             if boollcuronly:
                 want = np.where(desc == 'Light curves')[0]
             else:
                 want = np.arange(len(dataProducts))
             if want.size > 0:
-                print('desc')
-                print(desc)
-                print('want')
-                print(want)
                 manifest = astroquery.mast.Observations.download_products(dataProducts[want], download_dir=pathdownbase)
                 pathdown = manifest['Local Path'][0]
                 listpathdown.append(pathdown)
@@ -341,6 +344,13 @@ def read_tesskplr_fold(pathfold, pathwrit, typeinst='tess', strgtype='PDCSAP_FLU
     return arry 
 
 
+def retr_smaxkepl(peri, masstotl):
+    
+    smax = (7.496e-6 * peri**2)**(1. / 3.)
+    
+    return smax
+
+    
 def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqual=True, boolmasknann=True):
     
     '''
@@ -695,14 +705,6 @@ def retr_dataete6(nois=None, numbdata=None, boolnorm=True, boolplot=True, booldt
     
     indxrand = np.random.random_integers(numbdata)
     
-    if booldtrd:
-        fluxbsln = np.empty_like(flux)
-        for k in indxdata:
-            timeknotmaxm = np.amax(time[k, :] - 1)
-            timeknotminm = np.amin(time[k, :] + 1)
-            timeknot = np.arange(timeknotminm, timeknotmaxm, 30.)
-            fluxbsln[k, :] = sp.interpolate.LSQUnivariateSpline(time[k, :], flux[k, :], timeknot)(time[k, :])
-    
     flux = flux - fluxbsln
 
     return time, flux, labl, tici, peri
@@ -1043,5 +1045,126 @@ def samp(gdat, pathimag, numbsampwalk, numbsampburnwalk, retr_modl, retr_lpos, l
     
     return parapost
 
+
+def retr_lcur_mock(numbplan=100, numbnois=100, numbtime=100, dept=1e-2, nois=1e-3, numbbinsphas=1000, pathplot=None, boollabltime=False, boolflbn=False):
+    
+    '''
+    Function to generate mock light curves.
+    numbplan: number of data samples containing signal, i.e., planet transits
+    numbnois: number of background data samples, i.e., without planet transits
+    numbtime: number of time bins
+    pathplot: path in which plots are to be generated
+    boollabltime: Boolean flag to label each time bin separately (e.g., for using with LSTM)
+    '''
+    
+    # total number of data samples
+    numbdata = numbplan + numbnois
+    
+    indxdata = np.arange(numbdata)
+    indxtime = np.arange(numbtime)
+    
+    minmtime = 0.
+    maxmtime = 27.3
+
+    time = np.linspace(minmtime, maxmtime, numbtime)
+    
+    minmperi = 1.
+    maxmperi = 10.
+    minmdept = 1e-3
+    maxmdept = 1e-2
+    minmepoc = np.amin(time)
+    maxmepoc = np.amax(time)
+    minmdura = 0.125
+    maxmdura = 0.375
+
+    # input data
+    flux = np.zeros((numbdata, numbtime))
+    
+    # planet transit properties
+    ## durations
+    duraplan = minmdura * np.ones(numbplan) + (maxmdura - minmdura) * np.random.rand(numbplan)
+    ## phas  
+    epocplan = minmepoc * np.ones(numbplan) + (maxmepoc - minmepoc) * np.random.rand(numbplan)
+    ## periods
+    periplan = minmperi * np.ones(numbplan) + (maxmperi - minmperi) * np.random.rand(numbplan)
+    ##depths
+    deptplan = minmdept * np.ones(numbplan) + (maxmdept - minmdept) * np.random.rand(numbplan)
+
+    # input signal data
+    fluxplan = np.zeros((numbplan, numbtime))
+    indxplan = np.arange(numbplan)
+    for k in indxplan:
+        phas = (time - epocplan[k]) / periplan[k]
+        for n in range(-1000, 1000):
+            indxphastran = np.where(abs(phas - n) < duraplan[k] / periplan[k])[0]
+            fluxplan[k, indxphastran] -= deptplan[k]
+    
+    # place the signal data
+    flux[:numbplan, :] = fluxplan
+
+    # label the data
+    if boollabltime:
+        outp = np.zeros((numbdata, numbtime))
+        outp[np.where(flux == dept[0])] = 1.
+    else:
+        outp = np.zeros(numbdata)
+        outp[:numbplan] = 1
+    
+    # add noise to all data
+    flux += nois * np.random.randn(numbtime * numbdata).reshape((numbdata, numbtime))
+    
+    # adjust the units of periods from number of time bins to days
+    peri = peri / 24. / 30.
+    
+    # assign random periods to non-planet data
+    peritemp = np.empty(numbdata)
+    peritemp[:numbplan] = peri
+    peritemp[numbplan:] = 1. + np.random.rand(numbnois) * 9.
+    peri = peritemp
+
+    # phase-fold and bin
+    if boolflbn:
+        binsphas = np.linspace(0., 1., numbbinsphas + 1)
+        fluxflbn = np.empty((numbdata, numbbinsphas))
+        phas = np.empty((numbdata, numbtime))
+        for k in indxdata:
+            phas[k, :] = ((time - epoc[k]) / peri[k] + 0.25) % 1.
+            for n in indxphas:
+                indxtime = np.where((phas < binsphas[n+1]) & (phas > binsphas[n]))[0]
+                fluxflbn[k, n] = np.mean(flux[k, indxtime])
+        inpt = fluxflbn
+        xdat = meanphas
+    else:
+        inpt = flux
+        xdat = time
+
+    if pathplot != None:
+        # generate plots if pathplot is set
+        print ('Plotting the data set...')
+        for k in indxdata:
+            figr, axis = plt.subplots() # figr is unused
+            axis.plot(indxtime, inpt[k, :])
+            axis.set_title(outp[k])
+            if k < numbplan:
+                for t in indxtime:
+                    if (t - phas[k]) % peri[k] == 0:
+                        axis.axvline(t, ls='--', alpha=0.3, color='grey')
+            axis.set_xlabel('$t$')
+            axis.set_ylabel('$f(t)$')
+            path = pathplot + 'data_%04d.pdf' % k
+            print('Writing to %s...' % path)
+            plt.savefig(path)
+            plt.close()
+    
+    # randomize the data set
+    numpstat = np.random.get_state()
+    np.random.seed(0)
+    indxdatarand = np.random.choice(indxdata, size=numbdata, replace=False)
+    inpt = inpt[indxdatarand, :]
+    outp = outp[indxdatarand]
+    peri = peri[indxdatarand]
+    np.random.set_state(numpstat)
+
+    return inpt, xdat, outp, peri, epoc
 
 
