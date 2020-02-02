@@ -1,2 +1,2 @@
 # TESSTARG
-TESSTARG is a library for exoplanet science. It provides functions for processing (reading, flattening, phase folding and plotting) light curves. It can generate synthetic light curves.
+TESSTARG is a library for exoplanet science. It provides functions for processing (reading TESS and Kepler data, flattening, phase-folding and plotting) light curves. It can be used to generate synthetic light curves.
