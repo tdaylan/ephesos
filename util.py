@@ -1,5 +1,3 @@
-import tcat.main
-
 import numpy as np
 
 import sys, os, h5py, fnmatch
@@ -20,6 +18,8 @@ import scipy.interpolate
 # own modules
 import tdpy.util
 from tdpy.util import summgene
+
+import tcat.main
 
 import astroquery
 import astroquery.mast
@@ -86,7 +86,7 @@ def retr_indxtimetran(time, epoc, peri, duramask, booloutt=False):
 def retr_timeedge(time):
 
     difftime = time[1:] - time[:-1]
-    indxtimebrek = np.where(difftime > 1.)[0]
+    indxtimebrek = np.where(difftime > 0.5)[0]
     timeedge = [0, np.inf]
     for k in indxtimebrek:
         timeedge.append((time[k] + time[k+1]) / 2.)
@@ -130,7 +130,8 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
         
         # fit the spline
         if lcurregi[indxtimeregioutt[i]].size > 0:
-            objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], s=indxtimeregioutt[i].size/100)
+            objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]])
+            #objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], s=indxtimeregioutt[i].size/100)
             lcurdetrregi[i] = lcurregi - objtspln(timeregi) + 1.
             listobjtspln[i] = objtspln
         else:
@@ -139,7 +140,14 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
     return lcurdetrregi, indxtimeregi, indxtimeregioutt, listobjtspln
 
 
-def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=None, ticitarg=None):
+def retr_rvsa(peri, massplan, massstar, incl, ecce):
+    
+    rvsa = 203. * peri**(-1. / 3.) * massplan * np.sin(incl / 180. * np.pi) / (massstar + 9.548e-4 * massplan)**(2. / 3.) / np.sqrt(1. - ecce**2) # [m/s]
+
+    return rvsa
+
+
+def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=None, ticitarg=None, maxmnumbstartcat=None):
     
     # download data
     if datatype != 'tcat':
@@ -174,6 +182,7 @@ def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=No
                 listpathlcurinte.append(pathlcurinte)
                 pathlcur = pathlcurinte + fnmatch.filter(os.listdir(pathlcurinte), '*_lc.fits')[0]
                 listpathlcur.append(pathlcur)
+
         if datatype == 'qlop':
             pathlcurqlop = pathdata + 'qlop/'
             print('Searching for QLP light curve(s) in %s...' % pathlcurqlop)
@@ -190,21 +199,25 @@ def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=No
         
         listpathsapp = []
         listpathpdcc = []
-   
+    
         # merge light curves from different sectors
         numbsect = len(listpathlcur)
         indxsect = np.arange(numbsect)
+        listisec = np.empty(numbsect, dtype=int)
+        listicam = np.empty(numbsect, dtype=int)
+        listiccd = np.empty(numbsect, dtype=int)
         listarrylcursapp = [[] for o in indxsect] 
         listarrylcurpdcc = [[] for o in indxsect] 
         listarrylcur = []
         for o, pathlcur in enumerate(listpathlcur):
-            if datatype == 'tcat':
-                arrylcur = np.loadtxt(pathdata + 'band.csv', delimiter=',', skiprows=9)
-            elif datatype == 'qlop':
+            if datatype == 'qlop':
                 arrylcur = read_qlop(pathlcur, typeinst='tess', boolmask=True)
             else:
-                listarrylcursapp[o], indxtimequalgood, indxtimenanngood = read_tesskplr_file(pathlcur, typeinst='tess', strgtype='SAP_FLUX')
-                listarrylcurpdcc[o], indxtimequalgood, indxtimenanngood = read_tesskplr_file(pathlcur, typeinst='tess', strgtype='PDCSAP_FLUX')
+                listarrylcursapp[o], indxtimequalgood, indxtimenanngood, listisec[o], listicam[o], listiccd[o] = \
+                                                                        read_tesskplr_file(pathlcur, typeinst='tess', strgtype='SAP_FLUX')
+                listarrylcurpdcc[o], indxtimequalgood, indxtimenanngood, listisec[o], listicam[o], listiccd[o] = \
+                                                                        read_tesskplr_file(pathlcur, typeinst='tess', strgtype='PDCSAP_FLUX')
+                
                 if datatype == 'sapp':
                     arrylcur = listarrylcursapp[o]
                 else:
@@ -217,21 +230,21 @@ def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=No
     
     else:
         print('Will run TCAT on the object...')
-        listarrylcur = tcat.main.main( \
+        listarrylcur, listmeta = tcat.main.main( \
                                        ticitarg=ticitarg, \
                                        labltarg=labltarg, \
                                        strgtarg=strgtarg, \
+                                       maxmnumbstar=maxmnumbstartcat, \
                                       )
-        print('listarrylcur') 
-        print(listarrylcur)
-        print('listarrylcur[0]')
-        summgene(listarrylcur[0])
         arrylcur = np.concatenate(listarrylcur, 0) 
         arrylcursapp = None
         arrylcurpdcc = None
         listarrylcursapp = None
         listarrylcurpdcc = None
-    return datatype, arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc
+
+        listisec, listicam, listiccd = listmeta
+        
+    return datatype, arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc, listisec, listicam, listiccd
    
 
 def down_spoclcur(pathdownbase, strgmast, boollcuronly=True):
@@ -346,7 +359,7 @@ def read_tesskplr_fold(pathfold, pathwrit, typeinst='tess', strgtype='PDCSAP_FLU
 
 def retr_smaxkepl(peri, masstotl):
     
-    smax = (7.496e-6 * peri**2)**(1. / 3.)
+    smax = (7.496e-6 * masstotl * peri**2)**(1. / 3.)
     
     return smax
 
@@ -368,8 +381,12 @@ def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqu
     if strgtype == 'PDCSAP_FLUX':
         stdv = listhdun[1].data['PDCSAP_FLUX_ERR']
     else:
+        print('Assuming a constant uncertainty of 1 percent for the SAP data.')
         stdv = flux * 1e-2
     
+    isec = listhdun[0].header['SECTOR']
+    icam = listhdun[0].header['CAMERA']
+    iccd = listhdun[0].header['CCD']
         
     indxtimequalgood = np.where(listhdun[1].data['QUALITY'] == 0)[0]
     if boolmaskqual:
@@ -388,11 +405,12 @@ def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqu
     if boolmasknann:
         arry = arry[indxtimenanngood, :]
     
+    #print('HACKING, SKIPPING NORMALIZATION FOR SPOC DATA')
     # normalize
-    arry[:, 2] /= np.mean(arry[:, 1])
-    arry[:, 1] /= np.mean(arry[:, 1])
+    arry[:, 2] /= np.median(arry[:, 1])
+    arry[:, 1] /= np.median(arry[:, 1])
     
-    return arry, indxtimequalgood, indxtimenanngood
+    return arry, indxtimequalgood, indxtimenanngood, isec, icam, iccd
 
 
 def retr_fracrtsa(fracrprs, fracsars):
@@ -891,7 +909,7 @@ def retr_datatess(boolflbn=True, boolplot=True):
 
             axis.scatter(listphas[k], listflux[k], s=2)
             axis.set_title(listlegd[k])
-            path = pathdatalcurflbn + 'lcurflbn_012%d_%d.png' % (listtici[k], listitoi[k])
+            path = pathdatalcurflbn + 'lcurflbn_012%d_%d.pdf' % (listtici[k], listitoi[k])
             if (k % numbplotfram == numbplotfram - 1 or k == len(listdata[0]) - 1) and not os.path.exists(path):
                 axis.set_xlabel('Phase')
                 axis.set_ylabel('$\Delta f$')
@@ -899,7 +917,7 @@ def retr_datatess(boolflbn=True, boolplot=True):
                 plt.savefig(path)
                 plt.close()
                 cntr += 1
-        cmnd = 'convert %stran_*.png tran.gif' % pathdata
+        cmnd = 'convert %stran_*.pdf tran.gif' % pathdata
         # temp
         #os.system(cmnd)
     
@@ -910,140 +928,44 @@ def retr_datatess(boolflbn=True, boolplot=True):
     return listdata
 
 
-def retr_limtpara(scalpara, minmpara, maxmpara, meanpara, stdvpara):
+def retr_esmm(tmptplanequb, tmptstar, radiplan, radistar, kmag):
     
-    numbpara = scalpara.size
-    limtpara = np.empty((2, numbpara))
-    indxpara = np.arange(numbpara)
-    for n in indxpara:
-        if scalpara[n] == 'self':
-            limtpara[0, n] = minmpara[n]
-            limtpara[1, n] = maxmpara[n]
-        if scalpara[n] == 'gaus':
-            limtpara[0, n] = meanpara[n] - 10 * stdvpara[n]
-            limtpara[1, n] = meanpara[n] + 10 * stdvpara[n]
+    tmptplandayy = 1.1 * tmptplanequb
+
+    print('tmptplandayy')
+    summgene(tmptplandayy)
+    print(tmptplandayy)
+    print(np.where(np.isfinite(tmptplandayy))[0].size)
+    print('tmptstar')
+    print(tmptstar)
+    print('radiplan')
+    print(radiplan)
+    print('tdpy.util.retr_specbbod(tmptplandayy, 7.5)')
+    print(tdpy.util.retr_specbbod(tmptplandayy, 7.5))
+    print(np.where(np.isfinite(tdpy.util.retr_specbbod(tmptplandayy, 7.5)))[0].size)
     
-    return limtpara
+    esmm = 4.29e6 * tdpy.util.retr_specbbod(tmptplandayy, 7.5) / tdpy.util.retr_specbbod(tmptstar, 7.5) * (radiplan / radistar)*2 * 10**(-kmag / 5.)
+
+    return esmm
 
 
-def samp(gdat, pathimag, numbsampwalk, numbsampburnwalk, retr_modl, retr_lpos, listlablpara, scalpara, \
-                                                    minmpara, maxmpara, meanpara, stdvpara, numbdata, diagmode=True, strgmodl=None):
-        
-    if strgmodl is None:
-        strgmodl = ''
-    else:
-        strgmodl = '_' + strgmodl
+def retr_tsmm(radiplan, tmptplan, massplan, radistar, jmag):
 
-    numbpara = len(listlablpara)
-    indxpara = np.arange(numbpara)
-    numbdoff = numbdata - numbpara
-    
-    # plotting
-    ## plot limits 
-    limtpara = retr_limtpara(scalpara, minmpara, maxmpara, meanpara, stdvpara)
+    tsmm = radiplan**3 * tmptplan / massplan / radistar**2 * 10**(jmag / 5.)
 
-    ## plot bins
-    numbbins = 20
-    indxbins = np.arange(numbbins)
-    binspara = np.empty((numbbins + 1, numbpara)) 
-    for k in indxpara:
-        binspara[:, k] = np.linspace(limtpara[0, k], limtpara[1, k], numbbins + 1)
-    meanpara = (binspara[1:, :] + binspara[:-1, :]) / 2.
-    
-    dictllik = [gdat]
-    
-    # initialize
-    numbwalk = 2 * numbpara
-    indxwalk = np.arange(numbwalk)
-    parainit = [[] for k in indxwalk]
-    meanparainit = (limtpara[0, :] + limtpara[1, :]) / 2.
-    stdvnorm = (limtpara[1, :] - limtpara[0, :]) / 100.
-    for k in indxwalk:
-        print('limtpara')
-        print(limtpara)
-        print('meanparainit')
-        print(meanparainit)
-        print('stdvnorm')
-        print(stdvnorm)
-        parainit[k]  = (scipy.stats.truncnorm.rvs((limtpara[0, :] - meanparainit) / stdvnorm, \
-                                                            (limtpara[1, :] - meanparainit) / stdvnorm)) * stdvnorm + meanparainit
+    return tsmm
 
-    numbsamp = numbsampwalk * numbwalk
-    indxsamp = np.arange(numbsamp)
-    numbsampburn = numbsampburnwalk * numbwalk
-    if diagmode:
-        if numbsampwalk == 0:
-            raise Exception('')
-    initindxtranmodl, inittimetranmodl, initindxtranmodlproj, inittimetranmodlproj = retr_modl(gdat, meanparainit)
-    listvarb = [[initindxtranmodl], [inittimetranmodl], [initindxtranmodlproj], [inittimetranmodlproj]]
-    # temp
-    #objtsamp = emcee.EnsembleSampler(numbwalk, numbpara, retr_lpos, args=dictllik, pool=multiprocessing.Pool())
-    objtsamp = emcee.EnsembleSampler(numbwalk, numbpara, retr_lpos, args=dictllik)
-    if numbsampburnwalk > 0:
-        parainitburn, prob, state = objtsamp.run_mcmc(parainit, numbsampburnwalk, progress=True)
-        objtsamp.reset()
-    else:
-        parainitburn = parainit
-    objtsamp.run_mcmc(parainitburn, numbsampwalk, progress=True)
-    objtsave = objtsamp
-    
-    parapost = objtsave.flatchain
-    indxsampwalk = np.arange(numbsampwalk)
 
-    if numbsamp != numbsampwalk * numbwalk:
-        raise Exception('')
-
-    listsamp = objtsave.flatchain
-    listllik = objtsave.flatlnprobability
+def retr_magttess(gdat, cntp):
     
-    listlpos = objtsave.lnprobability
-    chi2 = -2. * listlpos
+    magt = -2.5 * np.log10(cntp / 1.5e4 / gdat.listcade) + 10
+    #mlikmagttemp = 10**((mlikmagttemp - 20.424) / (-2.5))
+    #stdvmagttemp = mlikmagttemp * stdvmagttemp / 1.09
+    #mliklcurtemp = -2.5 * np.log10(mlikfluxtemp) + 20.424
+    #gdat.magtrefr = -2.5 * np.log10(gdat.refrrflx[o] / 1.5e4 / 30. / 60.) + 10
+    #gdat.stdvmagtrefr = 1.09 * gdat.stdvrefrrflx[o] / gdat.refrrflx[o]
     
-    # plot the posterior
-    ## parameter
-    ### trace
-    figr, axis = plt.subplots(numbpara + 1, 1, figsize=(12, (numbpara + 1) * 4))
-    print('numbwalk')
-    print(numbwalk)
-    print('objtsave.lnprobability')
-    summgene(objtsave.lnprobability)
-    print('indxsampwalk')
-    summgene(indxsampwalk)
-    for i in indxwalk:
-        axis[0].plot(indxsampwalk, objtsave.lnprobability[i, :])
-    axis[0].set_ylabel('logL')
-    listlablparafull = []
-    for k in indxpara:
-        for i in indxwalk:
-            axis[k+1].plot(indxsampwalk, objtsave.chain[i, :, k])
-        labl = listlablpara[k][0]
-        if listlablpara[k][1] != '':
-            labl += ' [%s]' % listlablpara[k][1]
-        listlablparafull.append(labl)
-        axis[k+1].set_ylabel(labl)
-    path = pathimag + 'trac%s.png' % (strgmodl)
-    print('Writing to %s...' % path)
-    plt.savefig(path)
-    plt.close()
-        
-    indxsampmlik = np.argmax(listllik)
-    listparamlik = listsamp[indxsampmlik, :]
-    #print('Saving the maximum likelihood to %s...' % pathmlik)
-    #np.savetxt(pathmlik, listparamlik, delimiter=',')
-    
-    strgplot = 'post' + strgmodl
-    print('path')
-    print(path)
-    tdpy.mcmc.plot_grid(pathimag, strgplot, listsamp, listlablparafull, listvarbdraw=[meanpara.flatten()], numbbinsplot=numbbins)
-    
-    print('Minimum chi2: ')
-    print(np.amin(chi2))
-    print('Minimum chi2 per dof: ')
-    print(np.amin(chi2) / numbdoff)
-    print('Maximum aposterior: ')
-    print(np.amax(listlpos))
-    
-    return parapost
+    return magt
 
 
 def retr_lcur_mock(numbplan=100, numbnois=100, numbtime=100, dept=1e-2, nois=1e-3, numbbinsphas=1000, pathplot=None, boollabltime=False, boolflbn=False):
