@@ -951,7 +951,7 @@ def retr_esmm(tmptplanequb, tmptstar, radiplan, radistar, kmag):
 
 def retr_tsmm(radiplan, tmptplan, massplan, radistar, jmag):
 
-    tsmm = radiplan**3 * tmptplan / massplan / radistar**2 * 10**(jmag / 5.)
+    tsmm = radiplan**3 * tmptplan / massplan / radistar**2 * 10**(-jmag / 5.)
 
     return tsmm
 
