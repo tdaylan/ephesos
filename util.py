@@ -67,7 +67,13 @@ def read_qlop(path, pathcsvv=None, stdvcons=None):
 def retr_indxtimetran(time, epoc, peri, duramask, booloutt=False):
     
     listindxtimetran = []
-    for n in range(-20000, 20000):
+    intgminm = np.floor((np.amin(time) - epoc - duramask / 2.) / peri)
+    intgmaxm = np.ceil((np.amax(time) - epoc - duramask / 2.) / peri)
+    print('intgmaxm')
+    print(intgmaxm)
+    print('intgminm')
+    print(intgminm)
+    for n in np.arange(intgminm, intgmaxm + 1):
         timeinit = epoc + n * peri - duramask / 2.
         timefinl = epoc + n * peri + duramask / 2.
         indxtimetran = np.where((time > timeinit) & (time < timefinl))[0]
@@ -83,7 +89,7 @@ def retr_indxtimetran(time, epoc, peri, duramask, booloutt=False):
     return indxtimeretr
     
 
-def retr_timeedge(time):
+def retr_timeedge(time, durabrek=0.5):
 
     difftime = time[1:] - time[:-1]
     indxtimebrek = np.where(difftime > 0.5)[0]
@@ -96,12 +102,17 @@ def retr_timeedge(time):
     return timeedge
 
 
-def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=1, timedetr=None):
+def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=1, detrtype='medi', durakerndetrmedi=1., weigsplndetr=1.):
     
     if verbtype > 0:
         print('Detrending the light curve...')
-    
-    timeedge = retr_timeedge(time)
+   
+    # determine the times at which the light curve will be broken into pieces
+    if detrtype == 'medi':
+        durabrek = durakerndetrmedi * 0.5
+    else:
+        durabrek = 0.5
+    timeedge = retr_timeedge(time, durabrek=durabrek)
 
     numbedge = len(timeedge)
     numbregi = numbedge - 1
@@ -128,14 +139,28 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
         else:
             indxtimeregioutt[i] = np.arange(timeregi.size)
         
-        # fit the spline
-        if lcurregi[indxtimeregioutt[i]].size > 0:
-            objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]])
-            #objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], s=indxtimeregioutt[i].size/100)
-            lcurdetrregi[i] = lcurregi - objtspln(timeregi) + 1.
-            listobjtspln[i] = objtspln
+        if detrtype == 'medi':
+            listobjtspln = None
+            lcurdetrregi[i] = scipy.ndimage.median_filter(cntptile[:, :, t], size=sizefilt)
         else:
-            lcurdetrregi[i] = lcurregi
+            # fit the spline
+            if lcurregi[indxtimeregioutt[i]].size > 0:
+                if timeregi[indxtimeregioutt[i]].size < 4:
+                    print('Warning! Only %d points available for spine!' % timeregi[indxtimeregioutt[i]].size)
+                else:
+                    k = 3
+                if timeregi[indxtimeregioutt[i]].size == 3:
+                    k = 2
+                elif timeregi[indxtimeregioutt[i]].size == 2:
+                    k = 1
+                elif timeregi[indxtimeregioutt[i]].size < 2:
+                    raise Exception('')
+                
+                objtspln = scipy.interpolate.UnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], k=k, s=indxtimeregioutt[i].size*weigsplndetr)
+                lcurdetrregi[i] = lcurregi - objtspln(timeregi) + 1.
+                listobjtspln[i] = objtspln
+            else:
+                lcurdetrregi[i] = lcurregi
     
     return lcurdetrregi, indxtimeregi, indxtimeregioutt, listobjtspln
 
@@ -926,6 +951,13 @@ def retr_datatess(boolflbn=True, boolplot=True):
     indxdatabadd = listtemp[0]
 
     return listdata
+
+
+def retr_massfromradi(radiplan):
+    
+    massplan = 2.1 * (radiplan * 11.2)**1.5
+    
+    return massplan
 
 
 def retr_esmm(tmptplanequb, tmptstar, radiplan, radistar, kmag):
