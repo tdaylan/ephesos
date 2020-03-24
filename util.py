@@ -66,13 +66,11 @@ def read_qlop(path, pathcsvv=None, stdvcons=None):
 
 def retr_indxtimetran(time, epoc, peri, duramask, booloutt=False):
     
+    if not np.isfinite(time).all():
+        raise Exception('')
     listindxtimetran = []
     intgminm = np.floor((np.amin(time) - epoc - duramask / 2.) / peri)
     intgmaxm = np.ceil((np.amax(time) - epoc - duramask / 2.) / peri)
-    print('intgmaxm')
-    print(intgmaxm)
-    print('intgminm')
-    print(intgminm)
     for n in np.arange(intgminm, intgmaxm + 1):
         timeinit = epoc + n * peri - duramask / 2.
         timefinl = epoc + n * peri + duramask / 2.
@@ -106,6 +104,11 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
     
     if verbtype > 0:
         print('Detrending the light curve...')
+        
+        if epocmask is not None:
+            print('Using a specific ephemeris to mask out transits...')
+        else:
+            print('Not using a specific ephemeris to mask out transits...')
    
     # determine the times at which the light curve will be broken into pieces
     if detrtype == 'medi':
@@ -141,7 +144,12 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
         
         if detrtype == 'medi':
             listobjtspln = None
-            lcurdetrregi[i] = scipy.ndimage.median_filter(cntptile[:, :, t], size=sizefilt)
+            print('lcurregi')
+            summgene(lcurregi)
+            print('durakerndetrmedi')
+            print(durakerndetrmedi)
+            size = int(durakerndetrmedi / np.amin(timeregi[1:] - timeregi[:-1]))
+            lcurdetrregi[i] = scipy.ndimage.median_filter(lcurregi, size=size)
         else:
             # fit the spline
             if lcurregi[indxtimeregioutt[i]].size > 0:
@@ -205,6 +213,8 @@ def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=No
             for extn in os.listdir(pathlcurspoc):
                 pathlcurinte = pathlcurspoc + extn + '/'
                 listpathlcurinte.append(pathlcurinte)
+                print('pathlcurinte')
+                print(pathlcurinte)
                 pathlcur = pathlcurinte + fnmatch.filter(os.listdir(pathlcurinte), '*_lc.fits')[0]
                 listpathlcur.append(pathlcur)
 
@@ -955,7 +965,7 @@ def retr_datatess(boolflbn=True, boolplot=True):
 
 def retr_massfromradi(radiplan):
     
-    massplan = 2.1 * (radiplan * 11.2)**1.5
+    massplan = 2.1 * (radiplan * 11.2)**1.5 / 317.907
     
     return massplan
 
@@ -963,19 +973,6 @@ def retr_massfromradi(radiplan):
 def retr_esmm(tmptplanequb, tmptstar, radiplan, radistar, kmag):
     
     tmptplandayy = 1.1 * tmptplanequb
-
-    print('tmptplandayy')
-    summgene(tmptplandayy)
-    print(tmptplandayy)
-    print(np.where(np.isfinite(tmptplandayy))[0].size)
-    print('tmptstar')
-    print(tmptstar)
-    print('radiplan')
-    print(radiplan)
-    print('tdpy.util.retr_specbbod(tmptplandayy, 7.5)')
-    print(tdpy.util.retr_specbbod(tmptplandayy, 7.5))
-    print(np.where(np.isfinite(tdpy.util.retr_specbbod(tmptplandayy, 7.5)))[0].size)
-    
     esmm = 4.29e6 * tdpy.util.retr_specbbod(tmptplandayy, 7.5) / tdpy.util.retr_specbbod(tmptstar, 7.5) * (radiplan / radistar)*2 * 10**(-kmag / 5.)
 
     return esmm
