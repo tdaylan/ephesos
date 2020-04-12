@@ -12,6 +12,8 @@ from astropy.io import fits
 
 import multiprocessing
 
+import transitleastsquares
+
 import scipy as sp
 import scipy.interpolate
 
@@ -173,14 +175,184 @@ def detr_lcur(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
     return lcurdetrregi, indxtimeregi, indxtimeregioutt, listobjtspln
 
 
-def retr_rvsa(peri, massplan, massstar, incl, ecce):
+# semi-amplitude of radial velocity of a two-body
+# masstar in M_S
+# massplan in M_J
+# peri in days
+# incl in degrees
+def retr_radv(time, epoc, peri, massplan, massstar, incl, ecce, arguperi):
     
-    rvsa = 203. * peri**(-1. / 3.) * massplan * np.sin(incl / 180. * np.pi) / (massstar + 9.548e-4 * massplan)**(2. / 3.) / np.sqrt(1. - ecce**2) # [m/s]
+    phas = (time - epoc) / peri
+    phas = phas % 1.
+    #consgrav = 2.35e-49
+    #cons = 1.898e27
+    #masstotl = massplan + massstar
+    #smax = 
+    #ampl = np.sqrt(consgrav / masstotl / smax / (1. - ecce**2))
+    #radv = cons * ampl * mass * np.sin(np.pi * incl / 180.) * (np.cos(np.pi * arguperi / 180. + 2. * np.pi * phas) + ecce * np.cos(np.pi * arguperi / 180.))
 
-    return rvsa
+    ampl = 203. * peri**(-1. / 3.) * massplan * np.sin(incl / 180. * np.pi) / \
+                                                    (massstar + 9.548e-4 * massplan)**(2. / 3.) / np.sqrt(1. - ecce**2) # [m/s]
+    radv = ampl * (np.cos(np.pi * arguperi / 180. + 2. * np.pi * phas) + ecce * np.cos(np.pi * arguperi / 180.))
+
+    return radv
 
 
-def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=None, ticitarg=None, maxmnumbstartcat=None):
+def exec_tlss(arry, pathimag, numbplan=None, maxmnumbplantlss=None, \
+                                    ticitarg=None, strgplotextn='pdf', figrsize=(4., 3.), figrsizeydobskin=(8, 2.5)):
+    
+    # setup TLS
+    # temp
+    #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
+    
+    liststrgvarb = ['peri', 'epoc', 'dept', 'dura']
+
+    j = 0
+    dicttlss = {}
+    for strgvarb in liststrgvarb:
+        dicttlss[strgvarb] = []
+    while True:
+        
+        # mask
+        if j == 0:
+            timetlssmeta = arry[:, 0]
+            lcurtlssmeta = arry[:, 1]
+        else:
+            # mask out the detected transit
+            listtimetrantemp = results.transit_times
+            indxtimetran = []
+            for timetrantemp in listtimetrantemp:
+                indxtimetran.append(np.where(abs(timetlssmeta - timetrantemp) < results.duration / 2.)[0])
+            indxtimetran = np.concatenate(indxtimetran)
+            if indxtimetran.size != np.unique(indxtimetran).size:
+                raise Exception('')
+            indxtimegood = np.setdiff1d(np.arange(timetlssmeta.size), indxtimetran)
+            timetlssmeta = timetlssmeta[indxtimegood]
+            lcurtlssmeta = lcurtlssmeta[indxtimegood]
+        
+        # transit search
+        print('timetlssmeta')
+        summgene(timetlssmeta)
+        print('lcurtlssmeta')
+        summgene(lcurtlssmeta)
+
+        objtmodltlss = transitleastsquares.transitleastsquares(timetlssmeta, lcurtlssmeta)
+        #results = objtmodltlss.power(u=ab, use_threads=1)
+        results = objtmodltlss.power(period_min=9.8, period_max=10., transit_depth_min=1)
+        
+        print('results.period')
+        print(results.period)
+        print('results.T0')
+        print(results.T0)
+        print('results.duration')
+        print(results.duration)
+        print('results.depth')
+        print(results.depth)
+        print('np.amax(results.power)')
+        print(np.amax(results.power))
+        print('results.SDE')
+        print(results.SDE)
+        print('FAP: %g' % results.FAP) 
+        
+        # plot TLS power spectrum
+        figr, axis = plt.subplots(figsize=figrsize)
+        axis.axvline(results.period, alpha=0.4, lw=3)
+        axis.set_xlim(np.min(results.periods), np.max(results.periods))
+        for n in range(2, 10):
+            axis.axvline(n*results.period, alpha=0.4, lw=1, linestyle='dashed')
+            axis.axvline(results.period / n, alpha=0.4, lw=1, linestyle='dashed')
+        axis.set_ylabel(r'SDE')
+        axis.set_xlabel('Period (days)')
+        axis.plot(results.periods, results.power, color='black', lw=0.5)
+        axis.set_xlim(0, max(results.periods));
+        plt.subplots_adjust()
+        path = pathimag + 'sdeetls%d.%s' % (j, strgplotextn)
+        print('Writing to %s...' % path)
+        plt.savefig(path)
+        plt.close()
+        
+        # plot light curve + TLS model
+        figr, axis = plt.subplots(figsize=figrsizeydobskin)
+        axis.scatter(timetlssmeta, lcurtlssmeta, alpha=0.5, s = 0.8, zorder=0)
+        axis.plot(results.model_lightcurve_time, results.model_lightcurve_model, alpha=0.5, color='red', zorder=1)
+        axis.set_xlabel('Time (days)')
+        axis.set_ylabel('Relative flux');
+        plt.subplots_adjust()
+        path = pathimag + 'lcurtls%d.%s' % (j, strgplotextn)
+        print('Writing to %s...' % path)
+        plt.savefig(path)
+        plt.close()
+
+        # plot phase curve + TLS model
+        figr, axis = plt.subplots(figsize=figrsizeydobskin)
+        axis.plot(results.model_folded_phase, results.model_folded_model, color='red')
+        axis.scatter(results.folded_phase, results.folded_y, s=0.8, alpha=0.5, zorder=2)
+        axis.set_xlabel('Phase')
+        axis.set_ylabel('Relative flux');
+        plt.subplots_adjust()
+        path = pathimag + 'pcurtls%d.%s' % (j, strgplotextn)
+        print('Writing to %s...' % path)
+        plt.savefig(path)
+        plt.close()
+        
+        if numbplan is None:
+            if results.SDE > 7.1 and not (maxmnumbplantlss is not None and j >= maxmnumbplantlss):
+                dicttlss['peri'].append(results.period)
+                dicttlss['epoc'].append(results.T0)
+                dicttlss['dura'].append(results.duration)
+                dicttlss['dept'].append(results.depth)
+            else:
+                break
+        else:
+            if j == numbplan:
+                break
+        j += 1
+    
+    for strgvarb in liststrgvarb:
+        dicttlss[strgvarb] = np.array(dicttlss[strgvarb])
+    
+    return dicttlss
+
+
+def retr_reflfromdmag(dmag, stdvdmag=None):
+    
+    relf = 10**(-dmag / 2.5)
+
+    if stdvdmag is not None:
+        stdvrefl = np.log(10.) / 2.5 * relf * stdvdmag
+    
+    return relf, stdvrefl
+
+
+def retr_radvsema(peri, massplan, massstar, incl, ecce):
+    
+    radvsema = 203. * peri**(-1. / 3.) * massplan * np.sin(incl / 180. * np.pi) / \
+                                                    (massstar + 9.548e-4 * massplan)**(2. / 3.) / np.sqrt(1. - ecce**2) # [m/s]
+
+    return radvsema
+
+
+def writ_brgtcatl():
+    
+    catalog_data = astroquery.mast.Catalogs.query_criteria(catalog="TIC", radius=1e12, Tmag=[-15,6])
+    rasc = np.array(catalog_data[:]['ra'])
+    decl = np.array(catalog_data[:]['dec'])
+    kici = np.array(catalog_data[:]['KIC'])
+    tmag = np.array(catalog_data[:]['Tmag'])
+    indx = np.where(kici != -999)[0]
+    rasc = rasc[indx]
+    decl = decl[indx]
+    kici = kici[indx]
+    tmag = tmag[indx]
+    path = 'kic.txt'
+    numbtarg = rasc.size
+    data = np.empty((numbtarg, 2))
+    data[:, 0] = kici
+    data[:, 1] = tmag
+    np.savetxt(path, data, fmt=['%20d', '%20g'])
+
+
+def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=None, ticitarg=None, maxmnumbstartcat=None, boolmaskqual=True):
     
     # download data
     if datatype != 'tcat':
@@ -211,6 +383,8 @@ def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=No
         if datatype == 'sapp' or datatype == 'pdcc':
             listpathlcurinte = []
             for extn in os.listdir(pathlcurspoc):
+                if not extn.endswith('-s'):
+                    continue
                 pathlcurinte = pathlcurspoc + extn + '/'
                 listpathlcurinte.append(pathlcurinte)
                 print('pathlcurinte')
@@ -249,9 +423,9 @@ def retr_data(datatype, strgmast, pathdata, boolsapp, labltarg=None, strgtarg=No
                 arrylcur = read_qlop(pathlcur, typeinst='tess', boolmask=True)
             else:
                 listarrylcursapp[o], indxtimequalgood, indxtimenanngood, listisec[o], listicam[o], listiccd[o] = \
-                                                                        read_tesskplr_file(pathlcur, typeinst='tess', strgtype='SAP_FLUX')
+                                                       read_tesskplr_file(pathlcur, typeinst='tess', strgtype='SAP_FLUX', boolmaskqual=boolmaskqual)
                 listarrylcurpdcc[o], indxtimequalgood, indxtimenanngood, listisec[o], listicam[o], listiccd[o] = \
-                                                                        read_tesskplr_file(pathlcur, typeinst='tess', strgtype='PDCSAP_FLUX')
+                                                       read_tesskplr_file(pathlcur, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqual=boolmaskqual)
                 
                 if datatype == 'sapp':
                     arrylcur = listarrylcursapp[o]
@@ -366,7 +540,7 @@ def rebn_lcur(arry, numbbins):
     return arryrebn
 
     
-def read_tesskplr_fold(pathfold, pathwrit, typeinst='tess', strgtype='PDCSAP_FLUX'):
+def read_tesskplr_fold(pathfold, pathwrit, boolmaskqual=True, typeinst='tess', strgtype='PDCSAP_FLUX'):
     
     '''
     Reads all TESS or Kepler light curves in a folder and returns a data cube with time, flux and flux error
@@ -375,7 +549,7 @@ def read_tesskplr_fold(pathfold, pathwrit, typeinst='tess', strgtype='PDCSAP_FLU
     listpath = fnmatch.filter(os.listdir(pathfold), '%s*' % typeinst)
     listarry = []
     for path in listpath:
-        arry = read_tesskplr_file(pathfold + path + '/' + path + '_lc.fits', typeinst=typeinst, strgtype=strgtype)
+        arry = read_tesskplr_file(pathfold + path + '/' + path + '_lc.fits', typeinst=typeinst, strgtype=strgtype, boolmaskqual=boolmaskqual)
         listarry.append(arry)
     
     # merge sectors
@@ -965,7 +1139,9 @@ def retr_datatess(boolflbn=True, boolplot=True):
 
 def retr_massfromradi(radiplan):
     
-    massplan = 2.1 * (radiplan * 11.2)**1.5 / 317.907
+    # (Wolgang+2016 Table 1)
+    massplan = 2.7 * (radiplan * 11.2)**1.3 / 317.907
+    #massplan = 2.7 * (radiplan * 11.2)**1.3 / 317.907
     
     return massplan
 
