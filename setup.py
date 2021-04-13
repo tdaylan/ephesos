@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 setup(
     name = 'ephesus',
     packages = find_packages(),
-    version = '1.0',
+    version = '1.13',
     description = 'Library of useful routines in exoplanet science',
     author = 'Tansu Daylan',
     author_email = 'tansu.daylan@gmail.com',

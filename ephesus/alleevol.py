@@ -1,5 +1,4 @@
 import os
-import tesstarg.util
 import allesfitter
 pathalle = os.getcwd() + '/'
 
