@@ -218,6 +218,10 @@ def find_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=
     corr, listindxtimeposimaxm, timefull, lcurfull = corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, thrs=thrs, boolanim=boolanim, boolplot=boolplot, \
                                                                                             verbtype=verbtype, strgextn=strgextn, pathimag=pathimag)
 
+    #corr, listindxtimeposimaxm, timefull, rflxfull = ephesus.corr_tmpt(gdat.timethis, gdat.rflxthis, gdat.listtimetmpt, gdat.listdflxtmpt, \
+    #                                                                    thrs=gdat.thrstmpt, boolanim=gdat.boolanimtmpt, boolplot=gdat.boolplottmpt, \
+     #                                                               verbtype=gdat.verbtype, strgextn=gdat.strgextnthis, pathimag=gdat.pathtargimag)
+                
     return corr, listindxtimeposimaxm, meantimetmpt, timefull, lcurfull
 
 
@@ -1397,7 +1401,7 @@ def plot_lspe(pathimag, arrylcur, strgextn=''):
     lcur = arrylcur[:, 1]
     maxmperi = (np.amax(time) - np.amin(time)) / 4.
     minmperi = np.amin(time[1:] - time[:-1]) * 4.
-    peri = np.linspace(minmperi, maxmperi, 500)
+    peri = np.linspace(minmperi, maxmperi, 10000)
     freq = 1. / peri
     
     powr = LombScargle(time, lcur, nterms=2).power(freq)
@@ -1712,8 +1716,8 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     rflxtranmodl = np.ones_like(time)
     
     if booltrap:
-        durafull = retr_durafull(peri, rs2a, sini, rrat, imfa)
-        duratotl = retr_duratotl(peri, rs2a, sini, rrat, imfa)
+        durafull = retr_duratranfull(peri, rs2a, sini, rrat, imfa)
+        duratotl = retr_duratrantotl(peri, rs2a, sini, rrat, imfa)
         duraineg = (duratotl - durafull) / 2.
         durafullhalf = durafull / 2.
     else:
@@ -2135,64 +2139,6 @@ def retr_dictexar(strgexar=None):
     return dictexar
 
 
-def retr_dictcatltic8(pathdata, tsec):
-    
-    print('Retrieving a dictionary of TIC8...')
-    
-    listname = ['rasc', 'decl', 'tmag', 'radistar', 'massstar']
-    
-    path = pathdata + 'listtici_sc%02d.csv' % tsec
-    if not os.path.exists(path):
-        url = 'https://tess.mit.edu/wp-content/uploads/all_targets_S%03d_v1.csv' % tsec
-        c = pd.read_csv(url, header=5)
-        listtici = c['TICID'].values
-        print('Writing to %s...' % path)
-        np.savetxt(path, listtici)
-    else:
-        listtici = np.loadtxt(path)
-
-    listtici = listtici.astype(str)
-    
-    numbtarg = listtici.size
-    print('%d observed 2-min targets...' % numbtarg)
-    
-    path = pathdata + 'listticidata_sc%02d.csv' % tsec
-    if not os.path.exists(path):
-        request = {'service':'Mast.Catalogs.Filtered.Tic', 'format':'json', 'params':{'columns':'rad, mass', \
-                                                                        'filters':[{'paramName':'ID', 'values':list(listtici)}]}}
-        headers, outString = mastQuery(request)
-        listdictquer = json.loads(outString)['data']
-        print('%d matches...' % len(listdictquer))
-        dictcatl = dict()
-        for name in listname:
-            dictcatl[name] = []
-        for k in range(len(listdictquer)):
-            radistar = listdictquer[k]['rad']
-            massstar = listdictquer[k]['mass']
-            if radistar is None or massstar is None:
-                continue
-            if not np.isfinite(radistar) or not np.isfinite(massstar):
-                raise Exception('')
-
-            dictcatl['radistar'].append(radistar)
-            dictcatl['massstar'].append(massstar)
-            dictcatl['rasc'].append(listdictquer[k]['ra'])
-            dictcatl['decl'].append(listdictquer[k]['dec'])
-            dictcatl['tmag'].append(listdictquer[k]['Tmag'])
-        for name in listname:
-            dictcatl[name] = np.array(dictcatl[name])
-        numbfini = dictcatl['massstar'].size
-        print('%d targets with non-NAN radii...' % numbfini)
-        
-        print('Writing to %s...' % path)
-        pd.DataFrame.from_dict(dictcatl).to_csv(path)
-    else:
-        print('Reading from %s...' % path)
-        dictcatl = pd.read_csv(path).to_dict(orient='list')
-   
-    return dictcatl
-
-
 def expl_popl(typepopl='exoptran'):
     
     '''
@@ -2225,7 +2171,11 @@ def expl_popl(typepopl='exoptran'):
                 continue
             dictlistcatl[name].append(dictcatl[name])
     numbtsectarg = np.empty(numbtsec)
+    
     dictpopl = dict()
+    if typepopl == 'exoptran':
+        dictpopl = retr_dictexar()
+    
     for name in listname:
         if name.startswith('Unnamed'):
             continue
@@ -2259,15 +2209,15 @@ def expl_popl(typepopl='exoptran'):
     dictpopl['masstotl'] = dictpopl['masscomp'] + dictpopl['massstar']
     dictpopl['smax'] = retr_smaxkepl(dictpopl['peri'], dictpopl['masstotl'])
     dictpopl['rsma'] = dictpopl['radistar'] / dictpopl['smax'] / factaurs
+    dictpopl['duratran'] = 24. * retr_dura(dictpopl['peri'], dictpopl['rsma'], dictpopl['cosi'])
     if typepopl == 'slen':
-        dictpopl['duraslen'] = 24. * retr_dura(dictpopl['peri'], dictpopl['rsma'], dictpopl['cosi'])
         dictpopl['amplslen'] = retr_amplslen(dictpopl['peri'], dictpopl['radistar'], dictpopl['masscomp'], dictpopl['massstar'])
         dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['amplslen'] / dictpopl['nois']
     if typepopl == 'exoptran':
         dictpopl = retr_dictexar()
         
         dictpopl['dept'] = dictpopl['rrat']**2
-        dictpopl['s2no'] = np.sqrt(dictpopl['duraslen']) * dictpopl['amplslen'] / dictpopl['nois']
+        dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['dept'] / dictpopl['nois']
     
     listnametotl = list(dictpopl.keys())
     numbnametotl = len(listnametotl)
@@ -2277,7 +2227,7 @@ def expl_popl(typepopl='exoptran'):
     for name in listnametotl:
         dictpopl[name] = dictpopl[name][indx]
 
-    indx = np.where(np.isfinite(dictpopl['duraslen']))[0]
+    indx = np.where(np.isfinite(dictpopl['duratran']))[0]
     for name in listnametotl:
         dictpopl[name] = dictpopl[name][indx]
     
@@ -2296,7 +2246,7 @@ def expl_popl(typepopl='exoptran'):
     for k in indxnametotl:
        listsamp[:, k] = dictpopl[listnametotl[k]]
     
-#['rasc', 'decl', 'tmag', 'radistar', 'massstar', 'nois', 'incl', 'cosi', 'peri', 'masscomp', 'masstotl', 'smax', 'rsma', 'duraslen', 'amplslen', 'booldete']
+#['rasc', 'decl', 'tmag', 'radistar', 'massstar', 'nois', 'incl', 'cosi', 'peri', 'masscomp', 'masstotl', 'smax', 'rsma', 'duratran', 'amplslen', 'booldete']
 
     listlablpara = [['RA', 'deg'], ['DEC', ''], ['Tmag', ''], ['$R_s$', '$R_{\odot}$'], ['$M_s$', '$M_{\odot}$'], [r'$\sigma$', ''], \
                                                                     ['$i$', 'deg'], ['$\cos i$', ''], ['$P$', 'days'], ['$M_c$', '$M_{\odot}$'], \
@@ -2335,13 +2285,6 @@ def retr_rs2a(rsma, rrat):
     return rs2a
 
 
-def retr_dura(peri, rsma, cosi):
-    
-    dura = peri / np.pi * np.arcsin(np.sqrt(rsma**2 - cosi**2))
-    
-    return dura
-
-
 def retr_rsma(peri, dura, cosi):
     
     rsma = np.sqrt(np.sin(dura * np.pi / peri)**2 + cosi**2)
@@ -2349,14 +2292,14 @@ def retr_rsma(peri, dura, cosi):
     return rsma
 
 
-def retr_durafull(peri, rs2a, sini, rrat, imfa):
+def retr_duratranfull(peri, rs2a, sini, rrat, imfa):
     
     durafull = peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. - rrat)**2 - imfa**2))
 
     return durafull 
 
 
-def retr_duratotl(peri, rs2a, sini, rrat, imfa):
+def retr_duratrantotl(peri, rs2a, sini, rrat, imfa):
     
     duratotl = peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. + rrat)**2 - imfa**2))
     
@@ -2390,19 +2333,54 @@ def retr_amplelli(peri, densstar, massstar, masscomp):
 
 def retr_amplslen(peri, radistar, masscomp, massstar):
     
-    '''Calculates the self-lensing amplitude'''
+    """
+    Calculate the self-lensing amplitude.
+
+    Arguments
+        peri: orbital period [days]
+        radistar: radius of the star [Solar radius]
+        masscomp: mass of the companion [Solar mass]
+        massstar: mass of the star [Solar mass]
+
+    Returns
+        amplslen: the fractional amplitude of the self-lensing
+    """
     
     amplslen = 7.15e-5 * radistar**(-2.) * peri**(2. / 3.) * masscomp * (masscomp + massstar)**(1. / 3.)
 
     return amplslen
 
 
-def retr_duraslen(peri, radistar, masscomp, massstar, incl):
+def retr_smaxkepl(peri, masstotl):
     
-    print('temp')
-    duraslen = 2 * 1.8 * np.pi / 4. * peri**(1. / 3.) * (masscomp + massstar)**(-1. / 3.) * radistar / 24.
+    """
+    Get the semi-major axis of a Keplerian orbit (in AU) from the orbital period (in days) and total mass (in Solar masses).
 
-    return duraslen
+    Arguments
+        peri: orbital period [days]
+        masstotl: total mass of the system [Solar Masses]
+    Returns
+        smax: the semi-major axis of a Keplerian orbit [AU]
+    """
+    
+    smax = (7.496e-6 * masstotl * peri**2)**(1. / 3.) # [AU]
+    
+    return smax
+
+
+def retr_duratran(peri, rsma, cosi):
+    """
+    Return the transit duration in the unit of the input orbital period (peri).
+
+    Arguments
+        peri: orbital period
+        rsma: the sum of radii of the two bodies divided by the semi-major axis
+        cosi: cosine of the inclination
+    """    
+    
+    dura = peri / np.pi * np.arcsin(np.sqrt(rsma**2 - cosi**2))
+    
+    return dura
 
 
 # massplan in M_E
@@ -2460,15 +2438,6 @@ def retr_alphelli(u, g):
     alphelli = 0.15 * (15 + u) * (1 + g) / (3 - u)
     
     return alphelli
-
-
-def retr_smaxkepl(peri, masstotl):
-    
-    '''Calculate semi-major axis of a Keplerian orbit from the orbital period and total mass'''
-    
-    smax = (7.496e-6 * masstotl * peri**2)**(1. / 3.) # [AU]
-    
-    return smax
 
 
 def plot_anim():
