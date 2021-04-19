@@ -1,3 +1,6 @@
+import sys
+import os
+
 import numpy as np
 
 from tqdm import tqdm
@@ -5,11 +8,10 @@ from tqdm import tqdm
 import time as timemodu
 
 #from numba import jit, prange
-import sys, os, h5py, fnmatch
-import pickle
+import h5py
+import fnmatch
 
-import emcee
-
+import astropy
 import astropy as ap
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
@@ -19,51 +21,20 @@ import pandas as pd
 
 import multiprocessing
 
-import astropy
-
 import scipy as sp
 import scipy.interpolate
-
-# own modules
-import tdpy.util
-from tdpy.util import summgene
-
-import lygos.main
 
 import astroquery
 import astroquery.mast
 
 import matplotlib.pyplot as plt
 
-
-def retr_lcurflar(meantime, indxtime, listtimeflar, listamplflar, listscalrise, listscalfall):
-    
-    if meantime.size == 0:
-        raise Exception('')
-    
-    lcur = np.zeros_like(meantime)
-    numbflar = len(listtimeflar)
-    for k in np.arange(numbflar):
-        lcur += retr_lcurflarsing(meantime, listtimeflar[k], listamplflar[k], listscalrise[k], listscalfall[k])
-
-    return lcur
-
-
-def retr_lcurflarsing(meantime, timeflar, amplflar, scalrise, scalfall):
-    
-    numbtime = meantime.size
-    if numbtime == 0:
-        raise Exception('')
-    indxtime = np.arange(numbtime)
-    indxtimerise = np.where(meantime < timeflar)[0]
-    indxtimefall = np.setdiff1d(indxtime, indxtimerise)
-    lcur = np.empty_like(meantime)
-    lcur[indxtimerise] = np.exp((meantime[indxtimerise] - timeflar) / scalrise)
-    lcur[indxtimefall] = np.exp(-(meantime[indxtimefall] - timeflar) / scalfall)
-    lcur *= amplflar / np.amax(lcur) 
-    
-    return lcur
-
+# own modules
+import tdpy
+from tdpy.util import summgene
+import lygos
+import miletos
+import hattusa
 
 def anim_tmptdete(timefull, lcurfull, meantimetmpt, lcurtmpt, pathimag, listindxtimeposimaxm, corrprod, corr, strgextn='', colr=None):
     
@@ -183,7 +154,7 @@ def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, corr, indxtime=None, c
     axis.set_ylabel('Relative flux')
     
 
-def find_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=None, maxmscalfalltmpt=None, \
+def srch_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=None, maxmscalfalltmpt=None, \
                                                                     pathimag=None, boolplot=True, boolanim=False, thrs=None):
 
     minmtime = np.amin(time)
@@ -211,7 +182,7 @@ def find_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=
     for k in indxscalfall:
         numbtimekern = 3 * int(listscalfalltmpt[k] / difftime)
         meantimetmpt[k] = np.arange(numbtimekern) * difftime
-        listlcurtmpt[k] = retr_lcurflarsing(meantimetmpt[k], timeflartmpt, amplflartmpt, scalrisetmpt, listscalfalltmpt[k])
+        listlcurtmpt[k] = hattusa.retr_lcurflarsing(meantimetmpt[k], timeflartmpt, amplflartmpt, scalrisetmpt, listscalfalltmpt[k])
         if not np.isfinite(listlcurtmpt[k]).all():
             raise Exception('')
         
@@ -230,7 +201,7 @@ def corr_arryprod(lcurtemp, lcurtmpt, numbkern):
     
     # correlate
     corrprod = [[] for k in range(numbkern)]
-    for k in prange(numbkern):
+    for k in range(numbkern):
         corrprod[k] = lcurtmpt[k] * lcurtemp[k]
     
     return corrprod
@@ -238,11 +209,12 @@ def corr_arryprod(lcurtemp, lcurtmpt, numbkern):
 
 #@jit(parallel=True)
 def corr_copy(indxtimefullruns, lcurstan, indxtimekern, numbkern):
-    
+    """
+    Make a matrix with rows as the shifted and windowed copies of the time series.
+    """
     print('corr_copy()')
-    # make windowed and shifted copies of the light curve
     listlcurtemp = [[] for k in range(numbkern)]
-    for k in prange(numbkern):
+    for k in range(numbkern):
         numbtimefullruns = indxtimefullruns[k].size
         numbtimekern = indxtimekern[k].size
         listlcurtemp[k] = np.empty((numbtimefullruns, numbtimekern))
@@ -253,7 +225,7 @@ def corr_copy(indxtimefullruns, lcurstan, indxtimekern, numbkern):
         print('numbtimekern')
         print(numbtimekern)
 
-        for t in prange(numbtimefullruns):
+        for t in range(numbtimefullruns):
             listlcurtemp[k][t, :] = lcurstan[indxtimefullruns[k][t]+indxtimekern[k]]
         print('listlcurtemp[k]')
         summgene(listlcurtemp[k])
@@ -265,6 +237,10 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
     
     if verbtype > 1:
         timeinit = timemodu.time()
+    
+    print('corr_tmpt()')
+    print('time')
+    summgene(time)
     
     if lcur.ndim > 1:
         raise Exception('')
@@ -278,7 +254,7 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
 
     numbtime = lcur.size
     
-    # construct the full grid
+    # construct the "full" grid, i.e., regularly sampled even during the data gaps
     minmtime = np.amin(time)
     maxmtime = np.amax(time)
     timefull = np.linspace(minmtime, maxmtime, int(round((maxmtime - minmtime) / np.amin(time[1:] - time[:-1]))))
@@ -294,7 +270,10 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
     numbkern = len(listlcurtmpt)
     indxkern = np.arange(numbkern)
     numbtimekern = np.empty(numbkern, dtype=int)
+    
+    ## size of the full grid minus the kernel size
     numbtimefullruns = np.empty(numbkern, dtype=int)
+    
     corr = [[] for k in indxkern]
     corrprod = [[] for k in indxkern]
     indxtimekern = [[] for k in indxkern]
@@ -306,6 +285,12 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
         listlcurtmpt[k] /= np.std(listlcurtmpt[k])
         indxtimekern[k] = np.arange(numbtimekern[k])
         numbtimefullruns[k] = numbtimefull - numbtimekern[k]
+        
+        print('k')
+        print(k)
+        print('numbtimefullruns[k]')
+        print(numbtimefullruns[k])
+
         indxtimefullruns[k] = np.arange(numbtimefullruns[k])
     
     # standardize
@@ -395,8 +380,13 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
             figr, axis = plt.subplots(numbfram, 1, figsize=(8, numbfram*3))
             proc_axiscorr(timefull, lcurfull, axis[0], listindxtimeposimaxm[k], corr[k])
             
-            axis[1].plot(time[indxtimefullruns], corr[k], color='m', ls='', marker='o', ms=1, rasterized=True)
-            axis[1].plot(time[indxtimefullruns[listindxtimeposi]], corr[k][listindxtimeposi], color='r', ls='', marker='o', ms=1, rasterized=True)
+            print('time')
+            summgene(time)
+            print('indxtimefullruns')
+            summgene(indxtimefullruns)
+            print('')
+            axis[1].plot(timefull[indxtimefullruns], corr[k], color='m', ls='', marker='o', ms=1, rasterized=True)
+            axis[1].plot(timefull[indxtimefullruns[listindxtimeposi]], corr[k][listindxtimeposi], color='r', ls='', marker='o', ms=1, rasterized=True)
             axis[1].set_ylabel('C')
             
             axis[2].axvline(thrs, alpha=0.4, color='r', lw=3, ls='-.')
@@ -668,7 +658,19 @@ def retr_noistess(magtinpt):
     return nois
 
 
-def find_tran(arrytser):
+def retr_magttess(gdat, cntp):
+    
+    magt = -2.5 * np.log10(cntp / 1.5e4 / gdat.listcade) + 10
+    #mlikmagttemp = 10**((mlikmagttemp - 20.424) / (-2.5))
+    #stdvmagttemp = mlikmagttemp * stdvmagttemp / 1.09
+    #mliklcurtemp = -2.5 * np.log10(mlikfluxtemp) + 20.424
+    #gdat.magtrefr = -2.5 * np.log10(gdat.refrrflx[o] / 1.5e4 / 30. / 60.) + 10
+    #gdat.stdvmagtrefr = 1.09 * gdat.stdvrefrrflx[o] / gdat.refrrflx[o]
+    
+    return magt
+
+
+def exec_bslq(arrytser):
     
     numbtime = arrytser.shape[0]
     minmtime = np.amin(arrytser[:, 0])
@@ -820,14 +822,14 @@ def find_tran(arrytser):
     rrat = np.sqrt(deptmaxm)
 
     print('find_tran() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
-    dictbxls = dict()
-    dictbxls['sdeemaxm'] = sdeemaxm
-    dictbxls['perimaxm'] = perimaxm
-    dictbxls['epocmaxm'] = epocmaxm
-    dictbxls['duramaxm'] = duramaxm
-    dictbxls['deptmaxm'] = deptmaxm
-    dictbxls['listperi'] = listperi
-    dictbxls['listpowr'] = listpowr
+    dictblsq = dict()
+    dictblsq['sdeemaxm'] = sdeemaxm
+    dictblsq['perimaxm'] = perimaxm
+    dictblsq['epocmaxm'] = epocmaxm
+    dictblsq['duramaxm'] = duramaxm
+    dictblsq['deptmaxm'] = deptmaxm
+    dictblsq['listperi'] = listperi
+    dictblsq['listpowr'] = listpowr
     
     numbtimemodl = 100000
     arrytsermodl = np.empty((numbtimemodl, 3))
@@ -837,23 +839,27 @@ def find_tran(arrytser):
     arrypsermodl = fold_tser(arrytsermodl, epocmaxm, perimaxm, phasshft=phasshft)
     arrypserdata = fold_tser(arrytser, epocmaxm, perimaxm, phasshft=phasshft)
             
-    dictbxls['timedata'] = arrytser[:, 0]
-    dictbxls['rflxtserdata'] = arrytser[:, 1]
-    dictbxls['phasdata'] = arrypserdata[:, 0]
-    dictbxls['rflxpserdata'] = arrypserdata[:, 1]
+    dictblsq['timedata'] = arrytser[:, 0]
+    dictblsq['rflxtserdata'] = arrytser[:, 1]
+    dictblsq['phasdata'] = arrypserdata[:, 0]
+    dictblsq['rflxpserdata'] = arrypserdata[:, 1]
 
-    dictbxls['timemodl'] = arrytsermodl[:, 0]
-    dictbxls['rflxtsermodl'] = arrytsermodl[:, 1]
-    dictbxls['phasmodl'] = arrypsermodl[:, 0]
-    dictbxls['rflxpsermodl'] = arrypsermodl[:, 1]
+    dictblsq['timemodl'] = arrytsermodl[:, 0]
+    dictblsq['rflxtsermodl'] = arrytsermodl[:, 1]
+    dictblsq['phasmodl'] = arrypsermodl[:, 0]
+    dictblsq['rflxpsermodl'] = arrypsermodl[:, 1]
     
-    return dictbxls
+    return dictblsq
 
 
-def exec_blsq(arry, pathimag, numbplan=None, maxmnumbplanblsq=None, strgextn='', thrssdeeblsq=7.1, boolpuls=False, \
+def srch_pbox(arry, pathimag=None, numbplan=None, maxmnumbplanblsq=None, strgextn='', thrssdee=7.1, boolpuls=False, \
                                  ticitarg=None, dicttlsqinpt=None, booltlsq=False, \
                                  strgplotextn='pdf', figrsize=(4., 3.), figrsizeydobskin=(8, 2.5), alphraww=0.2, \
                                  ):
+    """
+    Parameters
+        pathimag: folder in which plots will be generated.
+    """
     
     print('Executing BLS...')
     print('booltlsq')
@@ -872,8 +878,8 @@ def exec_blsq(arry, pathimag, numbplan=None, maxmnumbplanblsq=None, strgextn='',
     # temp
     #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
     
-    liststrgvarb = ['peri', 'epoc', 'dept', 'dura', 'sdeemaxm']
-    #liststrgvarb = ['peri', 'epoc', 'dept', 'dura', 'listpowr', 'listperi', 'sdeemaxm', 'sdeetotl']
+    liststrgvarb = ['peri', 'epoc', 'dept', 'duratran', 'sdeemaxm']
+    #liststrgvarb = ['peri', 'epoc', 'dept', 'duratran', 'listpowr', 'listperi', 'sdeemaxm', 'sdeetotl']
     
     arrysrch = np.copy(arry)
     if boolpuls:
@@ -896,17 +902,17 @@ def exec_blsq(arry, pathimag, numbplan=None, maxmnumbplanblsq=None, strgextn='',
         # mask out the detected transit
         if j == 0:
             arrymeta = np.copy(arrysrch)
-            dictbxls = dict()
+            dictblsq = dict()
         else:
             
             #indxtimetran = []
             #for timetrantemp in listtimetrantemp:
-            #    indxtimetran.append(np.where(abs(timeblsqmeta - timetrantemp) < dictbxls['duramaxm'] / 2.)[0])
+            #    indxtimetran.append(np.where(abs(timeblsqmeta - timetrantemp) < dictblsq['duramaxm'] / 2.)[0])
             #indxtimetran = np.concatenate(indxtimetran)
             #if indxtimetran.size != np.unique(indxtimetran).size:
             #    raise Exception('')
             
-            indxtimetran = retr_indxtimetran(timeblsqmeta, dictbxls['epocmaxm'], dictbxls['perimaxm'], dictbxls['duramaxm'])
+            indxtimetran = retr_indxtimetran(timeblsqmeta, dictblsq['epocmaxm'], dictblsq['perimaxm'], dictblsq['duramaxm'])
 
             indxtimegood = np.setdiff1d(np.arange(timeblsqmeta.size), indxtimetran)
             arrymeta = arrymeta[indxtimegood, :]
@@ -926,81 +932,86 @@ def exec_blsq(arry, pathimag, numbplan=None, maxmnumbplanblsq=None, strgextn='',
             # temp check how to do BLS instead of TLS
             print('objtresu.periods')
             print(objtresu.periods)
-            dictbxls['listperi'] = objtresu.periods
-            dictbxls['listpowr'] = objtresu.power
-            dictbxls['perimaxm'] = objtresu.period
-            dictbxls['epocmaxm'] = objtresu.T0
-            dictbxls['duramaxm'] = objtresu.duration
-            dictbxls['deptmaxm'] = objtresu.depth
-            dictbxls['sdeemaxm'] = objtresu.SDE
-            dictbxls['prfp'] = objtresu.FAP
-            dictbxls['listtimetran'] = objtresu.transit_times
-            dictbxls['timemodl'] = objtresu.model_lightcurve_time
-            dictbxls['phasmodl'] = objtresu.model_folded_phase
-            dictbxls['rflxpsermodl'] = objtresu.model_folded_model
-            dictbxls['rflxtsermodl'] = objtresu.model_lightcurve_model
-            dictbxls['phasdata'] = objtresu.folded_phase
-            dictbxls['rflxpserdata'] = objtresu.folded_y
+            dictblsq['listperi'] = objtresu.periods
+            dictblsq['listpowr'] = objtresu.power
+            dictblsq['perimaxm'] = objtresu.period
+            dictblsq['epocmaxm'] = objtresu.T0
+            dictblsq['duramaxm'] = objtresu.duration
+            dictblsq['deptmaxm'] = objtresu.depth
+            dictblsq['sdeemaxm'] = objtresu.SDE
+            dictblsq['prfp'] = objtresu.FAP
+            dictblsq['listtimetran'] = objtresu.transit_times
+            dictblsq['timemodl'] = objtresu.model_lightcurve_time
+            dictblsq['phasmodl'] = objtresu.model_folded_phase
+            dictblsq['rflxpsermodl'] = objtresu.model_folded_model
+            dictblsq['rflxtsermodl'] = objtresu.model_lightcurve_model
+            dictblsq['phasdata'] = objtresu.folded_phase
+            dictblsq['rflxpserdata'] = objtresu.folded_y
 
         else:
-            dictbxls = find_tran(arrymeta)
+            dictblsq = find_tran(arrymeta)
         
-        # plot TLS power spectrum
-        figr, axis = plt.subplots(figsize=figrsize)
-        axis.axvline(dictbxls['perimaxm'], alpha=0.4, lw=3)
-        axis.set_xlim(np.min(dictbxls['listperi']), np.max(dictbxls['listperi']))
-        for n in range(2, 10):
-            axis.axvline(n * dictbxls['perimaxm'], alpha=0.4, lw=1, linestyle='dashed')
-            axis.axvline(dictbxls['perimaxm'] / n, alpha=0.4, lw=1, linestyle='dashed')
-        axis.set_ylabel(r'SDE')
-        axis.set_xlabel('Period [days]')
-        axis.plot(dictbxls['listperi'], dictbxls['listpowr'], color='black', lw=0.5)
-        axis.set_xlim(0, max(dictbxls['listperi']));
+        if pathimag is not None:
+            strgtitl = 'P=%.3g d, Dep=%.3g ppm, Dur=%.3g d, SDE=%.3g' % \
+                        (dictblsq['perimaxm'], dictblsq['deptmaxm'], dictblsq['duramaxm'], dictblsq['sdeemaxm'])
+            # plot TLS power spectrum
+            figr, axis = plt.subplots(figsize=figrsize)
+            axis.axvline(dictblsq['perimaxm'], alpha=0.4, lw=3)
+            axis.set_xlim(np.min(dictblsq['listperi']), np.max(dictblsq['listperi']))
+            for n in range(2, 10):
+                axis.axvline(n * dictblsq['perimaxm'], alpha=0.4, lw=1, linestyle='dashed')
+                axis.axvline(dictblsq['perimaxm'] / n, alpha=0.4, lw=1, linestyle='dashed')
+            axis.set_ylabel(r'SDE')
+            axis.set_xlabel('Period [days]')
+            axis.plot(dictblsq['listperi'], dictblsq['listpowr'], color='black', lw=0.5)
+            axis.set_xlim(0, max(dictblsq['listperi']));
+            axis.set_title(strgtitl)
+            plt.subplots_adjust(bottom=0.2)
+            path = pathimag + 'sdee_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
+            print('Writing to %s...' % path)
+            plt.savefig(path)
+            plt.close()
+            
+            # plot light curve + TLS model
+            figr, axis = plt.subplots(figsize=figrsizeydobskin)
+            axis.plot(timeblsqmeta, lcurblsqmeta, alpha=alphraww, marker='o', ms=1, ls='', color='grey', rasterized=True)
+            axis.plot(dictblsq['timemodl'], dictblsq['rflxtsermodl'], color='b')
+            axis.set_xlabel('Time [days]')
+            axis.set_ylabel('Relative flux');
+            if j == 0:
+                ylimtserinit = axis.get_ylim()
+            else:
+                axis.set_ylim(ylimtserinit)
+            axis.set_title(strgtitl)
+            plt.subplots_adjust(bottom=0.2)
+            path = pathimag + 'rflx_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
+            print('Writing to %s...' % path)
+            plt.savefig(path)
+            plt.close()
 
-        plt.subplots_adjust(bottom=0.2)
-        path = pathimag + 'sdee_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
-        print('Writing to %s...' % path)
-        plt.savefig(path)
-        plt.close()
+            # plot phase curve + TLS model
+            figr, axis = plt.subplots(figsize=figrsizeydobskin)
+            axis.plot(dictblsq['phasdata'], dictblsq['rflxpserdata'], marker='o', ms=1, ls='', alpha=alphraww, color='grey', rasterized=True)
+            axis.plot(dictblsq['phasmodl'], dictblsq['rflxpsermodl'], color='b')
+            axis.set_xlabel('Phase')
+            axis.set_ylabel('Relative flux');
+            if j == 0:
+                ylimpserinit = axis.get_ylim()
+            else:
+                axis.set_ylim(ylimpserinit)
+            axis.set_title(strgtitl)
+            plt.subplots_adjust(bottom=0.2)
+            path = pathimag + 'pcur_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
+            print('Writing to %s...' % path)
+            plt.savefig(path)
+            plt.close()
         
-        # plot light curve + TLS model
-        figr, axis = plt.subplots(figsize=figrsizeydobskin)
-        axis.plot(timeblsqmeta, lcurblsqmeta, alpha=alphraww, marker='o', ms=1, ls='', color='grey', rasterized=True)
-        axis.plot(dictbxls['timemodl'], dictbxls['rflxtsermodl'], color='b')
-        axis.set_xlabel('Time [days]')
-        axis.set_ylabel('Relative flux');
-        if j == 0:
-            ylimtserinit = axis.get_ylim()
-        else:
-            axis.set_ylim(ylimtserinit)
-        plt.subplots_adjust(bottom=0.2)
-        path = pathimag + 'rflx_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
-        print('Writing to %s...' % path)
-        plt.savefig(path)
-        plt.close()
-
-        # plot phase curve + TLS model
-        figr, axis = plt.subplots(figsize=figrsizeydobskin)
-        axis.plot(dictbxls['phasdata'], dictbxls['rflxpserdata'], marker='o', ms=1, ls='', alpha=alphraww, color='grey', rasterized=True)
-        axis.plot(dictbxls['phasmodl'], dictbxls['rflxpsermodl'], color='b')
-        axis.set_xlabel('Phase')
-        axis.set_ylabel('Relative flux');
-        if j == 0:
-            ylimpserinit = axis.get_ylim()
-        else:
-            axis.set_ylim(ylimpserinit)
-        plt.subplots_adjust(bottom=0.2)
-        path = pathimag + 'pcur_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
-        print('Writing to %s...' % path)
-        plt.savefig(path)
-        plt.close()
-        
-        if dictbxls['sdeemaxm'] > thrssdeeblsq:
-            dictblsq['peri'].append(dictbxls['perimaxm'])
-            dictblsq['epoc'].append(dictbxls['epocmaxm'])
-            dictblsq['dura'].append(dictbxls['duramaxm'])
-            dictblsq['dept'].append(dictbxls['deptmaxm'])
-            dictblsq['sdeemaxm'].append(dictbxls['sdeemaxm'])
+        if dictblsq['sdeemaxm'] > thrssdee:
+            dictblsq['peri'].append(dictblsq['perimaxm'])
+            dictblsq['epoc'].append(dictblsq['epocmaxm'])
+            dictblsq['duratran'].append(dictblsq['duramaxm'])
+            dictblsq['dept'].append(dictblsq['deptmaxm'])
+            dictblsq['sdeemaxm'].append(dictblsq['sdeemaxm'])
         else:
             break
         
@@ -1015,63 +1026,6 @@ def exec_blsq(arry, pathimag, numbplan=None, maxmnumbplanblsq=None, strgextn='',
         print('')
 
     return dictblsq
-
-
-def writ_brgtcatl():
-    
-    catalog_data = astroquery.mast.Catalogs.query_criteria(catalog='TIC', radius=1e12, Tmag=[-15,6])
-    rasc = np.array(catalog_data[:]['ra'])
-    decl = np.array(catalog_data[:]['dec'])
-    kici = np.array(catalog_data[:]['KIC'])
-    tmag = np.array(catalog_data[:]['Tmag'])
-    indx = np.where(kici != -999)[0]
-    rasc = rasc[indx]
-    decl = decl[indx]
-    kici = kici[indx]
-    tmag = tmag[indx]
-    path = 'kic.txt'
-    numbtarg = rasc.size
-    data = np.empty((numbtarg, 2))
-    data[:, 0] = kici
-    data[:, 1] = tmag
-    np.savetxt(path, data, fmt=['%20d', '%20g'])
-
-
-def mastQuery(request):
-
-    from urllib.parse import quote as urlencode
-    import json
-    import http.client as httplib 
-
-    server='mast.stsci.edu'
-
-    # Grab Python Version
-    version = '.'.join(map(str, sys.version_info[:3]))
-
-    # Create Http Header Variables
-    headers = {'Content-type': 'application/x-www-form-urlencoded',
-               'Accept': 'text/plain',
-               'User-agent':'python-requests/'+version}
-
-    # Encoding the request as a json string
-    requestString = json.dumps(request)
-    requestString = urlencode(requestString)
-
-    # opening the https connection
-    conn = httplib.HTTPSConnection(server)
-
-    # Making the query
-    conn.request('POST', '/api/v0/invoke', 'request='+requestString, headers)
-
-    # Getting the response
-    resp = conn.getresponse()
-    head = resp.getheaders()
-    content = resp.read().decode('utf-8')
-
-    # Close the https connection
-    conn.close()
-
-    return head,content
 
 
 def retr_rascdeclfromstrgmast(strgmast):
@@ -1220,7 +1174,7 @@ def retr_lcurtess( \
     listarrylcur = [[] for o in indxtsec]
     if len(listtseclygo) > 0:
         print('Will run lygos on the object...')
-        dictoutp = lygos.main.init( \
+        dictlygooutp = lygos.main.init( \
                                        
                                        strgmast=strgmast, \
                                        labltarg=labltarg, \
@@ -1234,11 +1188,23 @@ def retr_lcurtess( \
                                        boolcuttqual=boolcuttquallygo, \
                                        limttimeignoqual=limttimeignoquallygo, \
                                       )
+        print('listtsecsele')
+        print(listtsecsele)
+        print('dictlygooutp[listtsec]')
+        print(dictlygooutp['listtsec'])
         for o, tseclygo in enumerate(listtsecsele):
-            if tseclygo in listtseclygo:
-                listarrylcur[o] = dictoutp['listarry'][o]
-                listtcam[o] = dictoutp['listtcam'][o]
-                listtccd[o] = dictoutp['listtccd'][o]
+            indx = np.where(dictlygooutp['listtsec'] == tseclygo)[0]
+            if indx.size > 0:
+
+                print('o')
+                print(o)
+                print('tseclygo')
+                print(tseclygo)
+                print('dictlygooutp[listarry]')
+                summgene(dictlygooutp['listarry'])
+                listarrylcur[o] = dictlygooutp['listarry'][indx[0]]
+                listtcam[o] = dictlygooutp['listtcam'][indx[0]]
+                listtccd[o] = dictlygooutp['listtccd'][indx[0]]
     
     listarrylcursapp = None
     listarrylcurpdcc = None
@@ -1275,16 +1241,26 @@ def retr_lcurtess( \
         listarrylcurpdcc = [[] for o in indxtsec] 
         for o in indxtsec:
             if not boollygo[o]:
-                path = listpathdownspoclcur[o]
-                listarrylcursapp[o], indxtimequalgood, indxtimenanngood, listtsec[o], listtcam[o], listtccd[o] = \
+                
+                indx = np.where(listtsecsele[o] == listtsecspoc)[0][0]
+                print('listtsecsele')
+                print(listtsecsele)
+                print('o')
+                print(o)
+                print('listtsecspoc')
+                print(listtsecspoc)
+                print('indx')
+                print(indx)
+                path = listpathdownspoclcur[indx]
+                listarrylcursapp[indx], indxtimequalgood, indxtimenanngood, listtsec[o], listtcam[o], listtccd[o] = \
                                                        read_tesskplr_file(path, typeinst='tess', strgtype='SAP_FLUX', boolmaskqual=boolmaskqual)
-                listarrylcurpdcc[o], indxtimequalgood, indxtimenanngood, listtsec[o], listtcam[o], listtccd[o] = \
+                listarrylcurpdcc[indx], indxtimequalgood, indxtimenanngood, listtsec[o], listtcam[o], listtccd[o] = \
                                                        read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqual=boolmaskqual)
             
                 if typedataspoc == 'SAP':
-                    arrylcur = listarrylcursapp[o]
+                    arrylcur = listarrylcursapp[indx]
                 else:
-                    arrylcur = listarrylcurpdcc[o]
+                    arrylcur = listarrylcurpdcc[indx]
                 listarrylcur[o] = arrylcur
             
         if numbtsec == 0:
@@ -1422,8 +1398,8 @@ def plot_lspe(pathimag, arrylcur, strgextn=''):
 def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
               # break the line of the model when separation is very large
               boolbrekmodl=True, \
-                                        timedatabind=None, lcurdatabind=None, lcurdatastdvbind=None, boolwritover=True, \
-                                        titl='', listcolrmodl=None):
+              timedatabind=None, lcurdatabind=None, lcurdatastdvbind=None, boolwritover=True, \
+              titl='', listcolrmodl=None):
     
     if strgextn == '':
         raise Exception('')
@@ -1461,7 +1437,7 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
             numbchun = len(xdat)
             
             for n in range(numbchun):
-                axis.plot(xdat[n], ydat[n], color=listcolrmodl[k])
+                axis.plot(xdat[n], ydat[n], color=listcolrmodl[k], lw=2)
             k += 1
 
     # raw data
@@ -1476,6 +1452,7 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
     axis.set_ylabel('Relative flux')
     axis.set_title(titl)
     
+    plt.subplots_adjust(bottom=0.15)
     print(f'Writing to {path}...')
     plt.savefig(path)
     plt.close()
@@ -1657,18 +1634,18 @@ def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqu
         return listhdun, tsec, tcam, tccd
 
 
-def retr_fracrtsa(fracrprs, fracsars):
-    
-    fracrtsa = (fracrprs + 1.) / fracsars
-    
-    return fracrtsa
-
-
-def retr_fracsars(fracrprs, fracrtsa):
-    
-    fracsars = (fracrprs + 1.) / fracrtsa
-    
-    return fracsars
+#def retr_fracrtsa(fracrprs, fracsars):
+#    
+#    fracrtsa = (fracrprs + 1.) / fracsars
+#    
+#    return fracrtsa
+#
+#
+#def retr_fracsars(fracrprs, fracrtsa):
+#    
+#    fracsars = (fracrprs + 1.) / fracrtsa
+#    
+#    return fracsars
 
 
 def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0., sinw=0., booltrap=False):
@@ -1721,7 +1698,7 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
         duraineg = (duratotl - durafull) / 2.
         durafullhalf = durafull / 2.
     else:
-        duratotl = retr_dura(peri, rsma, cosi)
+        duratotl = retr_duratran(peri, rsma, cosi)
     duratotlhalf = duratotl / 2.
 
     # Boolean flag that indicates whether there is any transit
@@ -1866,18 +1843,6 @@ def retr_tsmm(radiplan, tmptplan, massplan, radistar, jmag):
     tsmm = 1.53 * radiplan**3 * tmptplan / massplan / radistar**2 * 10**(-jmag / 5.)
     
     return tsmm
-
-
-def retr_magttess(gdat, cntp):
-    
-    magt = -2.5 * np.log10(cntp / 1.5e4 / gdat.listcade) + 10
-    #mlikmagttemp = 10**((mlikmagttemp - 20.424) / (-2.5))
-    #stdvmagttemp = mlikmagttemp * stdvmagttemp / 1.09
-    #mliklcurtemp = -2.5 * np.log10(mlikfluxtemp) + 20.424
-    #gdat.magtrefr = -2.5 * np.log10(gdat.refrrflx[o] / 1.5e4 / 30. / 60.) + 10
-    #gdat.stdvmagtrefr = 1.09 * gdat.stdvrefrrflx[o] / gdat.refrrflx[o]
-    
-    return magt
 
 
 def retr_scalheig(tmptplan, massplan, radiplan):
@@ -2068,7 +2033,7 @@ def retr_dictexar(strgexar=None):
         dictexar['smax'] = objtexar['pl_orbsmax'][indx].values # [AU]
         dictexar['epoc'] = objtexar['pl_tranmid'][indx].values # [BJD]
         dictexar['cosi'] = np.cos(objtexar['pl_orbincl'][indx].values / 180. * np.pi)
-        dictexar['dura'] = objtexar['pl_trandur'][indx].values / 24. # [day]
+        dictexar['duratran'] = objtexar['pl_trandur'][indx].values / 24. # [day]
         dictexar['dept'] = objtexar['pl_trandep'][indx].values / 100. # dimensionless
         
         dictexar['boolfpos'] = np.zeros(numbplanexar, dtype=bool)
@@ -2135,108 +2100,118 @@ def retr_dictexar(strgexar=None):
             #dictexar['booltrantotl'][k] = dictexar['booltran'][indxexarstar].all()
         
         dictexar['rrat'] = dictexar['radiplan'] / dictexar['radistar'] / factrsre
-    
+        
     return dictexar
 
 
 def expl_popl(typepopl='exoptran'):
     
-    '''
+    """
     Explore a population
-    '''
+    """
     
     pathbase = os.environ['EPHESUS_DATA_PATH'] + '/'
     pathdata = pathbase + 'data/'
     pathimag = pathbase + 'imag/'
     
-    numbtsec = 27
-    dictlistcatl = dict()
-    # recall and precision
-    k = 0
-    for tsec in range(1, numbtsec + 1):
-        print('Sector %d...' % tsec)
-        
-        dictcatl = retr_dictcatltic8(pathdata, tsec)
-        if k == 0:
-            listname = list(dictcatl.keys())
-            listname = listname[1:]
-            print('listname')
-            print(listname)
+    # get the dictionaries holding the population properties
+    dictpopl = dict()
+    if typepopl == 'nomitess':
+        numbtsec = 27
+        dictlistcatl = dict()
+        # recall and precision
+        k = 0
+        for tsec in range(1, numbtsec + 1):
+            print('Sector %d...' % tsec)
+            
+            dictpopl = miletos.retr_dictcatltic8(pathdata, tsec)
+            if k == 0:
+                listname = list(dictpopl.keys())
+                listname = listname[1:]
+                print('listname')
+                print(listname)
+                for name in listname:
+                    dictlistcatl[name] = []
+                k += 1
+            
             for name in listname:
-                dictlistcatl[name] = []
-            k += 1
-        
+                if name.startswith('Unnamed'):
+                    continue
+                    raise Exception('')
+                dictlistcatl[name].append(dictpopl[name])
+    
         for name in listname:
             if name.startswith('Unnamed'):
+                raise Exception('')
                 continue
-            dictlistcatl[name].append(dictcatl[name])
-    numbtsectarg = np.empty(numbtsec)
+            
+            print('temp') 
+            # bypassing weird problem with from_dict()
+            if len(dictlistcatl[name]) == 0:
+                continue
+
+            dictpopl[name] = np.concatenate(dictlistcatl[name])
+            #dictpopl[name] = np.unique(dictpopl[name])
+        dictpopl['nois'] = retr_noistess(dictpopl['tmag'])
     
-    dictpopl = dict()
     if typepopl == 'exoptran':
         dictpopl = retr_dictexar()
-    
-    for name in listname:
-        if name.startswith('Unnamed'):
-            continue
-        
-        print('temp') 
-        # bypassing weird problem with from_dict()
-        if len(dictlistcatl[name]) == 0:
-            continue
-
-        dictpopl[name] = np.concatenate(dictlistcatl[name])
-        #dictpopl[name] = np.unique(dictpopl[name])
-    
-    # population model
-    
-    # load TIC
-    #path = pathdata + ''
-    #arry = pd.read_csv(path, header=0)
+        dictpopl['nois'] = retr_noistess(dictpopl['vmagsyst'])
     
     # conversion factors
     factrsrj, factrjre, factrsre, factmsmj, factmjme, factmsme, factaurs = retr_factconv()
-
-    numbtarg = dictpopl['radistar'].size
-    #listname = ['rasc', 'decl', 'tmag', 'radistar', 'massstar']
-    dictpopl['nois'] = retr_noistess(dictpopl['tmag'])
-
-    dictpopl['incl'] = np.random.rand(numbtarg) * 90.
-    dictpopl['cosi'] = np.cos(np.pi / 180. * dictpopl['incl'])
     
-    dictpopl['peri'] = tdpy.util.icdf_powr(np.random.rand(numbtarg), 0.3, 20., 2.)
-    dictpopl['masscomp'] = tdpy.util.icdf_powr(np.random.rand(numbtarg), 5., 200., 2.)
-    dictpopl['masstotl'] = dictpopl['masscomp'] + dictpopl['massstar']
-    dictpopl['smax'] = retr_smaxkepl(dictpopl['peri'], dictpopl['masstotl'])
-    dictpopl['rsma'] = dictpopl['radistar'] / dictpopl['smax'] / factaurs
-    dictpopl['duratran'] = 24. * retr_dura(dictpopl['peri'], dictpopl['rsma'], dictpopl['cosi'])
-    if typepopl == 'slen':
-        dictpopl['amplslen'] = retr_amplslen(dictpopl['peri'], dictpopl['radistar'], dictpopl['masscomp'], dictpopl['massstar'])
-        dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['amplslen'] / dictpopl['nois']
-    if typepopl == 'exoptran':
-        dictpopl = retr_dictexar()
+    if typepopl == 'nomiexop':
+        dictpopl['incl'] = np.random.rand(numbtarg) * 90.
+        dictpopl['cosi'] = np.cos(np.pi / 180. * dictpopl['incl'])
         
-        dictpopl['dept'] = dictpopl['rrat']**2
-        dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['dept'] / dictpopl['nois']
+        dictpopl['peri'] = tdpy.util.icdf_powr(np.random.rand(numbtarg), 0.3, 20., 2.)
+        dictpopl['masscomp'] = tdpy.util.icdf_powr(np.random.rand(numbtarg), 5., 200., 2.)
+        dictpopl['masstotl'] = dictpopl['masscomp'] + dictpopl['massstar']
+        dictpopl['smax'] = retr_smaxkepl(dictpopl['peri'], dictpopl['masstotl'])
+        dictpopl['rsma'] = dictpopl['radistar'] / dictpopl['smax'] / factaurs
+        dictpopl['duratran'] = 24. * retr_duratran(dictpopl['peri'], dictpopl['rsma'], dictpopl['cosi'])
+        if typepopl == 'slen':
+            dictpopl['amplslen'] = retr_amplslen(dictpopl['peri'], dictpopl['radistar'], dictpopl['masscomp'], dictpopl['massstar'])
+            dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['amplslen'] / dictpopl['nois']
+        if typepopl == 'exoptran':
+            dictpopl['dept'] = dictpopl['rrat']**2
+            dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['dept'] / dictpopl['nois']
     
-    listnametotl = list(dictpopl.keys())
+    # add any remaining features
+    #booldete = dictpopl['s2no'] > 5
+    #indxdete = np.where(booldete)[0]
+
+    listnametotltemp = list(dictpopl.keys())
+    listnametotl = []
+    for name in listnametotltemp:
+        if not isinstance(dictpopl[name][0], str):
+            listnametotl.append(name)
+
     numbnametotl = len(listnametotl)
     indxnametotl = np.arange(numbnametotl)
-
+    
+    # check for finiteness
     indx = np.where(np.isfinite(dictpopl['massstar']))[0]
-    for name in listnametotl:
+    for name in listnametotltemp:
         dictpopl[name] = dictpopl[name][indx]
 
     indx = np.where(np.isfinite(dictpopl['duratran']))[0]
-    for name in listnametotl:
+    for name in listnametotltemp:
         dictpopl[name] = dictpopl[name][indx]
     
-    booldete = dictpopl['s2no'] > 5
-    indxdete = np.where(booldete)[0]
-
-    numbtarg = dictpopl['radistar'].size
-    print('numbtarg')
-    print(numbtarg)
+    # check number of targets for each feature
+    numbkeys = len(listnametotltemp)
+    numbtarg = np.empty(numbkeys, dtype=int)
+    for k in range(numbkeys):
+        numbtarg[k] = dictpopl[listnametotltemp[k]].size
+    if np.unique(numbtarg).size != 1:
+        print('listnametotltemp')
+        print(listnametotltemp)
+        print('numbtarg')
+        print(numbtarg)
+        raise Exception('')
+    numbtarg = numbtarg[0]
     
     for name in listnametotl:
         print(name)
