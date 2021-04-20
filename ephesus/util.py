@@ -670,7 +670,7 @@ def retr_magttess(gdat, cntp):
     return magt
 
 
-def exec_bslq(arrytser):
+def exec_blsq(arrytser, minmdcyc=0.001):
     
     numbtime = arrytser.shape[0]
     minmtime = np.amin(arrytser[:, 0])
@@ -691,12 +691,11 @@ def exec_bslq(arrytser):
     print(numbperi)
     listperi = np.linspace(minmperi, maxmperi, numbperi)
     
-    numbdcyc = 20
-    minmdcyc = 0.001
+    numbdcyc = 4
     maxmdcyc = 0.1
     listdcyc = np.linspace(minmdcyc, maxmdcyc, numbdcyc)
     
-    numboffs = 10
+    numboffs = 3
     minmoffs = 0.
     maxmoffs = numboffs / (1 + numboffs)
     listoffs = np.linspace(minmoffs, maxmoffs, numboffs)
@@ -821,15 +820,15 @@ def exec_bslq(arrytser):
     rsma = retr_rsma(perimaxm, duramaxm, cosi)
     rrat = np.sqrt(deptmaxm)
 
-    print('find_tran() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
-    dictblsq = dict()
-    dictblsq['sdeemaxm'] = sdeemaxm
-    dictblsq['perimaxm'] = perimaxm
-    dictblsq['epocmaxm'] = epocmaxm
-    dictblsq['duramaxm'] = duramaxm
-    dictblsq['deptmaxm'] = deptmaxm
-    dictblsq['listperi'] = listperi
-    dictblsq['listpowr'] = listpowr
+    print('exec_blsq() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
+    dictblsqoutp = dict()
+    dictblsqoutp['sdeemaxm'] = sdeemaxm
+    dictblsqoutp['perimaxm'] = perimaxm
+    dictblsqoutp['epocmaxm'] = epocmaxm
+    dictblsqoutp['duramaxm'] = duramaxm
+    dictblsqoutp['deptmaxm'] = deptmaxm
+    dictblsqoutp['listperi'] = listperi
+    dictblsqoutp['listpowr'] = listpowr
     
     numbtimemodl = 100000
     arrytsermodl = np.empty((numbtimemodl, 3))
@@ -839,20 +838,27 @@ def exec_bslq(arrytser):
     arrypsermodl = fold_tser(arrytsermodl, epocmaxm, perimaxm, phasshft=phasshft)
     arrypserdata = fold_tser(arrytser, epocmaxm, perimaxm, phasshft=phasshft)
             
-    dictblsq['timedata'] = arrytser[:, 0]
-    dictblsq['rflxtserdata'] = arrytser[:, 1]
-    dictblsq['phasdata'] = arrypserdata[:, 0]
-    dictblsq['rflxpserdata'] = arrypserdata[:, 1]
+    dictblsqoutp['timedata'] = arrytser[:, 0]
+    dictblsqoutp['rflxtserdata'] = arrytser[:, 1]
+    dictblsqoutp['phasdata'] = arrypserdata[:, 0]
+    dictblsqoutp['rflxpserdata'] = arrypserdata[:, 1]
 
-    dictblsq['timemodl'] = arrytsermodl[:, 0]
-    dictblsq['rflxtsermodl'] = arrytsermodl[:, 1]
-    dictblsq['phasmodl'] = arrypsermodl[:, 0]
-    dictblsq['rflxpsermodl'] = arrypsermodl[:, 1]
+    dictblsqoutp['timemodl'] = arrytsermodl[:, 0]
+    dictblsqoutp['rflxtsermodl'] = arrytsermodl[:, 1]
+    dictblsqoutp['phasmodl'] = arrypsermodl[:, 0]
+    dictblsqoutp['rflxpsermodl'] = arrypsermodl[:, 1]
     
-    return dictblsq
+    print('dictblsqoutp')
+    print(dictblsqoutp)
+
+    return dictblsqoutp
 
 
-def srch_pbox(arry, pathimag=None, numbplan=None, maxmnumbplanblsq=None, strgextn='', thrssdee=7.1, boolpuls=False, \
+def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boolpuls=False, \
+              ### maximum number of transiting objects
+              maxmnumbtobj=None, \
+              ### input dictionary for BLS
+              dictblsqinpt=dict(), \
                                  ticitarg=None, dicttlsqinpt=None, booltlsq=False, \
                                  strgplotextn='pdf', figrsize=(4., 3.), figrsizeydobskin=(8, 2.5), alphraww=0.2, \
                                  ):
@@ -878,7 +884,7 @@ def srch_pbox(arry, pathimag=None, numbplan=None, maxmnumbplanblsq=None, strgext
     # temp
     #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
     
-    liststrgvarb = ['peri', 'epoc', 'dept', 'duratran', 'sdeemaxm']
+    #liststrgvarb = ['peri', 'epoc', 'dept', 'duratran', 'sdeemaxm']
     #liststrgvarb = ['peri', 'epoc', 'dept', 'duratran', 'listpowr', 'listperi', 'sdeemaxm', 'sdeetotl']
     
     arrysrch = np.copy(arry)
@@ -886,36 +892,21 @@ def srch_pbox(arry, pathimag=None, numbplan=None, maxmnumbplanblsq=None, strgext
         arrysrch[:, 1] = 2. - arrysrch[:, 1]
 
     j = 0
-    dictblsq = {}
-    for strgvarb in liststrgvarb:
-        dictblsq[strgvarb] = []
-    
+    dictsrchpboxoutp = {}
+    dictsrchpboxoutp['listdictblsq'] = []
+
     while True:
         
-        print('maxmnumbplanblsq')
-        print(maxmnumbplanblsq)
         print('j')
         print(j)
-        if maxmnumbplanblsq is not None and j >= maxmnumbplanblsq:
+        if maxmnumbtobj is not None and j >= maxmnumbtobj:
             break
 
         # mask out the detected transit
         if j == 0:
             arrymeta = np.copy(arrysrch)
-            dictblsq = dict()
         else:
-            
-            #indxtimetran = []
-            #for timetrantemp in listtimetrantemp:
-            #    indxtimetran.append(np.where(abs(timeblsqmeta - timetrantemp) < dictblsq['duramaxm'] / 2.)[0])
-            #indxtimetran = np.concatenate(indxtimetran)
-            #if indxtimetran.size != np.unique(indxtimetran).size:
-            #    raise Exception('')
-            
-            indxtimetran = retr_indxtimetran(timeblsqmeta, dictblsq['epocmaxm'], dictblsq['perimaxm'], dictblsq['duramaxm'])
-
-            indxtimegood = np.setdiff1d(np.arange(timeblsqmeta.size), indxtimetran)
-            arrymeta = arrymeta[indxtimegood, :]
+            arrymeta -= dictblsq['rflxtsermodl']
 
         # transit search
         timeblsqmeta = arrymeta[:, 0]
@@ -930,8 +921,7 @@ def srch_pbox(arry, pathimag=None, numbplan=None, maxmnumbplanblsq=None, strgext
                                          )
 
             # temp check how to do BLS instead of TLS
-            print('objtresu.periods')
-            print(objtresu.periods)
+            dictblsq = dict()
             dictblsq['listperi'] = objtresu.periods
             dictblsq['listpowr'] = objtresu.power
             dictblsq['perimaxm'] = objtresu.period
@@ -949,7 +939,7 @@ def srch_pbox(arry, pathimag=None, numbplan=None, maxmnumbplanblsq=None, strgext
             dictblsq['rflxpserdata'] = objtresu.folded_y
 
         else:
-            dictblsq = find_tran(arrymeta)
+            dictblsq = exec_blsq(arrymeta, **dictblsqinpt)
         
         if pathimag is not None:
             strgtitl = 'P=%.3g d, Dep=%.3g ppm, Dur=%.3g d, SDE=%.3g' % \
@@ -1007,25 +997,18 @@ def srch_pbox(arry, pathimag=None, numbplan=None, maxmnumbplanblsq=None, strgext
             plt.close()
         
         if dictblsq['sdeemaxm'] > thrssdee:
-            dictblsq['peri'].append(dictblsq['perimaxm'])
-            dictblsq['epoc'].append(dictblsq['epocmaxm'])
-            dictblsq['duratran'].append(dictblsq['duramaxm'])
-            dictblsq['dept'].append(dictblsq['deptmaxm'])
-            dictblsq['sdeemaxm'].append(dictblsq['sdeemaxm'])
+            dictsrchpboxoutp['listdictblsq'].append(dictblsq)
         else:
             break
         
+        for name in liststrgvarb:
+            dictsrchpboxoutp[name] = []
+            for k in range(len(dictsrchpboxoutp['listdictblsq'])):
+                dictsrchpboxoutp[name].append(dictsrchpboxoutp['listdictblsq'][k][name])
+            dictsrchpboxoutp[name] = np.array(dictsrchpboxoutp[name])
         j += 1
     
-    for strgvarb in liststrgvarb:
-        dictblsq[strgvarb] = np.array(dictblsq[strgvarb])
-        print('strgvarb')
-        print(strgvarb)
-        print('dictblsq[strgvarb]')
-        summgene(dictblsq[strgvarb])
-        print('')
-
-    return dictblsq
+    return dictsrchpboxoutp
 
 
 def retr_rascdeclfromstrgmast(strgmast):
@@ -2104,146 +2087,6 @@ def retr_dictexar(strgexar=None):
     return dictexar
 
 
-def expl_popl(typepopl='exoptran'):
-    
-    """
-    Explore a population
-    """
-    
-    pathbase = os.environ['EPHESUS_DATA_PATH'] + '/'
-    pathdata = pathbase + 'data/'
-    pathimag = pathbase + 'imag/'
-    
-    # get the dictionaries holding the population properties
-    dictpopl = dict()
-    if typepopl == 'nomitess':
-        numbtsec = 27
-        dictlistcatl = dict()
-        # recall and precision
-        k = 0
-        for tsec in range(1, numbtsec + 1):
-            print('Sector %d...' % tsec)
-            
-            dictpopl = miletos.retr_dictcatltic8(pathdata, tsec)
-            if k == 0:
-                listname = list(dictpopl.keys())
-                listname = listname[1:]
-                print('listname')
-                print(listname)
-                for name in listname:
-                    dictlistcatl[name] = []
-                k += 1
-            
-            for name in listname:
-                if name.startswith('Unnamed'):
-                    continue
-                    raise Exception('')
-                dictlistcatl[name].append(dictpopl[name])
-    
-        for name in listname:
-            if name.startswith('Unnamed'):
-                raise Exception('')
-                continue
-            
-            print('temp') 
-            # bypassing weird problem with from_dict()
-            if len(dictlistcatl[name]) == 0:
-                continue
-
-            dictpopl[name] = np.concatenate(dictlistcatl[name])
-            #dictpopl[name] = np.unique(dictpopl[name])
-        dictpopl['nois'] = retr_noistess(dictpopl['tmag'])
-    
-    if typepopl == 'exoptran':
-        dictpopl = retr_dictexar()
-        dictpopl['nois'] = retr_noistess(dictpopl['vmagsyst'])
-    
-    # conversion factors
-    factrsrj, factrjre, factrsre, factmsmj, factmjme, factmsme, factaurs = retr_factconv()
-    
-    if typepopl == 'nomiexop':
-        dictpopl['incl'] = np.random.rand(numbtarg) * 90.
-        dictpopl['cosi'] = np.cos(np.pi / 180. * dictpopl['incl'])
-        
-        dictpopl['peri'] = tdpy.util.icdf_powr(np.random.rand(numbtarg), 0.3, 20., 2.)
-        dictpopl['masscomp'] = tdpy.util.icdf_powr(np.random.rand(numbtarg), 5., 200., 2.)
-        dictpopl['masstotl'] = dictpopl['masscomp'] + dictpopl['massstar']
-        dictpopl['smax'] = retr_smaxkepl(dictpopl['peri'], dictpopl['masstotl'])
-        dictpopl['rsma'] = dictpopl['radistar'] / dictpopl['smax'] / factaurs
-        dictpopl['duratran'] = 24. * retr_duratran(dictpopl['peri'], dictpopl['rsma'], dictpopl['cosi'])
-        if typepopl == 'slen':
-            dictpopl['amplslen'] = retr_amplslen(dictpopl['peri'], dictpopl['radistar'], dictpopl['masscomp'], dictpopl['massstar'])
-            dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['amplslen'] / dictpopl['nois']
-        if typepopl == 'exoptran':
-            dictpopl['dept'] = dictpopl['rrat']**2
-            dictpopl['s2no'] = np.sqrt(dictpopl['duratran']) * dictpopl['dept'] / dictpopl['nois']
-    
-    # add any remaining features
-    #booldete = dictpopl['s2no'] > 5
-    #indxdete = np.where(booldete)[0]
-
-    listnametotltemp = list(dictpopl.keys())
-    listnametotl = []
-    for name in listnametotltemp:
-        if not isinstance(dictpopl[name][0], str):
-            listnametotl.append(name)
-
-    numbnametotl = len(listnametotl)
-    indxnametotl = np.arange(numbnametotl)
-    
-    # check for finiteness
-    indx = np.where(np.isfinite(dictpopl['massstar']))[0]
-    for name in listnametotltemp:
-        dictpopl[name] = dictpopl[name][indx]
-
-    indx = np.where(np.isfinite(dictpopl['duratran']))[0]
-    for name in listnametotltemp:
-        dictpopl[name] = dictpopl[name][indx]
-    
-    # check number of targets for each feature
-    numbkeys = len(listnametotltemp)
-    numbtarg = np.empty(numbkeys, dtype=int)
-    for k in range(numbkeys):
-        numbtarg[k] = dictpopl[listnametotltemp[k]].size
-    if np.unique(numbtarg).size != 1:
-        print('listnametotltemp')
-        print(listnametotltemp)
-        print('numbtarg')
-        print(numbtarg)
-        raise Exception('')
-    numbtarg = numbtarg[0]
-    
-    for name in listnametotl:
-        print(name)
-        summgene(dictpopl[name])
-    
-    listsamp = np.empty((numbtarg, numbnametotl))
-    for k in indxnametotl:
-       listsamp[:, k] = dictpopl[listnametotl[k]]
-    
-#['rasc', 'decl', 'tmag', 'radistar', 'massstar', 'nois', 'incl', 'cosi', 'peri', 'masscomp', 'masstotl', 'smax', 'rsma', 'duratran', 'amplslen', 'booldete']
-
-    listlablpara = [['RA', 'deg'], ['DEC', ''], ['Tmag', ''], ['$R_s$', '$R_{\odot}$'], ['$M_s$', '$M_{\odot}$'], [r'$\sigma$', ''], \
-                                                                    ['$i$', 'deg'], ['$\cos i$', ''], ['$P$', 'days'], ['$M_c$', '$M_{\odot}$'], \
-                                                                    ['$M_t$', '$M_{\odot}$'], ['$a$', 'AU'], ['$(R_s+R_c)/a$', ''], \
-                                                                    ['SL Duration', 'days'], \
-                                                                    ['SL Amplitude', ''], \
-                                                                    ['SNR', '']]
-    listscalpara = ['self', 'self', 'self', 'logt', 'logt', 'logt', 'self', 'self', 'logt', 'logt', 'logt', 'self', 'self', 'self', 'logt', 'logt']
-    boolscat = False
-    for k in range(2):  
-        if k == 0:
-            strg = 'popl'
-            listsamptemp = listsamp
-        if k == 1:
-            strg = 'popldete'
-            listsamptemp = listsamp[indxdete, :]
-        tdpy.mcmc.plot_grid(pathimag, strg, listsamptemp, listlablpara, boolscat=boolscat, listscalpara=listscalpara)#, join=True)
-    
-    # occurence rate
-    
-
-
 # physics
 
 def retr_vesc(massplan, radiplan):
@@ -2304,6 +2147,14 @@ def retr_amplelli(peri, densstar, massstar, masscomp):
     amplelli = 1.89e-2 * peri**(-2.) / densstar * (1. / (1. + massstar / masscomp))
     
     return amplelli
+
+
+def retr_masscomp(amplslen, peri):
+    
+    print('temp: this mass calculation is an approximation.')
+    masscomp = amplslen / 7.15e-5 / gdat.radistar**(-2.) / peri**(2. / 3.) / (gdat.massstar)**(1. / 3.)
+    
+    return masscomp
 
 
 def retr_amplslen(peri, radistar, masscomp, massstar):
