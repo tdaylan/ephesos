@@ -672,6 +672,8 @@ def retr_magttess(gdat, cntp):
 
 def exec_blsq(arrytser, minmdcyc=0.001):
     
+    dictblsqoutp = dict()
+    
     numbtime = arrytser.shape[0]
     minmtime = np.amin(arrytser[:, 0])
     maxmtime = np.amax(arrytser[:, 0])
@@ -791,52 +793,39 @@ def exec_blsq(arrytser, minmdcyc=0.001):
     
     indx = np.unravel_index(np.nanargmax(s2nr), s2nr.shape)
     
-    s2nrmaxm = np.nanmax(s2nr)
-    perimaxm = listperi[indx[0]]
-    duramaxm = listdcyc[indx[1]] * listperi[indx[0]]
-    epocmaxm = minmtime + listoffs[indx[2]] * listperi[indx[0]]
-    deptmaxm = listdept[indx]
-    print('perimaxm')
-    print(perimaxm)
-    print('epocmaxm')
-    print(epocmaxm)
-    print('duramaxm')
-    print(duramaxm)
-    print('deptmaxm')
-    print(deptmaxm)
+    dictblsqoutp['s2nr'] = np.nanmax(s2nr)
+    dictblsqoutp['peri'] = listperi[indx[0]]
+    dictblsqoutp['dura'] = listdcyc[indx[1]] * listperi[indx[0]]
+    dictblsqoutp['epoc'] = minmtime + listoffs[indx[2]] * listperi[indx[0]]
+    dictblsqoutp['dept'] = listdept[indx]
     
+    print('temp: assuming SDE == SNR')
+    dictblsqoutp['sdee'] = dictblsqoutp['s2nr']
+
     s2nrperi = np.empty_like(listperi)
     for k in indxperi:
         indx = np.unravel_index(np.nanargmax(s2nr[k, :, :]), s2nr[k, :, :].shape)
         s2nrperi[k] = s2nr[k, :, :][indx]
     
-
-    print('temp')
-    listpowr = s2nrperi
-    sdeemaxm = s2nrmaxm
-
     # best-fit orbit
     cosi = 0
-    rsma = retr_rsma(perimaxm, duramaxm, cosi)
-    rrat = np.sqrt(deptmaxm)
+    rsma = retr_rsma(dictblsqoutp['peri'], dictblsqoutp['dura'], cosi)
+    rrat = np.sqrt(dictblsqoutp['dept'])
 
     print('exec_blsq() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
-    dictblsqoutp = dict()
-    dictblsqoutp['sdeemaxm'] = sdeemaxm
-    dictblsqoutp['perimaxm'] = perimaxm
-    dictblsqoutp['epocmaxm'] = epocmaxm
-    dictblsqoutp['duramaxm'] = duramaxm
-    dictblsqoutp['deptmaxm'] = deptmaxm
     dictblsqoutp['listperi'] = listperi
-    dictblsqoutp['listpowr'] = listpowr
+    
+    print('temp: assuming power is SNR')
+    dictblsqoutp['listpowr'] = s2nrperi
     
     numbtimemodl = 100000
     arrytsermodl = np.empty((numbtimemodl, 3))
     arrytsermodl[:, 0] = np.linspace(minmtime, maxmtime, 100000)
-    arrytsermodl[:, 1] = retr_rflxtranmodl(arrytsermodl[:, 0], [perimaxm], [epocmaxm], [rrat], 1. / factrsre, [rsma], [cosi], booltrap=False)
+    arrytsermodl[:, 1] = retr_rflxtranmodl(arrytsermodl[:, 0], [dictblsqoutp['peri']], [dictblsqoutp['epoc']], \
+                                        [rrat], 1. / factrsre, [rsma], [cosi], booltrap=False)
 
-    arrypsermodl = fold_tser(arrytsermodl, epocmaxm, perimaxm, phasshft=phasshft)
-    arrypserdata = fold_tser(arrytser, epocmaxm, perimaxm, phasshft=phasshft)
+    arrypsermodl = fold_tser(arrytsermodl, dictblsqoutp['epoc'], dictblsqoutp['peri'], phasshft=phasshft)
+    arrypserdata = fold_tser(arrytser, dictblsqoutp['epoc'], dictblsqoutp['peri'], phasshft=phasshft)
             
     dictblsqoutp['timedata'] = arrytser[:, 0]
     dictblsqoutp['rflxtserdata'] = arrytser[:, 1]
@@ -884,8 +873,8 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
     # temp
     #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
     
-    #liststrgvarb = ['peri', 'epoc', 'dept', 'duratran', 'sdeemaxm']
-    #liststrgvarb = ['peri', 'epoc', 'dept', 'duratran', 'listpowr', 'listperi', 'sdeemaxm', 'sdeetotl']
+    liststrgvarb = ['peri', 'epoc', 'dept', 'dura', 'sdee']
+    #liststrgvarb = ['peri', 'epoc', 'dept', 'dura', 'listpowr', 'listperi', 'sdee']
     
     arrysrch = np.copy(arry)
     if boolpuls:
@@ -893,7 +882,7 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
 
     j = 0
     dictsrchpboxoutp = {}
-    dictsrchpboxoutp['listdictblsq'] = []
+    dictsrchpboxoutp['listdictblsqoutp'] = []
 
     while True:
         
@@ -906,7 +895,7 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
         if j == 0:
             arrymeta = np.copy(arrysrch)
         else:
-            arrymeta -= dictblsq['rflxtsermodl']
+            arrymeta -= dictblsqoutp['rflxtsermodl']
 
         # transit search
         timeblsqmeta = arrymeta[:, 0]
@@ -922,39 +911,43 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
 
             # temp check how to do BLS instead of TLS
             dictblsq = dict()
-            dictblsq['listperi'] = objtresu.periods
-            dictblsq['listpowr'] = objtresu.power
-            dictblsq['perimaxm'] = objtresu.period
-            dictblsq['epocmaxm'] = objtresu.T0
-            dictblsq['duramaxm'] = objtresu.duration
-            dictblsq['deptmaxm'] = objtresu.depth
-            dictblsq['sdeemaxm'] = objtresu.SDE
-            dictblsq['prfp'] = objtresu.FAP
-            dictblsq['listtimetran'] = objtresu.transit_times
-            dictblsq['timemodl'] = objtresu.model_lightcurve_time
-            dictblsq['phasmodl'] = objtresu.model_folded_phase
-            dictblsq['rflxpsermodl'] = objtresu.model_folded_model
-            dictblsq['rflxtsermodl'] = objtresu.model_lightcurve_model
-            dictblsq['phasdata'] = objtresu.folded_phase
-            dictblsq['rflxpserdata'] = objtresu.folded_y
+            dictblsqoutp['listperi'] = objtresu.periods
+            dictblsqoutp['listpowr'] = objtresu.power
+            
+            dictblsqoutp['peri'] = objtresu.period
+            dictblsqoutp['epoc'] = objtresu.T0
+            dictblsqoutp['dura'] = objtresu.duration
+            dictblsqoutp['dept'] = objtresu.depth
+            dictblsqoutp['sdee'] = objtresu.SDE
+            
+            dictblsqoutp['prfp'] = objtresu.FAP
+            
+            dictblsqoutp['listtimetran'] = objtresu.transit_times
+            
+            dictblsqoutp['timemodl'] = objtresu.model_lightcurve_time
+            dictblsqoutp['phasmodl'] = objtresu.model_folded_phase
+            dictblsqoutp['rflxpsermodl'] = objtresu.model_folded_model
+            dictblsqoutp['rflxtsermodl'] = objtresu.model_lightcurve_model
+            dictblsqoutp['phasdata'] = objtresu.folded_phase
+            dictblsqoutp['rflxpserdata'] = objtresu.folded_y
 
         else:
-            dictblsq = exec_blsq(arrymeta, **dictblsqinpt)
+            dictblsqoutp = exec_blsq(arrymeta, **dictblsqinpt)
         
         if pathimag is not None:
             strgtitl = 'P=%.3g d, Dep=%.3g ppm, Dur=%.3g d, SDE=%.3g' % \
-                        (dictblsq['perimaxm'], dictblsq['deptmaxm'], dictblsq['duramaxm'], dictblsq['sdeemaxm'])
+                        (dictblsqoutp['peri'], dictblsqoutp['dept'], dictblsqoutp['dura'], dictblsqoutp['sdee'])
             # plot TLS power spectrum
             figr, axis = plt.subplots(figsize=figrsize)
-            axis.axvline(dictblsq['perimaxm'], alpha=0.4, lw=3)
-            axis.set_xlim(np.min(dictblsq['listperi']), np.max(dictblsq['listperi']))
+            axis.axvline(dictblsqoutp['peri'], alpha=0.4, lw=3)
+            axis.set_xlim(np.min(dictblsqoutp['listperi']), np.max(dictblsqoutp['listperi']))
             for n in range(2, 10):
-                axis.axvline(n * dictblsq['perimaxm'], alpha=0.4, lw=1, linestyle='dashed')
-                axis.axvline(dictblsq['perimaxm'] / n, alpha=0.4, lw=1, linestyle='dashed')
+                axis.axvline(n * dictblsqoutp['peri'], alpha=0.4, lw=1, linestyle='dashed')
+                axis.axvline(dictblsqoutp['peri'] / n, alpha=0.4, lw=1, linestyle='dashed')
             axis.set_ylabel(r'SDE')
             axis.set_xlabel('Period [days]')
-            axis.plot(dictblsq['listperi'], dictblsq['listpowr'], color='black', lw=0.5)
-            axis.set_xlim(0, max(dictblsq['listperi']));
+            axis.plot(dictblsqoutp['listperi'], dictblsqoutp['listpowr'], color='black', lw=0.5)
+            axis.set_xlim(0, max(dictblsqoutp['listperi']));
             axis.set_title(strgtitl)
             plt.subplots_adjust(bottom=0.2)
             path = pathimag + 'sdee_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
@@ -965,7 +958,7 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
             # plot light curve + TLS model
             figr, axis = plt.subplots(figsize=figrsizeydobskin)
             axis.plot(timeblsqmeta, lcurblsqmeta, alpha=alphraww, marker='o', ms=1, ls='', color='grey', rasterized=True)
-            axis.plot(dictblsq['timemodl'], dictblsq['rflxtsermodl'], color='b')
+            axis.plot(dictblsqoutp['timemodl'], dictblsqoutp['rflxtsermodl'], color='b')
             axis.set_xlabel('Time [days]')
             axis.set_ylabel('Relative flux');
             if j == 0:
@@ -981,8 +974,8 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
 
             # plot phase curve + TLS model
             figr, axis = plt.subplots(figsize=figrsizeydobskin)
-            axis.plot(dictblsq['phasdata'], dictblsq['rflxpserdata'], marker='o', ms=1, ls='', alpha=alphraww, color='grey', rasterized=True)
-            axis.plot(dictblsq['phasmodl'], dictblsq['rflxpsermodl'], color='b')
+            axis.plot(dictblsqoutp['phasdata'], dictblsqoutp['rflxpserdata'], marker='o', ms=1, ls='', alpha=alphraww, color='grey', rasterized=True)
+            axis.plot(dictblsqoutp['phasmodl'], dictblsqoutp['rflxpsermodl'], color='b')
             axis.set_xlabel('Phase')
             axis.set_ylabel('Relative flux');
             if j == 0:
@@ -996,17 +989,18 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
             plt.savefig(path)
             plt.close()
         
-        if dictblsq['sdeemaxm'] > thrssdee:
-            dictsrchpboxoutp['listdictblsq'].append(dictblsq)
+        if dictblsqoutp['sdee'] > thrssdee:
+            dictsrchpboxoutp['listdictblsqoutp'].append(dictblsqoutp)
         else:
             break
-        
-        for name in liststrgvarb:
-            dictsrchpboxoutp[name] = []
-            for k in range(len(dictsrchpboxoutp['listdictblsq'])):
-                dictsrchpboxoutp[name].append(dictsrchpboxoutp['listdictblsq'][k][name])
-            dictsrchpboxoutp[name] = np.array(dictsrchpboxoutp[name])
         j += 1
+       
+    # merge output BLS dictionaries of different TCEs
+    for name in liststrgvarb:
+        dictsrchpboxoutp[name] = []
+        for k in range(len(dictsrchpboxoutp['listdictblsqoutp'])):
+            dictsrchpboxoutp[name].append(dictsrchpboxoutp['listdictblsqoutp'][k][name])
+        dictsrchpboxoutp[name] = np.array(dictsrchpboxoutp[name])
     
     return dictsrchpboxoutp
 
@@ -1054,11 +1048,7 @@ def retr_lcurtess( \
               # lygos
               labltarg=None, \
               strgtarg=None, \
-              boolcbvslygo=None, \
-              
-              maxmnumbstarlygo=None, \
-              boolcuttquallygo=True, \
-              limttimeignoquallygo=None, \
+              dictlygoinpt=dict(), \
 
               ## Boolean flag to apply quality mask
               boolmaskqual=True, \
@@ -1165,11 +1155,9 @@ def retr_lcurtess( \
                                        listtsecsele=listtseclygo, \
                                        
                                        # lygos-specific
-                                       maxmnumbstar=maxmnumbstarlygo, \
                                        booltpxflygo=booltpxflygo, \
-                                       boolcbvs=boolcbvslygo, \
-                                       boolcuttqual=boolcuttquallygo, \
-                                       limttimeignoqual=limttimeignoquallygo, \
+                                       **dictlygoinpt, \
+
                                       )
         print('listtsecsele')
         print(listtsecsele)
