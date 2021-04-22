@@ -36,6 +36,7 @@ import lygos
 import miletos
 import hattusa
 
+
 def anim_tmptdete(timefull, lcurfull, meantimetmpt, lcurtmpt, pathimag, listindxtimeposimaxm, corrprod, corr, strgextn='', colr=None):
     
     numbtimefull = timefull.size
@@ -108,7 +109,7 @@ def plot_tmptdete(timefull, lcurfull, tt, meantimetmpt, lcurtmpt, path, listindx
     print('meantimetmpt + tt * difftime')
     summgene(meantimetmpt + tt * difftime)
     # plot template
-    axis[2].plot(timefull[0] + meantimetmpt + tt * difftime, lcurtmpt, color='k', marker='D')
+    axis[2].plot(timefull[0] + meantimetmpt + tt * difftime, lcurtmpt, color='b', marker='v')
     axis[2].set_ylabel('Template')
     axis[2].set_xlim(axis[1].get_xlim())
 
@@ -137,7 +138,7 @@ def plot_tmptdete(timefull, lcurfull, tt, meantimetmpt, lcurtmpt, path, listindx
     plt.close()
     
 
-def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, corr, indxtime=None, colr='k'):
+def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, corr, indxtime=None, colr='k', timeoffs=2457000):
     
     if indxtime is None:
         indxtimetemp = np.arange(time.size)
@@ -147,10 +148,13 @@ def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, corr, indxtime=None, c
     maxmydat = axis.get_ylim()[1]
     for kk in range(len(listindxtimeposimaxm)):
         if listindxtimeposimaxm[kk] in indxtimetemp:
-            axis.plot(time[listindxtimeposimaxm[kk]], maxmydat, marker='D', color=colr)
+            axis.plot(time[listindxtimeposimaxm[kk]], maxmydat, marker='v', color='b')
             #axis.text(time[listindxtimeposimaxm[kk]], maxmydat, '%.3g' % corr[listindxtimeposimaxm[kk]], color='k', va='center', \
             #                                                ha='center', size=2, rasterized=False)
-    axis.set_xlabel('Time [days]')
+    axis.set_xlabel('Time [BJD]')
+    #print('timeoffs')
+    #print(timeoffs)
+    #axis.set_xlabel('Time [BJD-%d]' % timeoffs)
     axis.set_ylabel('Relative flux')
     
 
@@ -235,6 +239,10 @@ def corr_copy(indxtimefullruns, lcurstan, indxtimekern, numbkern):
 
 def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, strgextn='', pathimag=None, boolplot=True, boolanim=False):
     
+    timeoffs = np.amin(time) // 1000
+    timeoffs *= 1000
+    time -= timeoffs
+    
     if verbtype > 1:
         timeinit = timemodu.time()
     
@@ -254,6 +262,16 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
 
     numbtime = lcur.size
     
+    # count gaps
+    difftime = time[1:] - time[:-1]
+    minmdifftime = np.amin(difftime)
+    difftimesort = np.sort(difftime)[::-1]
+    print('difftimesort')
+    for k in range(difftimesort.size):
+        print(difftimesort[k] / minmdifftime)
+        if k == 20:
+             break
+
     # construct the "full" grid, i.e., regularly sampled even during the data gaps
     minmtime = np.amin(time)
     maxmtime = np.amax(time)
@@ -285,14 +303,11 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
         listlcurtmpt[k] /= np.std(listlcurtmpt[k])
         indxtimekern[k] = np.arange(numbtimekern[k])
         numbtimefullruns[k] = numbtimefull - numbtimekern[k]
-        
-        print('k')
-        print(k)
-        print('numbtimefullruns[k]')
-        print(numbtimefullruns[k])
-
         indxtimefullruns[k] = np.arange(numbtimefullruns[k])
     
+    print('numbtimekern')
+    print(numbtimekern)
+
     # standardize
     lcurstan = lcurfull / np.std(lcur - np.mean(lcur))
     
@@ -380,11 +395,6 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
             figr, axis = plt.subplots(numbfram, 1, figsize=(8, numbfram*3))
             proc_axiscorr(timefull, lcurfull, axis[0], listindxtimeposimaxm[k], corr[k])
             
-            print('time')
-            summgene(time)
-            print('indxtimefullruns')
-            summgene(indxtimefullruns)
-            print('')
             axis[1].plot(timefull[indxtimefullruns], corr[k], color='m', ls='', marker='o', ms=1, rasterized=True)
             axis[1].plot(timefull[indxtimefullruns[listindxtimeposi]], corr[k][listindxtimeposi], color='r', ls='', marker='o', ms=1, rasterized=True)
             axis[1].set_ylabel('C')
@@ -401,7 +411,7 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
             
             for i in range(numbdeteplot):
                 indxtimeplot = indxtimekern[k] + listindxtimeposimaxm[k][i]
-                proc_axiscorr(timefull, lcurfull, axis[3+i], listindxtimeposimaxm[k], corr[k], indxtime=indxtimeplot)
+                proc_axiscorr(timefull, lcurfull, axis[3+i], listindxtimeposimaxm[k], corr[k], indxtime=indxtimeplot, timeoffs=timeoffs)
             
             path = pathimag + 'lcurflardepr%s.pdf' % (strganim)
             print('Writing to %s...' % path)
@@ -843,32 +853,41 @@ def exec_blsq(arrytser, minmdcyc=0.001):
     return dictblsqoutp
 
 
-def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boolpuls=False, \
+def srch_pbox(arry, \
+              # folder in which plots will be generated
+              pathimag=None, \
+              numbplan=None, \
+              strgextn='', \
+              thrssdee=7.1, \
+              boolpuls=False, \
               ### maximum number of transiting objects
               maxmnumbtobj=None, \
               ### input dictionary for BLS
               dictblsqinpt=dict(), \
-                                 ticitarg=None, dicttlsqinpt=None, booltlsq=False, \
-                                 strgplotextn='pdf', figrsize=(4., 3.), figrsizeydobskin=(8, 2.5), alphraww=0.2, \
-                                 ):
+              ticitarg=None, \
+              dicttlsqinpt=None, \
+              booltlsq=False, \
+              # plotting
+              strgplotextn='pdf', \
+              figrsize=(4., 3.), \
+              figrsizeydobskin=(8, 2.5), \
+              alphraww=0.2, \
+             ):
     """
-    Parameters
-        pathimag: folder in which plots will be generated.
+    Search for periodic boxes in time-series data
     """
     
-    print('Executing BLS...')
+    print('Searching for periodic boxes in time-series data...')
     print('booltlsq')
     print(booltlsq)
-    print('arry[:, 0]')
-    summgene(arry[:, 0])
+    print('boolpuls')
+    print(boolpuls)
 
     if booltlsq:
         import transitleastsquares
         if dicttlsqinpt is None:
             dicttlsqinpt = dict()
     
-    print('boolpuls')
-    print(boolpuls)
     # setup TLS
     # temp
     #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
@@ -934,6 +953,14 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
         else:
             dictblsqoutp = exec_blsq(arrymeta, **dictblsqinpt)
         
+        if boolpuls:
+            dictblsqoutp['timemodl'] = 2. - dictblsqoutp['timemodl']
+            dictblsqoutp['phasmodl'] = 2. - dictblsqoutp['phasmodl']
+            dictblsqoutp['phasdata'] = 2. - dictblsqoutp['phasdata']
+            dictblsqoutp['rflxpserdata'] = 2. - dictblsqoutp['rflxpserdata']
+            dictblsqoutp['rflxpsermodl'] = 2. - dictblsqoutp['rflxpsermodl']
+            dictblsqoutp['rflxtsermodl'] = 2. - dictblsqoutp['rflxtsermodl']
+        
         if pathimag is not None:
             strgtitl = 'P=%.3g d, Dep=%.3g ppm, Dur=%.3g d, SDE=%.3g' % \
                         (dictblsqoutp['peri'], dictblsqoutp['dept'], dictblsqoutp['dura'], dictblsqoutp['sdee'])
@@ -957,6 +984,9 @@ def srch_pbox(arry, pathimag=None, numbplan=None, strgextn='', thrssdee=7.1, boo
             
             # plot light curve + TLS model
             figr, axis = plt.subplots(figsize=figrsizeydobskin)
+            if boolpuls:
+                timeblsqmetatemp = 2. - timeblsqmeta
+                lcurblsqmetatemp = 2. - lcurblsqmeta
             axis.plot(timeblsqmeta, lcurblsqmeta, alpha=alphraww, marker='o', ms=1, ls='', color='grey', rasterized=True)
             axis.plot(dictblsqoutp['timemodl'], dictblsqoutp['rflxtsermodl'], color='b')
             axis.set_xlabel('Time [days]')
