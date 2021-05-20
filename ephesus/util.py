@@ -44,15 +44,6 @@ def anim_tmptdete(timefull, lcurfull, meantimetmpt, lcurtmpt, pathimag, listindx
     numbtimefullruns = numbtimefull - numbtimekern
     indxtimefullruns = np.arange(numbtimefullruns)
     
-    print('anim_tmptdete()')
-    print('timefull')
-    summgene(timefull)
-    print('lcurfull')
-    summgene(lcurfull)
-    print('meantimetmpt')
-    summgene(meantimetmpt)
-    print('lcurtmpt')
-    summgene(lcurtmpt)
     listpath = []
     cmnd = 'convert -delay 20'
     
@@ -91,23 +82,16 @@ def plot_tmptdete(timefull, lcurfull, tt, meantimetmpt, lcurtmpt, path, listindx
     figr, axis = plt.subplots(5, 1, figsize=(8, 11))
     
     # plot the whole light curve
-    proc_axiscorr(timefull, lcurfull, axis[0], listindxtimeposimaxm, corr)
+    proc_axiscorr(timefull, lcurfull, axis[0], listindxtimeposimaxm)
     
     # plot zoomed-in light curve
-    print('plot_tmptdete()')
-    print('indxtimekern')
-    summgene(indxtimekern)
     minmindx = max(0, tt - int(numbtimekern / 4))
     maxmindx = min(numbtimefullruns - 1, tt + int(5. * numbtimekern / 4))
     indxtime = np.arange(minmindx, maxmindx + 1)
     print('indxtime')
     summgene(indxtime)
-    proc_axiscorr(timefull, lcurfull, axis[1], listindxtimeposimaxm, corr, indxtime=indxtime)
+    proc_axiscorr(timefull, lcurfull, axis[1], listindxtimeposimaxm, indxtime=indxtime)
     
-    print('tt')
-    print(tt)
-    print('meantimetmpt + tt * difftime')
-    summgene(meantimetmpt + tt * difftime)
     # plot template
     axis[2].plot(timefull[0] + meantimetmpt + tt * difftime, lcurtmpt, color='b', marker='v')
     axis[2].set_ylabel('Template')
@@ -138,7 +122,7 @@ def plot_tmptdete(timefull, lcurfull, tt, meantimetmpt, lcurtmpt, path, listindx
     plt.close()
     
 
-def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, corr, indxtime=None, colr='k', timeoffs=2457000):
+def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, indxtime=None, colr='k', timeoffs=2457000):
     
     if indxtime is None:
         indxtimetemp = np.arange(time.size)
@@ -149,9 +133,6 @@ def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, corr, indxtime=None, c
     for kk in range(len(listindxtimeposimaxm)):
         if listindxtimeposimaxm[kk] in indxtimetemp:
             axis.plot(time[listindxtimeposimaxm[kk]], maxmydat, marker='v', color='b')
-            #axis.text(time[listindxtimeposimaxm[kk]], maxmydat, '%.3g' % corr[listindxtimeposimaxm[kk]], color='k', va='center', \
-            #                                                ha='center', size=2, rasterized=False)
-    axis.set_xlabel('Time [BJD]')
     #print('timeoffs')
     #print(timeoffs)
     #axis.set_xlabel('Time [BJD-%d]' % timeoffs)
@@ -167,6 +148,10 @@ def srch_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=
     scalrisetmpt = 0. / 24.
     difftime = np.amin(time[1:] - time[:-1])
     
+    print('time')
+    summgene(time)
+    print('difftime')
+    print(difftime)
     if minmscalfalltmpt is None:
         minmscalfalltmpt = 3 * difftime
     
@@ -179,14 +164,21 @@ def srch_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=
     
     indxscalfall = np.arange(numbkern)
     listscalfalltmpt = np.linspace(minmscalfalltmpt, maxmscalfalltmpt, numbkern)
-    
+    print('listscalfalltmpt')
+    print(listscalfalltmpt)
     listcorr = []
     listlcurtmpt = [[] for k in indxscalfall]
     meantimetmpt = [[] for k in indxscalfall]
     for k in indxscalfall:
         numbtimekern = 3 * int(listscalfalltmpt[k] / difftime)
+        print('numbtimekern')
+        print(numbtimekern)
         meantimetmpt[k] = np.arange(numbtimekern) * difftime
-        listlcurtmpt[k] = hattusa.retr_lcurflarsing(meantimetmpt[k], timeflartmpt, amplflartmpt, scalrisetmpt, listscalfalltmpt[k])
+        print('meantimetmpt[k]')
+        summgene(meantimetmpt[k])
+        if numbtimekern == 0:
+            raise Exception('')
+        listlcurtmpt[k] = hattusa.retr_lcurmodl_flarsing(meantimetmpt[k], timeflartmpt, amplflartmpt, scalrisetmpt, listscalfalltmpt[k])
         if not np.isfinite(listlcurtmpt[k]).all():
             raise Exception('')
         
@@ -262,6 +254,9 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
 
     numbtime = lcur.size
     
+    numbkern = len(listlcurtmpt)
+    indxkern = np.arange(numbkern)
+    
     # count gaps
     difftime = time[1:] - time[:-1]
     minmdifftime = np.amin(difftime)
@@ -271,164 +266,213 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
         print(difftimesort[k] / minmdifftime)
         if k == 20:
              break
-
-    # construct the "full" grid, i.e., regularly sampled even during the data gaps
-    minmtime = np.amin(time)
-    maxmtime = np.amax(time)
-    timefull = np.linspace(minmtime, maxmtime, int(round((maxmtime - minmtime) / np.amin(time[1:] - time[:-1]))))
-    print('timefull')
-    summgene(timefull)
-    numbtimefull = timefull.size
-    lcurfull = np.zeros_like(timefull)
-    indx = np.digitize(time, timefull) - 1
-    lcurfull[indx] = lcur
-    print('lcurfull')
-    summgene(lcurfull)
-    
-    numbkern = len(listlcurtmpt)
-    indxkern = np.arange(numbkern)
-    numbtimekern = np.empty(numbkern, dtype=int)
-    
-    ## size of the full grid minus the kernel size
-    numbtimefullruns = np.empty(numbkern, dtype=int)
-    
-    corr = [[] for k in indxkern]
-    corrprod = [[] for k in indxkern]
-    indxtimekern = [[] for k in indxkern]
-    indxtimefullruns = [[] for k in indxkern]
-    listindxtimeposimaxm = [[] for k in indxkern]
-    for k in indxkern:
-        numbtimekern[k] = listlcurtmpt[k].size
-        listlcurtmpt[k] -= np.mean(listlcurtmpt[k])
-        listlcurtmpt[k] /= np.std(listlcurtmpt[k])
-        indxtimekern[k] = np.arange(numbtimekern[k])
-        numbtimefullruns[k] = numbtimefull - numbtimekern[k]
-        indxtimefullruns[k] = np.arange(numbtimefullruns[k])
-    
-    print('numbtimekern')
-    print(numbtimekern)
-
-    # standardize
-    lcurstan = lcurfull / np.std(lcur - np.mean(lcur))
-    
-    if verbtype > 1:
-        print('Delta T (corr_tmpt, initial): %g' % (timemodu.time() - timeinit))
-        timeinit = timemodu.time()
-    
-    listlcurtemp = corr_copy(indxtimefullruns, lcurstan, indxtimekern, numbkern)
-    if verbtype > 1:
-        print('Delta T (corr_tmpt, copy): %g' % (timemodu.time() - timeinit))
-        timeinit = timemodu.time()
-    
-    corrprod = corr_arryprod(listlcurtemp, listlcurtmpt, numbkern)
-    if verbtype > 1:
-        print('Delta T (corr_tmpt, corr_prod): %g' % (timemodu.time() - timeinit))
-        timeinit = timemodu.time()
     
     boolthrsauto = thrs is None
     
-    for k in indxkern:
-        # find the total correlation (along the time delay axis)
-        corr[k] = np.sum(corrprod[k], 1)
-        print('k')
-        print(k)
-        print('listlcurtemp[k]')
-        summgene(listlcurtemp[k])
-        print('corrprod[k]')
-        summgene(corrprod[k])
-        print('corr[k]')
-        summgene(corr[k])
-        if boolthrsauto:
-            perclowrcorr = np.percentile(corr[k],  1.)
-            percupprcorr = np.percentile(corr[k], 99.)
-            indx = np.where((corr[k] < percupprcorr) & (corr[k] > perclowrcorr))[0]
-            medicorr = np.median(corr[k])
-            thrs = np.std(corr[k][indx]) * 7. + medicorr
-
-        if not np.isfinite(corr[k]).all():
-            raise Exception('')
-
-        if verbtype > 1:
-            print('corr[k]')
-            summgene(corr[k])
+    print('temp: setting boolthrsauto')
+    thrs = 1.
+    boolthrsauto = False
     
-        # determine the threshold on the maximum correlation
-        if verbtype > 1:
-            print('thrs')
-            print(thrs)
+    # number of time samples in the kernel
+    numbtimekern = np.empty(numbkern, dtype=int)
+    indxtimekern = [[] for k in indxkern]
+    
+    # take out the mean
+    listlcurtmptstan = [[] for k in indxkern]
+    for k in indxkern:
+        listlcurtmptstan[k] = np.copy(listlcurtmpt[k])
+        listlcurtmptstan[k] -= np.mean(listlcurtmptstan[k])
+        numbtimekern[k] = listlcurtmptstan[k].size
+        indxtimekern[k] = np.arange(numbtimekern[k])
 
-        # find triggers
-        listindxtimeposi = np.where(corr[k] > thrs)[0]
-        if verbtype > 1:
-            print('listindxtimeposi')
-            summgene(listindxtimeposi)
+    minmtimechun = 3 * 3. / 24. / 60. # [days]
+    print('minmdifftime * 24 * 60')
+    print(minmdifftime * 24 * 60)
+    listlcurfull = []
+    indxtimebndr = np.where(difftime > minmtimechun)[0]
+    indxtimebndr = np.concatenate([np.array([0]), indxtimebndr, np.array([numbtime - 1])])
+    numbchun = indxtimebndr.size - 1
+    indxchun = np.arange(numbchun)
+    corrchun = [[[] for k in indxkern] for l in indxchun]
+    listindxtimeposimaxm = [[[] for k in indxkern] for l in indxchun]
+    listlcurchun = [[] for l in indxchun]
+    listtimechun = [[] for l in indxchun]
+    print('indxtimebndr')
+    print(indxtimebndr)
+    print('numbchun')
+    print(numbchun)
+    for l in indxchun:
         
-        # cluster triggers
-        listtemp = []
-        listindxtimeposiptch = []
-        for kk in range(len(listindxtimeposi)):
-            listtemp.append(listindxtimeposi[kk])
-            if kk == len(listindxtimeposi) - 1 or listindxtimeposi[kk] != listindxtimeposi[kk+1] - 1:
-                listindxtimeposiptch.append(np.array(listtemp))
-                listtemp = []
+        print('Chunk %d...' % l)
         
-        if verbtype > 1:
-            print('listindxtimeposiptch')
-            summgene(listindxtimeposiptch)
+        minmindxtimeminm = 0
+        minmtime = time[indxtimebndr[l]+1]
+        print('minmtime')
+        print(minmtime)
+        print('indxtimebndr[l]')
+        print(indxtimebndr[l])
+        maxmtime = time[indxtimebndr[l+1]]
+        print('maxmtime')
+        print(maxmtime)
+        numb = int(round((maxmtime - minmtime) / minmdifftime))
+        print('numb')
+        print(numb)
+        
+        if numb == 0:
+            print('Skipping due to chunk with single point...')
+            continue
 
-        listindxtimeposimaxm[k] = np.empty(len(listindxtimeposiptch), dtype=int)
-        for kk in range(len(listindxtimeposiptch)):
-            indxtemp = np.argmax(corr[k][listindxtimeposiptch[kk]])
-            listindxtimeposimaxm[k][kk] = listindxtimeposiptch[kk][indxtemp]
+        timechun = np.linspace(minmtime, maxmtime, numb)
+        listtimechun[l] = timechun
+        print('timechun')
+        summgene(timechun)
         
-        if verbtype > 1:
-            print('listindxtimeposimaxm[k]')
-            summgene(listindxtimeposimaxm[k])
+        if float(indxtimebndr[l+1] - indxtimebndr[l]) / numb < 0.8:
+            print('Skipping due to undersampled chunk...')
+            continue
+
+        numbtimefull = timechun.size
+        print('numbtimefull')
+        print(numbtimefull)
         
-        if boolplot or boolanim:
-            strganim = strgextn + '_kn%02d' % k
+        indxtimechun = np.arange(indxtimebndr[l], indxtimebndr[l+1] + 1)
         
-        if boolplot:
-            numbdeteplot = min(len(listindxtimeposimaxm[k]), 10)
-            indxtimefullruns = np.arange(numbtimefullruns[k])
-            numbfram = 3 + numbdeteplot
-            figr, axis = plt.subplots(numbfram, 1, figsize=(8, numbfram*3))
-            proc_axiscorr(timefull, lcurfull, axis[0], listindxtimeposimaxm[k], corr[k])
+        print('time[indxtimechun]')
+        summgene(time[indxtimechun])
+        
+        # interpolate
+        lcurchun = scipy.interpolate.interp1d(time[indxtimechun], lcur[indxtimechun])(timechun)
+        
+        if indxtimechun.size != timechun.size:
+            print('time[indxtimechun]')
+            if timechun.size < 50:
+                for timetemp in time[indxtimechun]:
+                    print(timetemp)
+            summgene(time[indxtimechun])
+            print('timechun')
+            if timechun.size < 50:
+                for timetemp in timechun:
+                    print(timetemp)
+            summgene(timechun)
+            #raise Exception('')
+
+        # take out the mean
+        lcurchun -= np.mean(lcurchun)
+        
+        listlcurchun[l] = lcurchun
+        
+        # size of the full grid minus the kernel size
+        numbtimefullruns = np.empty(numbkern, dtype=int)
+        indxtimefullruns = [[] for k in indxkern]
+        
+        # find the correlation
+        for k in indxkern:
+            print('Kernel %d...' % k)
             
-            axis[1].plot(timefull[indxtimefullruns], corr[k], color='m', ls='', marker='o', ms=1, rasterized=True)
-            axis[1].plot(timefull[indxtimefullruns[listindxtimeposi]], corr[k][listindxtimeposi], color='r', ls='', marker='o', ms=1, rasterized=True)
-            axis[1].set_ylabel('C')
+            if numb < numbtimekern[k]:
+                print('Skipping due to chunk shorther than the kernel...')
+                continue
             
-            axis[2].axvline(thrs, alpha=0.4, color='r', lw=3, ls='-.')
+            # find the total correlation (along the time delay axis)
+            corrchun[l][k] = scipy.signal.correlate(lcurchun, listlcurtmptstan[k], mode='valid')
+            print('corrchun[l][k]')
+            summgene(corrchun[l][k])
+        
+            numbtimefullruns[k] = numbtimefull - numbtimekern[k] + 1
+            indxtimefullruns[k] = np.arange(numbtimefullruns[k])
+        
+            print('numbtimekern[k]')
+            print(numbtimekern[k])
+            print('numbtimefullruns[k]')
+            print(numbtimefullruns[k])
+
             if boolthrsauto:
-                axis[2].axvline(percupprcorr, alpha=0.4, lw=3, ls='--')
-                axis[2].axvline(perclowrcorr, alpha=0.4, lw=3, ls='--')
-                axis[2].axvline(medicorr, alpha=0.4, lw=3, ls='-')
-            axis[2].set_ylabel(r'N')
-            axis[2].set_xlabel('C')
-            axis[2].set_yscale('log')
-            axis[2].hist(corr[k], color='black', bins=100)
-            
-            for i in range(numbdeteplot):
-                indxtimeplot = indxtimekern[k] + listindxtimeposimaxm[k][i]
-                proc_axiscorr(timefull, lcurfull, axis[3+i], listindxtimeposimaxm[k], corr[k], indxtime=indxtimeplot, timeoffs=timeoffs)
-            
-            path = pathimag + 'lcurflardepr%s.pdf' % (strganim)
-            print('Writing to %s...' % path)
-            plt.savefig(path)
-            plt.close()
+                perclowrcorr = np.percentile(corr[k],  1.)
+                percupprcorr = np.percentile(corr[k], 99.)
+                indx = np.where((corr[k] < percupprcorr) & (corr[k] > perclowrcorr))[0]
+                medicorr = np.median(corr[k])
+                thrs = np.std(corr[k][indx]) * 7. + medicorr
 
-        if boolanim:
-            path = pathimag + 'lcur%s.gif' % strganim
-            if not os.path.exists(path):
-                anim_tmptdete(timefull, lcurfull, meantimetmpt[k], listlcurtmpt[k], pathimag, \
-                                                            listindxtimeposimaxm[k], corrprod[k], corr[k], strgextn=strganim)
-            else:
-                print('Skipping animation for kernel %d...' % k)
+            if not np.isfinite(corrchun[l][k]).all():
+                raise Exception('')
+
+            # determine the threshold on the maximum correlation
+            if verbtype > 1:
+                print('thrs')
+                print(thrs)
+
+            # find triggers
+            listindxtimeposi = np.where(corrchun[l][k] > thrs)[0]
+            if verbtype > 1:
+                print('listindxtimeposi')
+                summgene(listindxtimeposi)
+            
+            # cluster triggers
+            listtemp = []
+            listindxtimeposiptch = []
+            for kk in range(len(listindxtimeposi)):
+                listtemp.append(listindxtimeposi[kk])
+                if kk == len(listindxtimeposi) - 1 or listindxtimeposi[kk] != listindxtimeposi[kk+1] - 1:
+                    listindxtimeposiptch.append(np.array(listtemp))
+                    listtemp = []
+            
+            if verbtype > 1:
+                print('listindxtimeposiptch')
+                summgene(listindxtimeposiptch)
+
+            listindxtimeposimaxm[l][k] = np.empty(len(listindxtimeposiptch), dtype=int)
+            for kk in range(len(listindxtimeposiptch)):
+                indxtemp = np.argmax(corrchun[l][k][listindxtimeposiptch[kk]])
+                listindxtimeposimaxm[l][k][kk] = listindxtimeposiptch[kk][indxtemp]
+            
+            if verbtype > 1:
+                print('listindxtimeposimaxm[l][k]')
+                summgene(listindxtimeposimaxm[l][k])
+            
+            if boolplot or boolanim:
+                strgextntotl = strgextn + '_kn%02d' % k
+        
+            if boolplot:
+                if numbtimefullruns[k] <= 0:
+                    continue
+                numbdeteplot = min(len(listindxtimeposimaxm[l][k]), 10)
+                figr, axis = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+                
+                #proc_axiscorr(time[indxtimechun], lcur[indxtimechun], axis[0], listindxtimeposimaxm[l][k])
+                proc_axiscorr(timechun, lcurchun, axis[0], listindxtimeposimaxm[l][k])
+                
+                axis[1].plot(timechun[indxtimefullruns[k]], corrchun[l][k], color='m', ls='', marker='o', ms=1, rasterized=True)
+                axis[1].set_ylabel('C')
+                axis[1].set_xlabel('Time [BJD-%d]' % timeoffs)
+                
+                path = pathimag + 'lcurflar_ch%02d%s.pdf' % (l, strgextntotl)
+                plt.subplots_adjust(left=0.2, bottom=0.2, hspace=0)
+                print('Writing to %s...' % path)
+                plt.savefig(path)
+                plt.close()
+                
+                for n in range(numbdeteplot):
+                    figr, axis = plt.subplots(figsize=(8, 4), sharex=True)
+                    for i in range(numbdeteplot):
+                        indxtimeplot = indxtimekern[k] + listindxtimeposimaxm[l][k][i]
+                        proc_axiscorr(timechun, lcurchun, axis, listindxtimeposimaxm[l][k], indxtime=indxtimeplot, timeoffs=timeoffs)
+                    path = pathimag + 'lcurflar_ch%02d%s_det.pdf' % (l, strgextntotl)
+                    print('Writing to %s...' % path)
+                    plt.savefig(path)
+                    plt.close()
+                
+            print('Done with the plot...')
+            if False and boolanim:
+                path = pathimag + 'lcur%s.gif' % strgextntotl
+                if not os.path.exists(path):
+                    anim_tmptdete(timefull, lcurfull, meantimetmpt[k], listlcurtmpt[k], pathimag, \
+                                                                listindxtimeposimaxm[l][k], corrprod[k], corrchun[l][k], strgextn=strgextntotl)
+                else:
+                    print('Skipping animation for kernel %d...' % k)
     if verbtype > 1:
         print('Delta T (corr_tmpt, rest): %g' % (timemodu.time() - timeinit))
 
-    return corr, listindxtimeposimaxm, timefull, lcurfull
+    return corrchun, listindxtimeposimaxm, listtimechun, listlcurchun
 
 
 def read_qlop(path, pathcsvv=None, stdvcons=None):
@@ -551,6 +595,8 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
               durabrek=None, \
               booladdddiscbdtr=False, \
               # baseline detrend type
+              ## 'medi':
+              ## 'spln':
               bdtrtype=None, \
               # spline
               ordrspln=None, \
@@ -633,7 +679,15 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
                     
                     timeknot = np.linspace(minmtime, maxmtime, numbknot)
                     timeknot = timeknot[1:-1]
-                    #print('Knot separation: %.3g hours' % (24 * (timeknot[1] - timeknot[0])))
+                    print('%d knots used. Knot separation: %.3g hours' % (numbknot, 24 * (timeknot[1] - timeknot[0])))
+                    print('timeregi[indxtimeregioutt[i]]')
+                    summgene(timeregi[indxtimeregioutt[i]])
+                    print('lcurregi[indxtimeregioutt[i]]')
+                    summgene(lcurregi[indxtimeregioutt[i]])
+                    print('timeknot')
+                    summgene(timeknot)
+                    print('ordrspln')
+                    print(ordrspln)
                     objtspln = scipy.interpolate.LSQUnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], timeknot, \
                                                                          k=ordrspln)
                     
@@ -660,7 +714,7 @@ def retr_logg(radi, mass):
 
 def retr_noistess(magtinpt):
     
-    nois = np.array([40., 40., 40., 90.,200.,700., 3e3, 2e4]) * 1e-6
+    nois = np.array([40., 40., 40., 90.,200.,700., 3e3, 2e4]) # [ppm]
     magt = np.array([ 2.,  4.,  6.,  8., 10., 12., 14., 16.])
     objtspln = scipy.interpolate.interp1d(magt, nois, fill_value='extrapolate')
     nois = objtspln(magtinpt)
@@ -1066,8 +1120,11 @@ def retr_lcurtess( \
               ## 'lygos-best'
               typedatatess='SPOC', \
               
-              # type of SPOC data to be used
+              ## type of SPOC light curve to be used for analysis: 'PDC', 'SAP'
               typedataspoc='PDC', \
+              
+              # Boolean flag to only consider SPOC data
+              boolspoconly=False, \
 
               ## subset of sectors to retrieve
               listtsecsele=None, \
@@ -1084,7 +1141,9 @@ def retr_lcurtess( \
               boolmaskqual=True, \
               ## Boolean flag to only use 20-sec data when SPOC light curves with both 2-min and 20-sec data exist
               boolfastonly=True, \
-
+         
+              **args, \
+              
              ):
     
     print('typedatatess')
@@ -1092,8 +1151,9 @@ def retr_lcurtess( \
     
     strgmast, rasctarg, decltarg = setp_coorstrgmast(rasctarg, decltarg, strgmast)
 
-    # get the list of sectors for which TESS SPOC data are available
-    listtsecffim, temp, temp = retr_listtsec(rasctarg, decltarg)
+    if not boolspoconly:
+        # get the list of sectors for which TESS SPOC data are available
+        listtsecffim, temp, temp = retr_listtsec(rasctarg, decltarg)
 
     listtsecspoc = []
         
@@ -1127,47 +1187,50 @@ def retr_lcurtess( \
     numbtsecspoc = listtsecspoc.size
     indxtsecspoc = np.arange(numbtsecspoc)
 
-    # merge SPOC and FFI sector lists
-    listtsec = np.unique(np.concatenate((listtsecffim, listtsecspoc)))
-        
+    if not boolspoconly:
+        # merge SPOC and FFI sector lists
+        listtsecmerg = np.unique(np.concatenate((listtsecffim, listtsecspoc)))
+    else:
+        listtsecmerg = listtsecspoc
+
     # filter the list of sectors using the desired list of sectors, if any
     if listtsecsele is not None:
-        listtsecsele = np.array(listtsecsele)
+        listtsec = np.array(listtsecsele)
         for tsec in listtsecsele:
-            if tsec not in listtsec:
-                print('listtsec')
-                print(listtsec)
+            if tsec not in listtsecmerg:
+                print('listtsecmerg')
+                print(listtsecmerg)
                 print('listtsecsele')
                 print(listtsecsele)
                 raise Exception('Selected sector is not in the list of available sectors.')
     else:
-        listtsecsele = listtsec
+        listtsec = listtsecmerg
     
-    print('listtsecsele')
-    print(listtsecsele)
+    print('listtsec')
+    print(listtsec)
     
-    numbtsec = len(listtsecsele)
+    numbtsec = len(listtsec)
     indxtsec = np.arange(numbtsec)
 
     listtcam = np.empty(numbtsec, dtype=int)
     listtccd = np.empty(numbtsec, dtype=int)
     
     # determine whether sectors have 2-minute cadence data
-    booltpxf = retr_booltpxf(listtsecsele, listtsecspoc)
+    booltpxf = retr_booltpxf(listtsec, listtsecspoc)
     print('booltpxf')
     print(booltpxf)
     
     boollygo = ~booltpxf
-    listtseclygo = listtsecsele[boollygo]
+    listtseclygo = listtsec[boollygo]
     if typedatatess == 'lygos' or typedatatess == 'lygos-best':
-        listtseclygo = listtsecsele
+        listtseclygo = listtsec
         if typedatatess == 'lygos':
             booltpxflygo = False
         if typedatatess == 'lygos-best':
             booltpxflygo = True
     if typedatatess == 'SPOC':
         booltpxflygo = False
-        listtseclygo = listtsecsele[boollygo]
+        listtseclygo = listtsec[boollygo]
     
     print('booltpxflygo')
     print(booltpxflygo)
@@ -1189,20 +1252,9 @@ def retr_lcurtess( \
                                        **dictlygoinpt, \
 
                                       )
-        print('listtsecsele')
-        print(listtsecsele)
-        print('dictlygooutp[listtsec]')
-        print(dictlygooutp['listtsec'])
-        for o, tseclygo in enumerate(listtsecsele):
+        for o, tseclygo in enumerate(listtsec):
             indx = np.where(dictlygooutp['listtsec'] == tseclygo)[0]
             if indx.size > 0:
-
-                print('o')
-                print(o)
-                print('tseclygo')
-                print(tseclygo)
-                print('dictlygooutp[listarry]')
-                summgene(dictlygooutp['listarry'])
                 listarrylcur[o] = dictlygooutp['listarry'][indx[0]]
                 listtcam[o] = dictlygooutp['listtcam'][indx[0]]
                 listtccd[o] = dictlygooutp['listtccd'][indx[0]]
@@ -1243,15 +1295,7 @@ def retr_lcurtess( \
         for o in indxtsec:
             if not boollygo[o]:
                 
-                indx = np.where(listtsecsele[o] == listtsecspoc)[0][0]
-                print('listtsecsele')
-                print(listtsecsele)
-                print('o')
-                print(o)
-                print('listtsecspoc')
-                print(listtsecspoc)
-                print('indx')
-                print(indx)
+                indx = np.where(listtsec[o] == listtsecspoc)[0][0]
                 path = listpathdownspoclcur[indx]
                 listarrylcursapp[indx], indxtimequalgood, indxtimenanngood, listtsec[o], listtcam[o], listtccd[o] = \
                                                        read_tesskplr_file(path, typeinst='tess', strgtype='SAP_FLUX', boolmaskqual=boolmaskqual)
@@ -1280,11 +1324,11 @@ def retr_lcurtess( \
     # merge light curves from different sectors
     arrylcur = np.concatenate(listarrylcur, 0)
         
-    for o, tseclygo in enumerate(listtsecsele):
+    for o, tseclygo in enumerate(listtsec):
         for k in range(3):
             if not np.isfinite(listarrylcur[o][:, k]).all():
-                print('listtsecsele')
-                print(listtsecsele)
+                print('listtsec')
+                print(listtsec)
                 print('tseclygo')
                 print(tseclygo)
                 print('k')
@@ -1303,7 +1347,7 @@ def retr_lcurtess( \
         summgene(indxbadd)
         raise Exception('')
                 
-    return arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc, listtsecsele, listtcam, listtccd
+    return arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc, listtsec, listtcam, listtccd
    
 
 def retr_listtablobsv(strgmast):
@@ -2042,7 +2086,7 @@ def retr_dictexar(strgexar=None):
         dictexar['booltran'] = objtexar['tran_flag'][indx].values
         dictexar['booltran'] = dictexar['booltran'].astype(bool)
         
-        for strg in ['radistar', 'massstar', 'tmptstar', 'loggstar', 'radiplan', 'massplan', 'tmptplan', \
+        for strg in ['radistar', 'massstar', 'tmptstar', 'loggstar', 'radiplan', 'massplan', 'tmptplan', 'tagestar', \
                      'vmagsyst', 'jmagsyst', 'hmagsyst', 'kmagsyst', 'metastar', 'distsyst', 'lumistar']:
             strgexar = None
             if strg.endswith('syst'):
@@ -2055,6 +2099,8 @@ def retr_dictexar(strgexar=None):
                 strgexar = 'st_'
                 if strg[:-4] == 'logg':
                     strgexar += 'logg'
+                if strg[:-4] == 'tage':
+                    strgexar += 'age'
                 if strg[:-4] == 'meta':
                     strgexar += 'met'
                 if strg[:-4] == 'radi':
@@ -2083,7 +2129,7 @@ def retr_dictexar(strgexar=None):
         dictexar['vesc'] = retr_vesc(dictexar['massplan'], dictexar['radiplan'])
         dictexar['masstotl'] = dictexar['massstar'] + dictexar['massplan'] / factmsme
         
-        dictexar['densplan'] = objtexar['pl_dens'][indx].values / 5.51 # [d_E]
+        dictexar['densplan'] = objtexar['pl_dens'][indx].values # [g/cm3]
         dictexar['vsiistar'] = objtexar['st_vsin'][indx].values # [km/s]
         dictexar['projoblq'] = objtexar['pl_projobliq'][indx].values # [deg]
         
@@ -2109,7 +2155,7 @@ def retr_dictexar(strgexar=None):
 
 def retr_vesc(massplan, radiplan):
     
-    vesc = 59.5 * np.sqrt(massplan / radiplan) # km/s
+    vesc = 11.2 * np.sqrt(massplan / radiplan) # km/s
 
     return vesc
 
@@ -2130,14 +2176,14 @@ def retr_rsma(peri, dura, cosi):
 
 def retr_duratranfull(peri, rs2a, sini, rrat, imfa):
     
-    durafull = peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. - rrat)**2 - imfa**2))
+    durafull = 24. * peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. - rrat)**2 - imfa**2)) # [hours]
 
     return durafull 
 
 
 def retr_duratrantotl(peri, rs2a, sini, rrat, imfa):
     
-    duratotl = peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. + rrat)**2 - imfa**2))
+    duratotl = 24. * peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. + rrat)**2 - imfa**2)) # [hours]
     
     return duratotl
 
@@ -2222,7 +2268,7 @@ def retr_duratran(peri, rsma, cosi):
         cosi: cosine of the inclination
     """    
     
-    dura = peri / np.pi * np.arcsin(np.sqrt(rsma**2 - cosi**2))
+    dura = 24. * peri / np.pi * np.arcsin(np.sqrt(rsma**2 - cosi**2)) # [hours]
     
     return dura
 
