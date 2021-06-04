@@ -597,7 +597,7 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
               # baseline detrend type
               ## 'medi':
               ## 'spln':
-              bdtrtype=None, \
+              typebdtr=None, \
               # spline
               ordrspln=None, \
               timescalspln=None, \
@@ -605,8 +605,8 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
               durakernbdtrmedi=None, \
              ):
     
-    if bdtrtype is None:
-        bdtrtype = 'spln'
+    if typebdtr is None:
+        typebdtr = 'spln'
     if durabrek is None:
         durabrek = 0.1
     if ordrspln is None:
@@ -616,7 +616,7 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
     if durakernbdtrmedi is None:
         durakernbdtrmedi = 1.
     
-    if bdtrtype == 'spln':
+    if typebdtr == 'spln':
         timescal = timescalspln
     else:
         timescal = durakernbdtrmedi
@@ -656,12 +656,20 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
         else:
             indxtimeregioutt[i] = np.arange(timeregi.size)
         
-        if bdtrtype == 'medi':
+        if typebdtr == 'medi':
             listobjtspln = None
             size = int(durakernbdtrmedi / np.amin(timeregi[1:] - timeregi[:-1]))
+            if size == 0:
+                print('durakernbdtrmedi')
+                print(durakernbdtrmedi)
+                print('np.amin(timeregi[1:] - timeregi[:-1])')
+                print(np.amin(timeregi[1:] - timeregi[:-1]))
+                print('lcurregi')
+                summgene(lcurregi)
+                raise Exception('')
             lcurbdtrregi[i] = 1. + lcurregi - scipy.ndimage.median_filter(lcurregi, size=size)
         
-        if bdtrtype == 'spln':
+        if typebdtr == 'spln':
             if verbtype > 1:
                 print('lcurregi[indxtimeregioutt[i]]')
                 summgene(lcurregi[indxtimeregioutt[i]])
@@ -1482,6 +1490,16 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
             numbchun = len(xdat)
             
             for n in range(numbchun):
+                print('n')
+                print(n)
+                print('numbchun')
+                print(numbchun)
+                print('xdat[n]')
+                print(xdat[n])
+                print('k')
+                print(k)
+                print('listcolrmodl')
+                print(listcolrmodl)
                 axis.plot(xdat[n], ydat[n], color=listcolrmodl[k], lw=2)
             k += 1
 
