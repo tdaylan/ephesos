@@ -139,7 +139,7 @@ def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, indxtime=None, colr='k
     axis.set_ylabel('Relative flux')
     
 
-def srch_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=None, maxmscalfalltmpt=None, \
+def srch_flar(time, lcur, typeverb=1, strgextn='', numbkern=3, minmscalfalltmpt=None, maxmscalfalltmpt=None, \
                                                                     pathimag=None, boolplot=True, boolanim=False, thrs=None):
 
     minmtime = np.amin(time)
@@ -158,7 +158,7 @@ def srch_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=
     if maxmscalfalltmpt is None:
         maxmscalfalltmpt = 3. / 24.
     
-    if verbtype > 1:
+    if typeverb > 1:
         print('lcurtmpt')
         summgene(lcurtmpt)
     
@@ -183,11 +183,11 @@ def srch_flar(time, lcur, verbtype=1, strgextn='', numbkern=3, minmscalfalltmpt=
             raise Exception('')
         
     corr, listindxtimeposimaxm, timefull, lcurfull = corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, thrs=thrs, boolanim=boolanim, boolplot=boolplot, \
-                                                                                            verbtype=verbtype, strgextn=strgextn, pathimag=pathimag)
+                                                                                            typeverb=typeverb, strgextn=strgextn, pathimag=pathimag)
 
     #corr, listindxtimeposimaxm, timefull, rflxfull = ephesus.corr_tmpt(gdat.timethis, gdat.rflxthis, gdat.listtimetmpt, gdat.listdflxtmpt, \
     #                                                                    thrs=gdat.thrstmpt, boolanim=gdat.boolanimtmpt, boolplot=gdat.boolplottmpt, \
-     #                                                               verbtype=gdat.verbtype, strgextn=gdat.strgextnthis, pathimag=gdat.pathtargimag)
+     #                                                               typeverb=gdat.typeverb, strgextn=gdat.strgextnthis, pathimag=gdat.pathtargimag)
                 
     return corr, listindxtimeposimaxm, meantimetmpt, timefull, lcurfull
 
@@ -229,13 +229,13 @@ def corr_copy(indxtimefullruns, lcurstan, indxtimekern, numbkern):
     return listlcurtemp
 
 
-def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, strgextn='', pathimag=None, boolplot=True, boolanim=False):
+def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, typeverb=2, thrs=None, strgextn='', pathimag=None, boolplot=True, boolanim=False):
     
     timeoffs = np.amin(time) // 1000
     timeoffs *= 1000
     time -= timeoffs
     
-    if verbtype > 1:
+    if typeverb > 1:
         timeinit = timemodu.time()
     
     print('corr_tmpt()')
@@ -397,13 +397,13 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
                 raise Exception('')
 
             # determine the threshold on the maximum correlation
-            if verbtype > 1:
+            if typeverb > 1:
                 print('thrs')
                 print(thrs)
 
             # find triggers
             listindxtimeposi = np.where(corrchun[l][k] > thrs)[0]
-            if verbtype > 1:
+            if typeverb > 1:
                 print('listindxtimeposi')
                 summgene(listindxtimeposi)
             
@@ -416,7 +416,7 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
                     listindxtimeposiptch.append(np.array(listtemp))
                     listtemp = []
             
-            if verbtype > 1:
+            if typeverb > 1:
                 print('listindxtimeposiptch')
                 summgene(listindxtimeposiptch)
 
@@ -425,7 +425,7 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
                 indxtemp = np.argmax(corrchun[l][k][listindxtimeposiptch[kk]])
                 listindxtimeposimaxm[l][k][kk] = listindxtimeposiptch[kk][indxtemp]
             
-            if verbtype > 1:
+            if typeverb > 1:
                 print('listindxtimeposimaxm[l][k]')
                 summgene(listindxtimeposimaxm[l][k])
             
@@ -469,7 +469,7 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, verbtype=2, thrs=None, str
                                                                 listindxtimeposimaxm[l][k], corrprod[k], corrchun[l][k], strgextn=strgextntotl)
                 else:
                     print('Skipping animation for kernel %d...' % k)
-    if verbtype > 1:
+    if typeverb > 1:
         print('Delta T (corr_tmpt, rest): %g' % (timemodu.time() - timeinit))
 
     return corrchun, listindxtimeposimaxm, listtimechun, listlcurchun
@@ -589,19 +589,34 @@ def retr_timeedge(time, lcur, durabrek, \
     return timeedge
 
 
-def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=1, \
+def bdtr_tser( \
+              # time grid
+              time, \
+              # dependent variable
+              lcur, \
               
-              # break
+              # epoc, period, and duration of mask
+              epocmask=None, perimask=None, duramask=None, \
+              
+              # verbosity level
+              typeverb=1, \
+              
+              # minimum gap to break the time-series into regions
               durabrek=None, \
+              
+              # Boolean flag to add breaks at vertical discontinuties
               booladdddiscbdtr=False, \
+              
               # baseline detrend type
               ## 'medi':
               ## 'spln':
               typebdtr=None, \
-              # spline
+              
+              # order of the spline
               ordrspln=None, \
+              # time scale of the spline fit
               timescalspln=None, \
-              # median filter
+              # time scale of the median detrending
               durakernbdtrmedi=None, \
              ):
     
@@ -621,7 +636,7 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
     else:
         timescal = durakernbdtrmedi
 
-    if verbtype > 0:
+    if typeverb > 0:
         print('Detrending the light curve with at a time scale of %.g days...' % timescal)
         if epocmask is not None:
             print('Using a specific ephemeris to mask out transits while detrending...')
@@ -637,7 +652,7 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
     indxtimeregioutt = [[] for i in indxregi]
     listobjtspln = [[] for i in indxregi]
     for i in indxregi:
-        if verbtype > 1:
+        if typeverb > 1:
             print('i')
             print(i)
         # find times inside the region
@@ -670,7 +685,7 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
             lcurbdtrregi[i] = 1. + lcurregi - scipy.ndimage.median_filter(lcurregi, size=size)
         
         if typebdtr == 'spln':
-            if verbtype > 1:
+            if typeverb > 1:
                 print('lcurregi[indxtimeregioutt[i]]')
                 summgene(lcurregi[indxtimeregioutt[i]])
             # fit the spline
@@ -705,7 +720,7 @@ def bdtr_tser(time, lcur, epocmask=None, perimask=None, duramask=None, verbtype=
                 lcurbdtrregi[i] = lcurregi
                 listobjtspln[i] = None
             
-            if verbtype > 1:
+            if typeverb > 1:
                 print('lcurbdtrregi[i]')
                 summgene(lcurbdtrregi[i])
                 print('')
