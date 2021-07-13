@@ -20,6 +20,7 @@ from astropy.io import fits
 import pandas as pd
 
 import multiprocessing
+from functools import partial
 
 import scipy as sp
 import scipy.interpolate
@@ -515,6 +516,11 @@ def read_qlop(path, pathcsvv=None, stdvcons=None):
 
 def retr_indxtimetran(time, epoc, peri, dura, booloutt=False, boolseco=False):
     
+    '''
+    
+    Duration is in hours.
+
+    '''
     if not np.isfinite(time).all():
         raise Exception('')
     
@@ -524,8 +530,8 @@ def retr_indxtimetran(time, epoc, peri, dura, booloutt=False, boolseco=False):
     listindxtimetran = []
     
     if np.isfinite(peri):
-        intgminm = np.floor((np.amin(time) - epoc - dura / 2.) / peri)
-        intgmaxm = np.ceil((np.amax(time) - epoc - dura / 2.) / peri)
+        intgminm = np.floor((np.amin(time) - epoc - dura / 48.) / peri)
+        intgmaxm = np.ceil((np.amax(time) - epoc - dura / 48.) / peri)
         arry = np.arange(intgminm, intgmaxm + 1)
     else:
         arry = np.arange(1)
@@ -536,8 +542,8 @@ def retr_indxtimetran(time, epoc, peri, dura, booloutt=False, boolseco=False):
         offs = 0.
 
     for n in arry:
-        timeinit = epoc + (n + offs) * peri - dura / 2.
-        timefinl = epoc + (n + offs) * peri + dura / 2.
+        timeinit = epoc + (n + offs) * peri - dura / 48.
+        timefinl = epoc + (n + offs) * peri + dura / 48.
         indxtimetran = np.where((time > timeinit) & (time < timefinl))[0]
         listindxtimetran.append(indxtimetran)
     indxtimetran = np.concatenate(listindxtimetran)
@@ -551,14 +557,14 @@ def retr_indxtimetran(time, epoc, peri, dura, booloutt=False, boolseco=False):
     return indxtimeretr
     
 
-def retr_timeedge(time, lcur, durabrek, \
+def retr_timeedge(time, lcur, timebrek, \
                   # Boolean flag to add breaks at discontinuties
                   booladdddiscbdtr, \
                   timescal, \
                  ):
     
     difftime = time[1:] - time[:-1]
-    indxtimebrek = np.where(difftime > durabrek)[0]
+    indxtimebrek = np.where(difftime > timebrek)[0]
     
     if booladdddiscbdtr:
         listindxtimebrekaddi = []
@@ -602,7 +608,7 @@ def bdtr_tser( \
               typeverb=1, \
               
               # minimum gap to break the time-series into regions
-              durabrek=None, \
+              timebrek=None, \
               
               # Boolean flag to add breaks at vertical discontinuties
               booladdddiscbdtr=False, \
@@ -614,35 +620,34 @@ def bdtr_tser( \
               
               # order of the spline
               ordrspln=None, \
-              # time scale of the spline fit
-              timescalspln=None, \
+              # time scale of the spline detrending
+              timescalbdtrspln=None, \
               # time scale of the median detrending
-              durakernbdtrmedi=None, \
+              timescalbdtrmedi=None, \
              ):
     
     if typebdtr is None:
         typebdtr = 'spln'
-    if durabrek is None:
-        durabrek = 0.1
+    if timebrek is None:
+        timebrek = 0.1 # [day]
     if ordrspln is None:
         ordrspln = 3
-    if timescalspln is None:
-        timescalspln = 0.5
-    if durakernbdtrmedi is None:
-        durakernbdtrmedi = 1.
+    if timescalbdtrspln is None:
+        timescalbdtrspln = 0.5
+    if timescalbdtrmedi is None:
+        timescalbdtrmedi = 0.5 # [hour]
     
     if typebdtr == 'spln':
-        timescal = timescalspln
+        timescal = timescalbdtrspln
     else:
-        timescal = durakernbdtrmedi
-
+        timescal = timescalbdtrmedi
     if typeverb > 0:
         print('Detrending the light curve with at a time scale of %.g days...' % timescal)
         if epocmask is not None:
             print('Using a specific ephemeris to mask out transits while detrending...')
         
     # determine the times at which the light curve will be broken into pieces
-    timeedge = retr_timeedge(time, lcur, durabrek, booladdddiscbdtr, timescal)
+    timeedge = retr_timeedge(time, lcur, timebrek, booladdddiscbdtr, timescal)
 
     numbedge = len(timeedge)
     numbregi = numbedge - 1
@@ -673,10 +678,10 @@ def bdtr_tser( \
         
         if typebdtr == 'medi':
             listobjtspln = None
-            size = int(durakernbdtrmedi / np.amin(timeregi[1:] - timeregi[:-1]))
+            size = int(timescalbdtrmedi / np.amin(timeregi[1:] - timeregi[:-1]))
             if size == 0:
-                print('durakernbdtrmedi')
-                print(durakernbdtrmedi)
+                print('timescalbdtrmedi')
+                print(timescalbdtrmedi)
                 print('np.amin(timeregi[1:] - timeregi[:-1])')
                 print(np.amin(timeregi[1:] - timeregi[:-1]))
                 print('lcurregi')
@@ -698,24 +703,20 @@ def bdtr_tser( \
                 else:
                     minmtime = np.amin(timeregi[indxtimeregioutt[i]])
                     maxmtime = np.amax(timeregi[indxtimeregioutt[i]])
-                    numbknot = int((maxmtime - minmtime) / timescalspln)
+                    numbknot = int((maxmtime - minmtime) / timescalbdtrspln)
                     
                     timeknot = np.linspace(minmtime, maxmtime, numbknot)
-                    timeknot = timeknot[1:-1]
-                    print('%d knots used. Knot separation: %.3g hours' % (numbknot, 24 * (timeknot[1] - timeknot[0])))
-                    print('timeregi[indxtimeregioutt[i]]')
-                    summgene(timeregi[indxtimeregioutt[i]])
-                    print('lcurregi[indxtimeregioutt[i]]')
-                    summgene(lcurregi[indxtimeregioutt[i]])
-                    print('timeknot')
-                    summgene(timeknot)
-                    print('ordrspln')
-                    print(ordrspln)
-                    objtspln = scipy.interpolate.LSQUnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], timeknot, \
-                                                                         k=ordrspln)
                     
-                    lcurbdtrregi[i] = lcurregi - objtspln(timeregi) + 1.
-                    listobjtspln[i] = objtspln
+                    if numbknot >= 2:
+                        print('%d knots used. Knot separation: %.3g hours' % (timeknot.size, 24 * (timeknot[1] - timeknot[0])))
+                        timeknot = timeknot[1:-1]
+                    
+                        objtspln = scipy.interpolate.LSQUnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], timeknot, k=ordrspln)
+                        lcurbdtrregi[i] = lcurregi - objtspln(timeregi) + 1.
+                        listobjtspln[i] = objtspln
+                    else:
+                        lcurbdtrregi[i] = lcurregi - np.mean(lcurregi)
+                        listobjtspln[i] = None
             else:
                 lcurbdtrregi[i] = lcurregi
                 listobjtspln[i] = None
@@ -745,37 +746,108 @@ def retr_noistess(magtinpt):
     return nois
 
 
-def retr_magttess(gdat, cntp):
+def retr_tmag(gdat, cntp):
     
-    magt = -2.5 * np.log10(cntp / 1.5e4 / gdat.listcade) + 10
+    tmag = -2.5 * np.log10(cntp / 1.5e4 / gdat.listcade) + 10
+    #tmag = -2.5 * np.log10(mlikfluxtemp) + 20.424
+    
     #mlikmagttemp = 10**((mlikmagttemp - 20.424) / (-2.5))
     #stdvmagttemp = mlikmagttemp * stdvmagttemp / 1.09
-    #mliklcurtemp = -2.5 * np.log10(mlikfluxtemp) + 20.424
-    #gdat.magtrefr = -2.5 * np.log10(gdat.refrrflx[o] / 1.5e4 / 30. / 60.) + 10
     #gdat.stdvmagtrefr = 1.09 * gdat.stdvrefrrflx[o] / gdat.refrrflx[o]
     
-    return magt
+    return tmag
 
 
-def exec_blsq(arrytser, minmdcyc=0.001):
+def spaw_blsq(listperi, arrytser, minmtime, phasshft, listdcyc, listoffs, i):
+    
+    numbperi = len(listperi[i])
+    numboffs = len(listoffs)
+    indxoffs = np.arange(numboffs)
+    numbdcyc = len(listdcyc)
+    indxdcyc = np.arange(numbdcyc)
+    
+    listdept = np.zeros((numbperi, numbdcyc, numboffs))
+    s2nr = np.zeros((numbperi, numbdcyc, numboffs))
+
+    for k, peri in enumerate(listperi[i]):
+        #timechec[k, 0] = timemodu.time()
+
+        arrypcur = fold_tser(arrytser, minmtime, peri, boolsort=False, booldiagmode=False, phasshft=phasshft)
+        
+        #timechec[k, 1] = timemodu.time()
+
+        vari = arrypcur[:, 2]**2
+        weig = 1. / vari
+        stdvdepttemp = np.sqrt(np.nanmean(vari))
+
+        #timechec[k, 2] = timemodu.time()
+
+        for l in indxdcyc:
+            for m in indxoffs:
+                
+                #timechecloop[0][k, l, m] = timemodu.time()
+
+                booltemp = (arrypcur[:, 0] + listdcyc[l] / 2. - listoffs[m]) % 1. < listdcyc[l]
+                
+                #timechecloop[1][k, l, m] = timemodu.time()
+
+                indxitra = np.where(booltemp)[0]
+                
+                if indxitra.size == 0:
+                    continue
+                
+                indxotra = np.where(~booltemp)[0]
+                
+                #timechecloop[2][k, l, m] = timemodu.time()
+
+                #deptitra = np.nansum(arrypcur[indxitra, 1] * weig[indxitra]) / np.nansum(weig[indxitra])
+                #deptotra = np.nansum(arrypcur[indxotra, 1] * weig[indxotra]) / np.nansum(weig[indxotra])
+                
+                deptitra = np.mean(arrypcur[indxitra, 1])
+                deptotra = np.mean(arrypcur[indxotra, 1])
+                
+                #timechecloop[3][k, l, m] = timemodu.time()
+
+                depttemp = deptotra - deptitra
+                s2nrtemp = depttemp / stdvdepttemp
+                listdept[k, l, m] = depttemp
+                s2nr[k, l, m] = s2nrtemp
+                
+                #timechecloop[4][k, l, m] = timemodu.time()
+                
+    return listdept, s2nr
+
+
+def exec_blsq( \
+              arrytser, \
+              minmdcyc=0.001, \
+              # Boolean flag to enable multiprocessing
+              boolmult=False, \
+             ):
     
     dictblsqoutp = dict()
     
+    timeinit = timemodu.time()
+
     numbtime = arrytser.shape[0]
     minmtime = np.amin(arrytser[:, 0])
     maxmtime = np.amax(arrytser[:, 0])
     indxtime = np.arange(numbtime)
     timeinit = timemodu.time()
     
-    factrsrj, factrjre, factrsre, factmsmj, factmjme, factmsme, factaurs = retr_factconv()
+    dictfact = retr_factconv()
     
-    minmperi = 0.3
-    maxmperi = (maxmtime - minmtime) / 3.
+    minmperi = 1.
+    maxmperi = (maxmtime - minmtime) / 4.
+    maxmperi = 1.4
+    print('minmperi')
+    print(minmperi)
     print('maxmperi')
     print(maxmperi)
     numbtranmaxm = (maxmtime - minmtime) / minmperi
     diffperi = (maxmtime - minmtime) / numbtranmaxm
-    numbperi = 5 * int((maxmperi - minmperi) / diffperi)
+    numbperi = int(4. * (maxmperi - minmperi) / diffperi)
+    numbperi = 10000
     print('numbperi')
     print(numbperi)
     listperi = np.linspace(minmperi, maxmperi, numbperi)
@@ -798,91 +870,46 @@ def exec_blsq(arrytser, minmdcyc=0.001):
     indxperi = np.arange(numbperi)
     indxdcyc = np.arange(numbdcyc)
     indxoffs = np.arange(numboffs)
-    listdept = np.zeros((numbperi, numbdcyc, numboffs))
-    s2nr = np.zeros((numbperi, numbdcyc, numboffs))
     
     numbphas = 1000
     indxphas = np.arange(numbphas)
     binsphas = np.linspace(-phasshft, phasshft, numbphas + 1)
     meanphas = (binsphas[1:] + binsphas[:-1]) / 2.
 
-    arrytserextn = arrytser[:, :, None, None] + 0 * listdcyc[None, None, :, None] * listoffs[None, None, None, :]
-    for k in tqdm(range(numbperi)):
-        
-        arrypcur = fold_tser(arrytser, minmtime, listperi[k], boolsort=False, booldiagmode=False, phasshft=phasshft)
-        
-        # rebin the phase curve
-        arrypcur = rebn_tser(arrypcur, binsxdat=binsphas)
+    timechec = np.zeros((numbperi, 10))
+    timechecloop = [np.zeros((numbperi, numbdcyc, numboffs)) for k in range(5)]
 
-        vari = arrypcur[:, 2]**2
-        weig = 1. / vari
-        stdvdepttemp = np.sqrt(np.nanmean(vari))
-        for l in indxdcyc:
-            for m in indxoffs:
-                
-                booltemp = (arrypcur[:, 0] + listdcyc[l] / 2. - listoffs[m]) % 1. < listdcyc[l]
-                indxitra = np.where(booltemp)[0]
-                if indxitra.size == 0:
-                    continue
-                indxotra = np.where(~booltemp)[0]
-                deptitra = np.nansum(arrypcur[indxitra, 1] * weig[indxitra]) / np.nansum(weig[indxitra])
-                deptotra = np.nansum(arrypcur[indxotra, 1] * weig[indxotra]) / np.nansum(weig[indxotra])
-                #deptitra = np.mean(arrypcur[indxitra, 1])
-                #deptotra = np.mean(arrypcur[indxotra, 1])
-                depttemp = deptotra - deptitra
-                s2nrtemp = depttemp / stdvdepttemp
-                listdept[k, l, m] = depttemp
-                s2nr[k, l, m] = s2nrtemp
-                
-                if False:
-                #if True:
-                #if k == 11 and l == 6 and m == 121:
-                    print('listdcyc[l]')
-                    print(listdcyc[l])
-                    print('listoffs[m]')
-                    print(listoffs[m])
-                    print('arrypcur[:, 0]')
-                    print(arrypcur[:, 0])
-                    print('arrypcur[:, 1]')
-                    print(arrypcur[:, 1])
-                    
-                    print('arrypcur[:, 1] * booltemp.astype(int)')
-                    print(arrypcur[:, 1] * booltemp.astype(int))
-                    print('indxitra')
-                    summgene(indxitra)
-                    print('arrypcur[indxitra, 1]')
-                    summgene(arrypcur[indxitra, 1])
-                    print('arrypcur[indxitra, 2]')
-                    summgene(arrypcur[indxitra, 2])
-                    print('weig[indxitra]')
-                    summgene(weig[indxitra])
-                    print('arrypcur[indxotra, 1]')
-                    summgene(arrypcur[indxotra, 1])
-                    print('arrypcur[indxotra, 2]')
-                    summgene(arrypcur[indxotra, 2])
-                    print('weig[indxotra]')
-                    summgene(weig[indxotra])
-                    print('deptitra')
-                    print(deptitra)
-                    print('deptotra')
-                    print(deptotra)
-                    print('depttemp')
-                    print(depttemp)
-                    print('stdvdepttemp')
-                    print(stdvdepttemp)
-                    print('s2nrtemp')
-                    print(s2nrtemp)
-                    print('')
+    if boolmult:
+        objtpool = multiprocessing.Pool()
+        numbproc = objtpool._processes
+        indxproc = np.arange(numbproc)
+        
+        print('Generating %d processes...' % numbproc)
+
+        listperiproc = [[] for i in indxproc]
+        indxprocperi = np.linspace(0, numbproc - 1, numbperi).astype(int)
+        for i in indxproc:
+            indx = np.where(indxprocperi == i)[0]
+            listperiproc[i] = listperi[indx]
+        temp = objtpool.map(partial(spaw_blsq, listperiproc, arrytser, minmtime, phasshft, listdcyc, listoffs), indxproc)
+        listdept = [temp[k][0] for k in indxproc]
+        lists2nr = [temp[k][1] for k in indxproc]
+        listdept = np.concatenate(listdept, 0)
+        lists2nr = np.concatenate(lists2nr, 0)
+    else:
+        listdept, lists2nr = spaw_blsq([listperi], arrytser, minmtime, phasshft, listdcyc, listoffs, 0)
     
-    timefinl = timemodu.time()
-    timetotl = timefinl - timeinit
-    timeredu = timetotl / numbtime / numbperi / numboffs / numbdcyc
+    indx = np.unravel_index(np.nanargmax(lists2nr), lists2nr.shape)
     
-    indx = np.unravel_index(np.nanargmax(s2nr), s2nr.shape)
-    
-    dictblsqoutp['s2nr'] = np.nanmax(s2nr)
+    dictblsqoutp['s2nr'] = np.nanmax(lists2nr)
     dictblsqoutp['peri'] = listperi[indx[0]]
-    dictblsqoutp['dura'] = listdcyc[indx[1]] * listperi[indx[0]]
+    print('indx')
+    print(indx)
+    print('listdcyc')
+    summgene(listdcyc)
+    print('listdcyc[indx[1]]')
+    print(listdcyc[indx[1]])
+    dictblsqoutp['dura'] = 24. * listdcyc[indx[1]] * listperi[indx[0]] # [hours]
     dictblsqoutp['epoc'] = minmtime + listoffs[indx[2]] * listperi[indx[0]]
     dictblsqoutp['dept'] = listdept[indx]
     
@@ -891,15 +918,14 @@ def exec_blsq(arrytser, minmdcyc=0.001):
 
     s2nrperi = np.empty_like(listperi)
     for k in indxperi:
-        indx = np.unravel_index(np.nanargmax(s2nr[k, :, :]), s2nr[k, :, :].shape)
-        s2nrperi[k] = s2nr[k, :, :][indx]
+        indx = np.unravel_index(np.nanargmax(lists2nr[k, :, :]), lists2nr[k, :, :].shape)
+        s2nrperi[k] = lists2nr[k, :, :][indx]
     
     # best-fit orbit
     cosi = 0
     rsma = retr_rsma(dictblsqoutp['peri'], dictblsqoutp['dura'], cosi)
     rrat = np.sqrt(dictblsqoutp['dept'])
 
-    print('exec_blsq() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
     dictblsqoutp['listperi'] = listperi
     
     print('temp: assuming power is SNR')
@@ -909,7 +935,7 @@ def exec_blsq(arrytser, minmdcyc=0.001):
     arrytsermodl = np.empty((numbtimemodl, 3))
     arrytsermodl[:, 0] = np.linspace(minmtime, maxmtime, 100000)
     arrytsermodl[:, 1] = retr_rflxtranmodl(arrytsermodl[:, 0], [dictblsqoutp['peri']], [dictblsqoutp['epoc']], \
-                                        [rrat], 1. / factrsre, [rsma], [cosi], booltrap=False)
+                                        [rrat], 1. / dictfact['rsre'], [rsma], [cosi], booltrap=False)
 
     arrypsermodl = fold_tser(arrytsermodl, dictblsqoutp['epoc'], dictblsqoutp['peri'], phasshft=phasshft)
     arrypserdata = fold_tser(arrytser, dictblsqoutp['epoc'], dictblsqoutp['peri'], phasshft=phasshft)
@@ -924,8 +950,21 @@ def exec_blsq(arrytser, minmdcyc=0.001):
     dictblsqoutp['phasmodl'] = arrypsermodl[:, 0]
     dictblsqoutp['rflxpsermodl'] = arrypsermodl[:, 1]
     
-    print('dictblsqoutp')
-    print(dictblsqoutp)
+    print('dictblsqoutp[peri]')
+    print(dictblsqoutp['peri'])
+    
+    #print('dt0: %.3g ms.' % (1e3 * np.mean(timechec[:, 1] - timechec[:, 0])))
+    #print('dt1: %.3g ms.' % (1e3 * np.mean(timechec[:, 2] - timechec[:, 1])))
+    #print('dt2: %.3g ms.' % (1e3 * np.mean(timechec[:, 3] - timechec[:, 2])))
+    #for k in range(4):
+    #    indx = np.where((timechecloop[k] > 0) & (timechecloop[k+1] > 0))[0]
+    #    print('dtl%d: %.3g ms.' % (k, 1e3 * numbdcyc * numboffs * np.mean(timechecloop[k+1][indx] - timechecloop[k][indx])))
+    
+    timefinl = timemodu.time()
+    timetotl = timefinl - timeinit
+    timeredu = timetotl / numbtime / numbperi / numboffs / numbdcyc
+    
+    print('exec_blsq() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
 
     return dictblsqoutp
 
@@ -982,10 +1021,11 @@ def srch_pbox(arry, \
 
     while True:
         
-        print('j')
-        print(j)
         if maxmnumbtobj is not None and j >= maxmnumbtobj:
             break
+        
+        print('j')
+        print(j)
 
         # mask out the detected transit
         if j == 0:
@@ -1039,7 +1079,7 @@ def srch_pbox(arry, \
             dictblsqoutp['rflxtsermodl'] = 2. - dictblsqoutp['rflxtsermodl']
         
         if pathimag is not None:
-            strgtitl = 'P=%.3g d, Dep=%.3g ppm, Dur=%.3g d, SDE=%.3g' % \
+            strgtitl = 'P=%.3g d, Dep=%.3g ppm, Dur=%.3g hr, SDE=%.3g' % \
                         (dictblsqoutp['peri'], dictblsqoutp['dept'], dictblsqoutp['dura'], dictblsqoutp['sdee'])
             # plot TLS power spectrum
             figr, axis = plt.subplots(figsize=figrsize)
@@ -1505,16 +1545,6 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
             numbchun = len(xdat)
             
             for n in range(numbchun):
-                print('n')
-                print(n)
-                print('numbchun')
-                print(numbchun)
-                print('xdat[n]')
-                print(xdat[n])
-                print('k')
-                print(k)
-                print('listcolrmodl')
-                print(listcolrmodl)
                 axis.plot(xdat[n], ydat[n], color=listcolrmodl[k], lw=2)
             k += 1
 
@@ -1757,15 +1787,15 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     maxmtime = np.amax(time)
     numbtime = time.size
     
-    factrsrj, factrjre, factrsre, factmsmj, factmjme, factmsme, factaurs = retr_factconv()
+    dictfact = retr_factconv()
     
     if boolinptphys:
-        smax = (radistar + radiplan / factrsre) / rsma / factaurs
+        smax = (radistar + radiplan / dictfact['rsre']) / rsma / dictfact['aurs']
     
-    rs2a = radistar / smax / factaurs
+    rs2a = radistar / smax / dictfact['aurs']
     imfa = retr_imfa(cosi, rs2a, ecce, sinw)
     sini = np.sqrt(1. - cosi**2)
-    rrat = radiplan / factrsre / radistar
+    rrat = radiplan / dictfact['rsre'] / radistar
     dept = rrat**2
     
     rflxtranmodl = np.ones_like(time)
@@ -1828,14 +1858,15 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
                 timeshftnega = -timeshft
                 timeshftabso = abs(timeshft)
                 
-                indxtimetotl = np.where(timeshftabso < duratotlhalf[j])[0]
+                indxtimetotl = np.where(timeshftabso < duratotlhalf[j] / 24.)[0]
                 if booltrap:
-                    indxtimefull = indxtimetotl[np.where(timeshftabso[indxtimetotl] < durafullhalf[j])]
-                    indxtimeinre = indxtimetotl[np.where((timeshftnega[indxtimetotl] < duratotlhalf[j]) & (timeshftnega[indxtimetotl] > durafullhalf[j]))]
-                    indxtimeegre = indxtimetotl[np.where((timeshft[indxtimetotl] < duratotlhalf[j]) & (timeshft[indxtimetotl] > durafullhalf[j]))]
+                    indxtimefull = indxtimetotl[np.where(timeshftabso[indxtimetotl] < durafullhalf[j] / 24.)]
+                    indxtimeinre = indxtimetotl[np.where((timeshftnega[indxtimetotl] < duratotlhalf[j] / 24.) & \
+                                                                                        (timeshftnega[indxtimetotl] > durafullhalf[j] / 24.))]
+                    indxtimeegre = indxtimetotl[np.where((timeshft[indxtimetotl] < duratotlhalf[j] / 24.) & (timeshft[indxtimetotl] > durafullhalf[j] / 24.))]
                 
-                    rflxtranmodl[indxtimeinre] += dept[j] * ((timeshftnega[indxtimeinre] - duratotlhalf[j]) / duraineg[j])
-                    rflxtranmodl[indxtimeegre] += dept[j] * ((timeshft[indxtimeegre] - duratotlhalf[j]) / duraineg[j])
+                    rflxtranmodl[indxtimeinre] += dept[j] * ((timeshftnega[indxtimeinre] - duratotlhalf[j] / 24.) / duraineg[j] / 24.)
+                    rflxtranmodl[indxtimeegre] += dept[j] * ((timeshft[indxtimeegre] - duratotlhalf[j] / 24.) / duraineg[j])
                     rflxtranmodl[indxtimefull] -= dept[j]
                 else:
                     rflxtranmodl[indxtimetotl] -= dept[j]
@@ -1969,8 +2000,8 @@ def retr_lcur_mock(numbplan=100, numbnois=100, numbtime=100, dept=1e-2, nois=1e-
     maxmdept = 1e-2
     minmepoc = np.amin(time)
     maxmepoc = np.amax(time)
-    minmdura = 0.125
-    maxmdura = 0.375
+    minmdura = 3. # [hour]
+    maxmdura = 4. # [hour]
 
     # input data
     flux = np.zeros((numbdata, numbtime))
@@ -1991,7 +2022,7 @@ def retr_lcur_mock(numbplan=100, numbnois=100, numbtime=100, dept=1e-2, nois=1e-
     for k in indxplan:
         phas = (time - epocplan[k]) / periplan[k]
         for n in range(-1000, 1000):
-            indxphastran = np.where(abs(phas - n) < duraplan[k] / periplan[k])[0]
+            indxphastran = np.where(abs(phas - n) < duraplan[k] / periplan[k] / 24.)[0]
             fluxplan[k, indxphastran] -= deptplan[k]
     
     # place the signal data
@@ -2076,7 +2107,7 @@ def retr_dictexar(strgexar=None):
         indx = np.where(objtexar['hostname'] == strgexar)[0]
         #indx = np.where((objtexar['hostname'] == strgexar) & (objtexar['default_flag'].values == 1))[0]
     
-    factrsrj, factrjre, factrsre, factmsmj, factmjme, factmsme, factaurs = retr_factconv()
+    dictfact = retr_factconv()
     
     if indx.size == 0:
         print('The target name, %s, was not found in the NASA Exoplanet Archive composite table.' % strgexar)
@@ -2111,7 +2142,7 @@ def retr_dictexar(strgexar=None):
         dictexar['smax'] = objtexar['pl_orbsmax'][indx].values # [AU]
         dictexar['epoc'] = objtexar['pl_tranmid'][indx].values # [BJD]
         dictexar['cosi'] = np.cos(objtexar['pl_orbincl'][indx].values / 180. * np.pi)
-        dictexar['duratran'] = objtexar['pl_trandur'][indx].values / 24. # [day]
+        dictexar['duratran'] = objtexar['pl_trandur'][indx].values # [hour]
         dictexar['dept'] = objtexar['pl_trandep'][indx].values / 100. # dimensionless
         
         dictexar['boolfpos'] = np.zeros(numbplanexar, dtype=bool)
@@ -2160,7 +2191,7 @@ def retr_dictexar(strgexar=None):
             dictexar['stdv%s' % strg] = (objtexar['%serr1' % strgexar][indx].values - objtexar['%serr2' % strgexar][indx].values) / 2.
        
         dictexar['vesc'] = retr_vesc(dictexar['massplan'], dictexar['radiplan'])
-        dictexar['masstotl'] = dictexar['massstar'] + dictexar['massplan'] / factmsme
+        dictexar['masstotl'] = dictexar['massstar'] + dictexar['massplan'] / dictfact['msme']
         
         dictexar['densplan'] = objtexar['pl_dens'][indx].values # [g/cm3]
         dictexar['vsiistar'] = objtexar['st_vsin'][indx].values # [km/s]
@@ -2179,7 +2210,7 @@ def retr_dictexar(strgexar=None):
             dictexar['numbplantranstar'][k] = indxexarstartran.size
             #dictexar['booltrantotl'][k] = dictexar['booltran'][indxexarstar].all()
         
-        dictexar['rrat'] = dictexar['radiplan'] / dictexar['radistar'] / factrsre
+        dictexar['rrat'] = dictexar['radiplan'] / dictexar['radistar'] / dictfact['rsre']
         
     return dictexar
 
@@ -2202,7 +2233,7 @@ def retr_rs2a(rsma, rrat):
 
 def retr_rsma(peri, dura, cosi):
     
-    rsma = np.sqrt(np.sin(dura * np.pi / peri)**2 + cosi**2)
+    rsma = np.sqrt(np.sin(dura * np.pi / peri / 24.)**2 + cosi**2)
     
     return rsma
 
@@ -2310,10 +2341,10 @@ def retr_duratran(peri, rsma, cosi):
 # massstar in M_S
 def retr_rvelsema(peri, massplan, massstar, incl, ecce):
     
-    factrsrj, factrjre, factrsre, factmsmj, factmjme, factmsme, factaurs = retr_factconv()
+    dictfact = retr_factconv()
     
     rvelsema = 203. * peri**(-1. / 3.) * massplan * np.sin(incl / 180. * np.pi) / \
-                                                    (massplan + massstar * factmsme)**(2. / 3.) / np.sqrt(1. - ecce**2) # [m/s]
+                                                    (massplan + massstar * dictfact['msme'])**(2. / 3.) / np.sqrt(1. - ecce**2) # [m/s]
 
     return rvelsema
 
@@ -2343,17 +2374,18 @@ def retr_rvel(time, epoc, peri, massplan, massstar, incl, ecce, arguperi):
 
 def retr_factconv():
     
-    factrsrj = 9.731
-    factrjre = 11.21
-    factrsre = factrsrj * factrjre
-    
-    factmsmj = 1048.
-    factmjme = 317.8
-    factmsme = factmsmj * factmjme
+    dictfact = dict()
 
-    factaurs = 215.
-    
-    return factrsrj, factrjre, factrsre, factmsmj, factmjme, factmsme, factaurs
+    dictfact['rsrj'] = 9.731
+    dictfact['rjre'] = 11.21
+    dictfact['rsre'] = dictfact['rsrj'] * dictfact['rjre']
+    dictfact['msmj'] = 1048.
+    dictfact['mjme'] = 317.8
+    dictfact['msme'] = dictfact['msmj'] * dictfact['mjme']
+    dictfact['aurs'] = 215.
+    dictfact['pcau'] = 206265.
+
+    return dictfact
 
 
 def retr_alphelli(u, g):
