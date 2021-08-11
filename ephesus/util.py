@@ -853,13 +853,14 @@ def exec_blsq_work(listperi, arrytser, listdcyc, listoffs, i):
     lists2nr = np.empty(numbperi)
     listdept = np.empty(numbperi)
     
-
     listindxdcycmaxm = np.empty(numbperi, dtype=int)
     listindxoffsmaxm = np.empty(numbperi, dtype=int)
 
-    for k, peri in enumerate(listperi[i]):
+    for k in tqdm(range(len(listperi[i]))):
         #timechec[k, 0] = timemodu.time()
         
+        peri = listperi[i][k]
+
         phas = (time % peri) / peri
 
         maxms2nr = -1e100
@@ -1014,7 +1015,7 @@ def exec_blsq( \
     
     timechec = np.zeros((numbperi, 10))
     timechecloop = [np.zeros((numbperi, numbdcyc, numboffs)) for k in range(5)]
-
+    
     if boolmult:
         
         if numbproc is None:
@@ -1957,7 +1958,14 @@ def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqu
 #    return fracsars
 
 
-def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0., sinw=0., booltrap=False):
+def retr_rsma(radiplan, radistar, smax):
+    
+    dictfact = retr_factconv()
+    rsma = (radistar + radiplan / dictfact['rsre']) / (smax * dictfact['aurs'])
+    return rsma
+
+
+def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0., sinw=0., booltrap=True):
     
     timeinit = timemodu.time()
 
@@ -2017,7 +2025,6 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     indxplan = np.arange(numbplan)
     
     if False:
-    #if True:
         print('time')
         summgene(time)
         print('epoc')
@@ -2038,8 +2045,9 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
         print(rs2a)
         print('duratotl')
         print(duratotl)
-        print('durafull')
-        print(durafull)
+        if booltrap:
+            print('durafull')
+            print(durafull)
         print('booltran')
         print(booltran)
         print('indxplan')
@@ -2049,10 +2057,18 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
         
         if booltran[j]:
             
-            minmindxtran = int(np.floor((epoc[j] - minmtime) / peri[j]))
+            minmindxtran = int(np.floor((minmtime - epoc[j]) / peri[j]))
             maxmindxtran = int(np.ceil((maxmtime - epoc[j]) / peri[j]))
             indxtranthis = np.arange(minmindxtran, maxmindxtran + 1)
             
+            if False:
+                print('minmindxtran')
+                print(minmindxtran)
+                print('maxmindxtran')
+                print(maxmindxtran)
+                print('indxtranthis')
+                print(indxtranthis)
+
             for n in indxtranthis:
                 timetran = epoc[j] + peri[j] * n
                 timeshft = time - timetran
@@ -2073,7 +2089,6 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
                     rflxtranmodl[indxtimetotl] -= 1e-3 * dept[j]
                 
                 if False:
-                #if True:
                     print('n')
                     print(n)
                     print('timetran')
