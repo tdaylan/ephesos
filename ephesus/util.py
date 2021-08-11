@@ -2024,7 +2024,7 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     numbplan = radiplan.size
     indxplan = np.arange(numbplan)
     
-    if False:
+    if True:
         print('time')
         summgene(time)
         print('epoc')
@@ -2061,7 +2061,7 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
             maxmindxtran = int(np.ceil((maxmtime - epoc[j]) / peri[j]))
             indxtranthis = np.arange(minmindxtran, maxmindxtran + 1)
             
-            if False:
+            if True:
                 print('minmindxtran')
                 print(minmindxtran)
                 print('maxmindxtran')
@@ -2088,7 +2088,7 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
                 else:
                     rflxtranmodl[indxtimetotl] -= 1e-3 * dept[j]
                 
-                if False:
+                if True:
                     print('n')
                     print(n)
                     print('timetran')
