@@ -515,16 +515,17 @@ def read_qlop(path, pathcsvv=None, stdvcons=None):
 # transits
 
 def retr_indxtimetran(time, epoc, peri, duratotl, durafull=None, typeineg=None, booloutt=False, boolseco=False):
-    
     '''
-    
+    Return the indices of times during transit
     Duration is in hours.
-
     '''
+
     if not np.isfinite(time).all():
         raise Exception('')
     
     if not np.isfinite(duratotl).all():
+        print('duratotl')
+        print(duratotl)
         raise Exception('')
     
     if np.isfinite(peri):
@@ -833,13 +834,13 @@ def retr_tmag(gdat, cntp):
     return tmag
 
 
-def exec_blsq_work(listperi, arrytser, listdcyc, listoffs, i):
+def srch_pbox_work(listperi, arrytser, listdcyc, listoffs, i):
     
     numbperi = len(listperi[i])
     numbdcyc = len(listdcyc)
     indxdcyc = np.arange(numbdcyc)
     
-    time = arrytser[:, 0] - np.amin(arrytser[:, 0])
+    time = arrytser[:, 0]
     rflx = arrytser[:, 1]
     stdvrflx = 0.01 + 0 * arrytser[:, 1]
     vari = stdvrflx**2
@@ -855,6 +856,12 @@ def exec_blsq_work(listperi, arrytser, listdcyc, listoffs, i):
     
     listindxdcycmaxm = np.empty(numbperi, dtype=int)
     listindxoffsmaxm = np.empty(numbperi, dtype=int)
+    
+    numbtria = 0
+    for k in tqdm(range(len(listperi[i]))):
+        for l in indxdcyc:
+            numbtria += len(listoffs[l])
+    print('Number of trials: %d...' % numbtria)
 
     for k in tqdm(range(len(listperi[i]))):
         #timechec[k, 0] = timemodu.time()
@@ -943,355 +950,372 @@ def exec_blsq_work(listperi, arrytser, listdcyc, listoffs, i):
     return listsigr, listdept, listindxdcycmaxm, listindxoffsmaxm
 
 
-def exec_blsq( \
-              arrytser, \
-              minmdcyc=0.01, \
+def srch_pbox(arry, \
+              # Boolean flag to search for positive boxes
+              boolpuls=False, \
               
-              # Boolean flag to enable multiprocessing
-              boolmult=True, \
-              #boolmult=False, \
+              ### maximum number of transiting objects
+              maxmnumbpbox=None, \
+              
+              ticitarg=None, \
+              
+              dicttlsqinpt=None, \
+              booltlsq=False, \
               
               # maximum frequency
               maxmfreq=None, \
 
               # factor by which to oversample the frequency grid
-              factosam=None, \
-
+              factosam=20., \
+                
+              # minimum duty cycle
+              minmdcyc=0.01, \
+              
+              # Boolean flag to enable multiprocessing
+              boolmult=True, \
+              
+              # number of processes
               numbproc=None, \
-             ):
-    
-    dictblsqoutp = dict()
-    
-    timeinit = timemodu.time()
-
-    dictfact = retr_factconv()
-    
-    if factosam is None:
-        factosam = 20.
-
-    numbtime = arrytser[:, 0].size
-    minmtime = np.amin(arrytser[:, 0])
-    maxmtime = np.amax(arrytser[:, 0])
-    delttime = maxmtime - minmtime
-    deltfreq = 1. / delttime / factosam
-    minmfreq = 2. / delttime
-    if maxmfreq is None:
-        maxmfreq = 1. / 0.5 # 0.5 days
-    
-    listfreq = np.arange(minmfreq, maxmfreq, deltfreq)
-    listperi = 1. / listfreq
-
-    numbperi = listperi.size
-    print('numbperi')
-    print(numbperi)
-    indxperi = np.arange(numbperi)
-    minmperi = np.amin(listperi)
-    maxmperi = np.amax(listperi)
-    print('minmperi')
-    print(minmperi)
-    print('maxmperi')
-    print(maxmperi)
-    
-    numbdcyc = 10
-    logtmaxmdcyc = -1.
-    listdcyc = np.logspace(np.log10(minmdcyc), logtmaxmdcyc, numbdcyc)
-    print('listdcyc')
-    print(listdcyc)
-    print('listdcyc * listperi[0] * 24 [hr]')
-    print(listdcyc * listperi[0] * 24)
-
-    numboffs = 10
-    minmoffs = 0.
-    maxmoffs = numboffs / (1 + numboffs)
-    listnumboffs = (3. / listdcyc).astype(int)
-    listoffs = [np.linspace(minmoffs, maxmoffs, numboffs) for numboffs in listnumboffs]
-    
-    dflx = arrytser[:, 1] - 1.
-    stdvdflx = arrytser[:, 2]
-    varidflx = stdvdflx**2
-    
-    indxdcyc = np.arange(numbdcyc)
-    indxoffs = np.arange(numboffs)
-    
-    timechec = np.zeros((numbperi, 10))
-    timechecloop = [np.zeros((numbperi, numbdcyc, numboffs)) for k in range(5)]
-    
-    if boolmult:
-        
-        if numbproc is None:
-            #numbproc = multiprocessing.cpu_count() - 1
-            numbproc = int(0.3 * multiprocessing.cpu_count())
-        
-        print('Generating %d processes...' % numbproc)
-        
-        objtpool = multiprocessing.Pool(numbproc)
-        numbproc = objtpool._processes
-        indxproc = np.arange(numbproc)
-
-        listperiproc = [[] for i in indxproc]
-        indxprocperi = np.linspace(0, numbproc - 1, numbperi).astype(int)
-        for i in indxproc:
-            indx = np.where(indxprocperi == i)[0]
-            listperiproc[i] = listperi[indx]
-        data = objtpool.map(partial(exec_blsq_work, listperiproc, arrytser, listdcyc, listoffs), indxproc)
-        listsigr = np.concatenate([data[k][0] for k in indxproc])
-        listdept = np.concatenate([data[k][1] for k in indxproc])
-        listindxdcycmaxm = np.concatenate([data[k][2] for k in indxproc])
-        listindxoffsmaxm = np.concatenate([data[k][3] for k in indxproc])
-    else:
-        listsigr, listdept, listindxdcycmaxm, listindxoffsmaxm = exec_blsq_work([listperi], arrytser, listdcyc, listoffs, 0)
-
-    indxperimaxm = np.argmax(listsigr)
-    
-    dept = listdept[indxperimaxm]
-    
-    sdee = (np.amax(listsigr) - np.mean(listsigr)) / np.std(listsigr)
-    
-    dictblsqoutp['sdee'] = sdee
-    dictblsqoutp['peri'] = listperi[indxperimaxm]
-    dictblsqoutp['dura'] = 24. * listdcyc[listindxdcycmaxm[indxperimaxm]] * listperi[indxperimaxm] # [hours]
-    dictblsqoutp['epoc'] = minmtime + listoffs[listindxdcycmaxm[indxperimaxm]][listindxoffsmaxm[indxperimaxm]] * listperi[indxperimaxm]
-    dictblsqoutp['dept'] = dept
-    
-    # best-fit orbit
-    cosi = 0
-    rsma = retr_rsma(dictblsqoutp['peri'], dictblsqoutp['dura'], cosi)
-    rrat = np.sqrt(dictblsqoutp['dept'] * 1e-3)
-
-    dictblsqoutp['listperi'] = listperi
-    
-    print('temp: assuming power is SNR')
-    dictblsqoutp['listpowr'] = listsigr
-    
-    numbtimemodl = 100000
-    arrytsermodl = np.empty((numbtimemodl, 3))
-    arrytsermodl[:, 0] = np.linspace(minmtime, maxmtime, 100000)
-    arrytsermodl[:, 1] = retr_rflxtranmodl(arrytsermodl[:, 0], [dictblsqoutp['peri']], [dictblsqoutp['epoc']], \
-                                        [rrat], 1. / dictfact['rsre'], [rsma], [cosi], booltrap=False)
-
-    arrypsermodl = fold_tser(arrytsermodl, dictblsqoutp['epoc'], dictblsqoutp['peri'], phasshft=0.5)
-    arrypserdata = fold_tser(arrytser, dictblsqoutp['epoc'], dictblsqoutp['peri'], phasshft=0.5)
-            
-    dictblsqoutp['timedata'] = arrytser[:, 0]
-    dictblsqoutp['rflxtserdata'] = arrytser[:, 1]
-    dictblsqoutp['phasdata'] = arrypserdata[:, 0]
-    dictblsqoutp['rflxpserdata'] = arrypserdata[:, 1]
-
-    dictblsqoutp['timemodl'] = arrytsermodl[:, 0]
-    dictblsqoutp['rflxtsermodl'] = arrytsermodl[:, 1]
-    dictblsqoutp['phasmodl'] = arrypsermodl[:, 0]
-    dictblsqoutp['rflxpsermodl'] = arrypsermodl[:, 1]
-    
-    print('dictblsqoutp[peri]')
-    print(dictblsqoutp['peri'])
-    
-    #print('dt0: %.3g ms.' % (1e3 * np.mean(timechec[:, 1] - timechec[:, 0])))
-    #print('dt1: %.3g ms.' % (1e3 * np.mean(timechec[:, 2] - timechec[:, 1])))
-    #print('dt2: %.3g ms.' % (1e3 * np.mean(timechec[:, 3] - timechec[:, 2])))
-    #for k in range(4):
-    #    indx = np.where((timechecloop[k] > 0) & (timechecloop[k+1] > 0))[0]
-    #    print('dtl%d: %.3g ms.' % (k, 1e3 * numbdcyc * numboffs * np.mean(timechecloop[k+1][indx] - timechecloop[k][indx])))
-    
-    timefinl = timemodu.time()
-    timetotl = timefinl - timeinit
-    timeredu = timetotl / numbtime / numbperi / numboffs / numbdcyc
-    
-    print('exec_blsq() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
-
-    return dictblsqoutp
-
-
-def srch_pbox(arry, \
-              # folder in which plots will be generated
-              pathimag=None, \
-              numbplan=None, \
-              strgextn='', \
+              
+              # detection threshold
               thrssdee=7.1, \
-              boolpuls=False, \
-              ### maximum number of transiting objects
-              maxmnumbtobj=None, \
-              ### input dictionary for BLS
-              dictblsqinpt=dict(), \
-              ticitarg=None, \
-              dicttlsqinpt=None, \
-              booltlsq=False, \
+              
+              # string extension to output files
+              strgextn='', \
+              # path where the output data will be stored
+              pathdata=None, \
+
               # plotting
+              ## path where the output images will be stored
+              pathimag=None, \
               strgplotextn='pdf', \
-              figrsize=(4., 3.), \
+              ## figure size
               figrsizeydobskin=(8, 2.5), \
+              ## time offset
               timeoffs=0, \
+              ## data transparency
               alphraww=0.2, \
+              
+              # verbosity level
+              typeverb=1, \
+        
              ):
-    """
+    '''
     Search for periodic boxes in time-series data
-    """
+    '''
     
-    print('Searching for periodic boxes in time-series data...')
-    print('booltlsq')
-    print(booltlsq)
-    print('boolpuls')
-    print(boolpuls)
+    boolproc = False
+    if pathdata is None:
+        boolproc = True
+    else:
+        pathsave = pathdata + 'pbox.csv'
+        if not os.path.exists(pathsave):
+            boolproc = True
 
-    if booltlsq:
-        import transitleastsquares
-        if dicttlsqinpt is None:
-            dicttlsqinpt = dict()
-    
-    # setup TLS
-    # temp
-    #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
-    
-    liststrgvarb = ['peri', 'epoc', 'dept', 'dura', 'sdee']
-    #liststrgvarb = ['peri', 'epoc', 'dept', 'dura', 'listpowr', 'listperi', 'sdee']
-    
-    arrysrch = np.copy(arry)
-    if boolpuls:
-        arrysrch[:, 1] = 2. - arrysrch[:, 1]
-
-    j = 0
-    dictsrchpboxoutp = {}
-    dictsrchpboxoutp['listdictblsqoutp'] = []
-
-    while True:
+    if not boolproc:
+        if typeverb > 0:
+            print('Reading %s...' % pathsave)
         
-        if maxmnumbtobj is not None and j >= maxmnumbtobj:
-            break
+        dictpboxoutpsave = pd.read_csv(pathsave).to_dict()
+        for name in dictpboxoutpsave:
+            if len(dictpboxoutpsave[name]) == 0:
+                dictpboxoutpsave[name] = np.array([])
         
-        print('j')
-        print(j)
+    else:
+        print('Searching for periodic boxes in time-series data...')
 
-        # mask out the detected transit
-        if j == 0:
-            arrymeta = np.copy(arrysrch)
-        else:
-            arrymeta -= dictblsqoutp['rflxtsermodl']
-
-        # transit search
-        timeblsqmeta = arrymeta[:, 0]
-        lcurblsqmeta = arrymeta[:, 1]
         if booltlsq:
-            objtmodltlsq = transitleastsquares.transitleastsquares(timeblsqmeta, lcurblsqmeta)
-            objtresu = objtmodltlsq.power(\
-                                          # temp
-                                          #u=ab, \
-                                          **dicttlsqinpt, \
-                                          #use_threads=1, \
-                                         )
-
-            # temp check how to do BLS instead of TLS
-            dictblsq = dict()
-            dictblsqoutp['listperi'] = objtresu.periods
-            dictblsqoutp['listpowr'] = objtresu.power
-            
-            dictblsqoutp['peri'] = objtresu.period
-            dictblsqoutp['epoc'] = objtresu.T0
-            dictblsqoutp['dura'] = objtresu.duration
-            dictblsqoutp['dept'] = objtresu.depth * 1e3
-            dictblsqoutp['sdee'] = objtresu.SDE
-            
-            dictblsqoutp['prfp'] = objtresu.FAP
-            
-            dictblsqoutp['listtimetran'] = objtresu.transit_times
-            
-            dictblsqoutp['timemodl'] = objtresu.model_lightcurve_time
-            dictblsqoutp['phasmodl'] = objtresu.model_folded_phase
-            dictblsqoutp['rflxpsermodl'] = objtresu.model_folded_model
-            dictblsqoutp['rflxtsermodl'] = objtresu.model_lightcurve_model
-            dictblsqoutp['phasdata'] = objtresu.folded_phase
-            dictblsqoutp['rflxpserdata'] = objtresu.folded_y
-
-        else:
-            dictblsqoutp = exec_blsq(arrymeta, **dictblsqinpt)
+            import transitleastsquares
+            if dicttlsqinpt is None:
+                dicttlsqinpt = dict()
         
+        # setup TLS
+        # temp
+        #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
+        
+        liststrgvarbsave = ['peri', 'epoc', 'dept', 'dura', 'sdee']
+        
+        arrysrch = np.copy(arry)
         if boolpuls:
-            dictblsqoutp['rflxpserdata'] = 2. - dictblsqoutp['rflxpserdata']
-            dictblsqoutp['rflxpsermodl'] = 2. - dictblsqoutp['rflxpsermodl']
-            dictblsqoutp['rflxtsermodl'] = 2. - dictblsqoutp['rflxtsermodl']
-        
-        if pathimag is not None:
-            strgtitl = 'P=%.3g d, Dep=%.2g ppt, Dur=%.2g hr, SDE=%.3g' % \
-                        (dictblsqoutp['peri'], dictblsqoutp['dept'], dictblsqoutp['dura'], dictblsqoutp['sdee'])
-            # plot TLS power spectrum
-            figr, axis = plt.subplots(figsize=figrsizeydobskin)
-            
-            axis.axvline(dictblsqoutp['peri'], alpha=0.4, lw=3)
-            minmxaxi = np.amin(dictblsqoutp['listperi'])
-            maxmxaxi = np.amax(dictblsqoutp['listperi'])
-            for n in range(2, 10):
-                xpos = n * dictblsqoutp['peri']
-                if xpos > maxmxaxi:
-                    break
-                axis.axvline(xpos, alpha=0.4, lw=1, linestyle='dashed')
-            for n in range(2, 10):
-                xpos = dictblsqoutp['peri'] / n
-                if xpos < minmxaxi:
-                    break
-                axis.axvline(xpos, alpha=0.4, lw=1, linestyle='dashed')
-            
-            axis.set_ylabel(r'Power')
-            axis.set_xlabel('Period [days]')
-            axis.set_xscale('log')
-            axis.plot(dictblsqoutp['listperi'], dictblsqoutp['listpowr'], color='black', lw=0.5)
-            axis.set_title(strgtitl)
-            plt.subplots_adjust(bottom=0.2)
-            path = pathimag + 'sigr_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
-            print('Writing to %s...' % path)
-            plt.savefig(path)
-            plt.close()
-            
-            # plot light curve + TLS model
-            figr, axis = plt.subplots(figsize=figrsizeydobskin)
-            if boolpuls:
-                lcurblsqmetatemp = 2. - lcurblsqmeta
-            axis.plot(timeblsqmeta - timeoffs, lcurblsqmetatemp, alpha=alphraww, marker='o', ms=1, ls='', color='grey', rasterized=True)
-            axis.plot(dictblsqoutp['timemodl'] - timeoffs, dictblsqoutp['rflxtsermodl'], color='b')
-            if timeoffs == 0:
-                axis.set_xlabel('Time [days]')
-            else:
-                axis.set_xlabel('Time [BJD-%d]' % timeoffs)
-            axis.set_ylabel('Relative flux');
-            if j == 0:
-                ylimtserinit = axis.get_ylim()
-            else:
-                axis.set_ylim(ylimtserinit)
-            axis.set_title(strgtitl)
-            plt.subplots_adjust(bottom=0.2)
-            path = pathimag + 'rflx_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
-            print('Writing to %s...' % path)
-            plt.savefig(path)
-            plt.close()
+            arrysrch[:, 1] = 2. - arrysrch[:, 1]
 
-            # plot phase curve + TLS model
-            figr, axis = plt.subplots(figsize=figrsizeydobskin)
-            axis.plot(dictblsqoutp['phasdata'], dictblsqoutp['rflxpserdata'], marker='o', ms=1, ls='', alpha=alphraww, color='grey', rasterized=True)
-            axis.plot(dictblsqoutp['phasmodl'], dictblsqoutp['rflxpsermodl'], color='b')
-            axis.set_xlabel('Phase')
-            axis.set_ylabel('Relative flux');
-            if j == 0:
-                ylimpserinit = axis.get_ylim()
-            else:
-                axis.set_ylim(ylimpserinit)
-            axis.set_title(strgtitl)
-            plt.subplots_adjust(bottom=0.2)
-            path = pathimag + 'pcur_blsq_tce%d_%s.%s' % (j, strgextn, strgplotextn)
-            print('Writing to %s...' % path)
-            plt.savefig(path)
-            plt.close()
+        j = 0
+        dictpboxoutp = dict()
+        dictpboxoutp['listdictpboxoutp'] = []
         
-        if dictblsqoutp['sdee'] > thrssdee:
-            dictsrchpboxoutp['listdictblsqoutp'].append(dictblsqoutp)
-        else:
-            break
-        j += 1
-       
-    # merge output BLS dictionaries of different TCEs
-    for name in liststrgvarb:
-        dictsrchpboxoutp[name] = []
-        for k in range(len(dictsrchpboxoutp['listdictblsqoutp'])):
-            dictsrchpboxoutp[name].append(dictsrchpboxoutp['listdictblsqoutp'][k][name])
-        dictsrchpboxoutp[name] = np.array(dictsrchpboxoutp[name])
-    
-    return dictsrchpboxoutp
+        timeinit = timemodu.time()
+
+        dictfact = retr_factconv()
+        
+        timepboxmeta = arrysrch[:, 0]
+        numbtime = arrymeta[:, 0].size
+        
+        minmtime = np.amin(arrymeta[:, 0])
+        maxmtime = np.amax(arrymeta[:, 0])
+        delttime = maxmtime - minmtime
+        deltfreq = 1. / delttime / factosam
+        minmfreq = 2. / delttime
+        if maxmfreq is None:
+            maxmfreq = 1. / 0.5 # 0.5 days
+        
+        listfreq = np.arange(minmfreq, maxmfreq, deltfreq)
+        listperi = 1. / listfreq
+
+        numbperi = listperi.size
+        print('numbperi')
+        print(numbperi)
+        indxperi = np.arange(numbperi)
+        minmperi = np.amin(listperi)
+        maxmperi = np.amax(listperi)
+        print('minmperi')
+        print(minmperi)
+        print('maxmperi')
+        print(maxmperi)
+        
+        numbdcyc = 10
+        logtmaxmdcyc = -1.
+        listdcyc = np.logspace(np.log10(minmdcyc), logtmaxmdcyc, numbdcyc)
+        print('listdcyc')
+        print(listdcyc)
+        print('listdcyc * listperi[0] * 24 [hr]')
+        print(listdcyc * listperi[0] * 24)
+
+        numboffs = 10
+        minmoffs = 0.
+        maxmoffs = numboffs / (1 + numboffs)
+        listnumboffs = (3. / listdcyc).astype(int)
+        listoffs = [np.linspace(minmoffs, maxmoffs, numboffs) for numboffs in listnumboffs]
+        
+        dflx = arrymeta[:, 1] - 1.
+        stdvdflx = arrymeta[:, 2]
+        varidflx = stdvdflx**2
+        
+        indxdcyc = np.arange(numbdcyc)
+        
+        arrymeta = np.copy(arry)
+
+        while True:
+            
+            if maxmnumbpbox is not None and j >= maxmnumbpbox:
+                break
+            
+            print('j')
+            print(j)
+
+            # mask out the detected transit
+            if j == 0:
+                lcurpboxmeta 
+                arrymeta[:, 1] = np.copy(arrysrch[:, 1])
+            else:
+                arrymeta[:, 1] -= dictpboxoutp['rflxtsermodl'][j-1]
+
+            if booltlsq:
+                objtmodltlsq = transitleastsquares.transitleastsquares(timepboxmeta, lcurpboxmeta)
+                objtresu = objtmodltlsq.power(\
+                                              # temp
+                                              #u=ab, \
+                                              **dicttlsqinpt, \
+                                              #use_threads=1, \
+                                             )
+
+                dictpbox = dict()
+                dictpboxoutp['listperi'] = objtresu.periods
+                dictpboxoutp['listpowr'] = objtresu.power
+                
+                dictpboxoutp['peri'] = objtresu.period
+                dictpboxoutp['epoc'] = objtresu.T0
+                dictpboxoutp['dura'] = objtresu.duration
+                dictpboxoutp['dept'] = objtresu.depth * 1e3
+                dictpboxoutp['sdee'] = objtresu.SDE
+                
+                dictpboxoutp['prfp'] = objtresu.FAP
+                
+                dictpboxoutp['listtimetran'] = objtresu.transit_times
+                
+                dictpboxoutp['timemodl'] = objtresu.model_lightcurve_time
+                dictpboxoutp['phasmodl'] = objtresu.model_folded_phase
+                dictpboxoutp['rflxpsermodl'] = objtresu.model_folded_model
+                dictpboxoutp['rflxtsermodl'] = objtresu.model_lightcurve_model
+                dictpboxoutp['phasdata'] = objtresu.folded_phase
+                dictpboxoutp['rflxpserdata'] = objtresu.folded_y
+
+            else:
+                
+                if boolmult:
+                    
+                    if numbproc is None:
+                        #numbproc = multiprocessing.cpu_count() - 1
+                        numbproc = int(0.3 * multiprocessing.cpu_count())
+                    
+                    print('Generating %d processes...' % numbproc)
+                    
+                    objtpool = multiprocessing.Pool(numbproc)
+                    numbproc = objtpool._processes
+                    indxproc = np.arange(numbproc)
+
+                    listperiproc = [[] for i in indxproc]
+                    indxprocperi = np.linspace(0, numbproc - 1, numbperi).astype(int)
+                    for i in indxproc:
+                        indx = np.where(indxprocperi == i)[0]
+                        listperiproc[i] = listperi[indx]
+                    data = objtpool.map(partial(srch_pbox_work, listperiproc, arrymeta, listdcyc, listoffs), indxproc)
+                    listsigr = np.concatenate([data[k][0] for k in indxproc])
+                    listdept = np.concatenate([data[k][1] for k in indxproc])
+                    listindxdcycmaxm = np.concatenate([data[k][2] for k in indxproc])
+                    listindxoffsmaxm = np.concatenate([data[k][3] for k in indxproc])
+                else:
+                    listsigr, listdept, listindxdcycmaxm, listindxoffsmaxm = srch_pbox_work([listperi], arrymeta, listdcyc, listoffs, 0)
+
+                indxperimaxm = np.argmax(listsigr)
+                
+                dept = listdept[indxperimaxm]
+                
+                sdee = (np.amax(listsigr) - np.mean(listsigr)) / np.std(listsigr)
+                
+                dictpboxoutp['sdee'] = sdee
+                dictpboxoutp['peri'] = listperi[indxperimaxm]
+                dictpboxoutp['dura'] = 24. * listdcyc[listindxdcycmaxm[indxperimaxm]] * listperi[indxperimaxm] # [hours]
+                dictpboxoutp['epoc'] = minmtime + listoffs[listindxdcycmaxm[indxperimaxm]][listindxoffsmaxm[indxperimaxm]] * listperi[indxperimaxm]
+                dictpboxoutp['dept'] = dept
+                
+                # best-fit orbit
+                cosi = 0
+                rsma = retr_rsma(dictpboxoutp['peri'], dictpboxoutp['dura'], cosi)
+                rrat = np.sqrt(dictpboxoutp['dept'] * 1e-3)
+
+                dictpboxoutp['listperi'] = listperi
+                
+                print('temp: assuming power is SNR')
+                dictpboxoutp['listpowr'] = listsigr
+                
+                numbtimemodl = 100000
+                arrymetamodl = np.empty((numbtimemodl, 3))
+                arrymetamodl[:, 0] = np.linspace(minmtime, maxmtime, 100000)
+                arrymetamodl[:, 1] = retr_rflxtranmodl(arrymetamodl[:, 0], 1. / dictfact['rsre'], [dictpboxoutp['peri']], [dictpboxoutp['epoc']], [rsma], \
+                                                                        [cosi], radicomp=[rrat], booltrap=False)
+
+                arrypsermodl = fold_tser(arrymetamodl, dictpboxoutp['epoc'], dictpboxoutp['peri'], phasshft=0.5)
+                arrypserdata = fold_tser(arrymeta, dictpboxoutp['epoc'], dictpboxoutp['peri'], phasshft=0.5)
+                        
+                dictpboxoutp['timedata'] = arrymeta[:, 0]
+                dictpboxoutp['rflxtserdata'] = arrymeta[:, 1]
+                dictpboxoutp['phasdata'] = arrypserdata[:, 0]
+                dictpboxoutp['rflxpserdata'] = arrypserdata[:, 1]
+
+                dictpboxoutp['timemodl'] = arrymetamodl[:, 0]
+                dictpboxoutp['rflxtsermodl'] = arrymetamodl[:, 1]
+                dictpboxoutp['phasmodl'] = arrypsermodl[:, 0]
+                dictpboxoutp['rflxpsermodl'] = arrypsermodl[:, 1]
+        
+            if boolpuls:
+                dictpboxoutp['rflxpserdata'] = 2. - dictpboxoutp['rflxpserdata']
+                dictpboxoutp['rflxpsermodl'] = 2. - dictpboxoutp['rflxpsermodl']
+                dictpboxoutp['rflxtsermodl'] = 2. - dictpboxoutp['rflxtsermodl']
+            
+            if pathimag is not None:
+                strgtitl = 'P=%.3g d, Dep=%.2g ppt, Dur=%.2g hr, SDE=%.3g' % \
+                            (dictpboxoutp['peri'], dictpboxoutp['dept'], dictpboxoutp['dura'], dictpboxoutp['sdee'])
+                # plot TLS power spectrum
+                figr, axis = plt.subplots(figsize=figrsizeydobskin)
+                
+                axis.axvline(dictpboxoutp['peri'], alpha=0.4, lw=3)
+                minmxaxi = np.amin(dictpboxoutp['listperi'])
+                maxmxaxi = np.amax(dictpboxoutp['listperi'])
+                for n in range(2, 10):
+                    xpos = n * dictpboxoutp['peri']
+                    if xpos > maxmxaxi:
+                        break
+                    axis.axvline(xpos, alpha=0.4, lw=1, linestyle='dashed')
+                for n in range(2, 10):
+                    xpos = dictpboxoutp['peri'] / n
+                    if xpos < minmxaxi:
+                        break
+                    axis.axvline(xpos, alpha=0.4, lw=1, linestyle='dashed')
+                
+                axis.set_ylabel(r'Power')
+                axis.set_xlabel('Period [days]')
+                axis.set_xscale('log')
+                axis.plot(dictpboxoutp['listperi'], dictpboxoutp['listpowr'], color='black', lw=0.5)
+                axis.set_title(strgtitl)
+                plt.subplots_adjust(bottom=0.2)
+                path = pathimag + 'sigr_pbox_tce%d_%s.%s' % (j, strgextn, strgplotextn)
+                print('Writing to %s...' % path)
+                plt.savefig(path)
+                plt.close()
+                
+                # plot light curve + TLS model
+                figr, axis = plt.subplots(figsize=figrsizeydobskin)
+                if boolpuls:
+                    lcurpboxmetatemp = 2. - lcurpboxmeta
+                else:
+                    lcurpboxmetatemp = lcurpboxmeta
+                axis.plot(timepboxmeta - timeoffs, lcurpboxmetatemp, alpha=alphraww, marker='o', ms=1, ls='', color='grey', rasterized=True)
+                axis.plot(dictpboxoutp['timemodl'] - timeoffs, dictpboxoutp['rflxtsermodl'], color='b')
+                if timeoffs == 0:
+                    axis.set_xlabel('Time [days]')
+                else:
+                    axis.set_xlabel('Time [BJD-%d]' % timeoffs)
+                axis.set_ylabel('Relative flux');
+                if j == 0:
+                    ylimtserinit = axis.get_ylim()
+                else:
+                    axis.set_ylim(ylimtserinit)
+                axis.set_title(strgtitl)
+                plt.subplots_adjust(bottom=0.2)
+                path = pathimag + 'rflx_pbox_tce%d_%s.%s' % (j, strgextn, strgplotextn)
+                print('Writing to %s...' % path)
+                plt.savefig(path)
+                plt.close()
+
+                # plot phase curve + TLS model
+                figr, axis = plt.subplots(figsize=figrsizeydobskin)
+                axis.plot(dictpboxoutp['phasdata'], dictpboxoutp['rflxpserdata'], marker='o', ms=1, ls='', alpha=alphraww, color='grey', rasterized=True)
+                axis.plot(dictpboxoutp['phasmodl'], dictpboxoutp['rflxpsermodl'], color='b')
+                axis.set_xlabel('Phase')
+                axis.set_ylabel('Relative flux');
+                if j == 0:
+                    ylimpserinit = axis.get_ylim()
+                else:
+                    axis.set_ylim(ylimpserinit)
+                axis.set_title(strgtitl)
+                plt.subplots_adjust(bottom=0.2)
+                path = pathimag + 'pcur_pbox_tce%d_%s.%s' % (j, strgextn, strgplotextn)
+                print('Writing to %s...' % path)
+                plt.savefig(path)
+                plt.close()
+            
+            if dictpboxoutp['sdee'] > thrssdee:
+                dictpboxoutp['listdictpboxoutp'].append(dictpboxoutp)
+            else:
+                break
+            j += 1
+        
+        dictpboxoutpsave = dict()
+        # merge output dictionaries of different TCEs
+        for name in liststrgvarbsave:
+            dictpboxoutp[name] = []
+            dictpboxoutpsave[name] = []
+            for k in range(len(dictpboxoutp['listdictpboxoutp'])):
+                dictpboxoutp[name].append(dictpboxoutp['listdictpboxoutp'][k][name])
+                dictpboxoutpsave[name].append(dictpboxoutpsave['listdictpboxoutp'][k][name])
+            dictpboxoutp[name] = np.array(dictpboxoutp[name])
+            dictpboxoutpsave[name] = np.array(dictpboxoutpsave[name])
+        
+        print('dictpboxoutp')
+        print(dictpboxoutp)
+        
+        print('dictpboxoutp[peri]')
+        print(dictpboxoutp['peri'])
+        
+        pd.DataFrame.from_dict(dictpboxoutpsave).to_csv(pathsave)
+                
+        timefinl = timemodu.time()
+        timetotl = timefinl - timeinit
+        timeredu = timetotl / numbtime / numbperi / numboffs / numbdcyc
+        
+        print('srch_pbox() took %.3g seconds in total and %g ns per observation and trial.' % (timetotl, timeredu * 1e9))
+
+    return dictpboxoutpsave
 
 
 def retr_rascdeclfromstrgmast(strgmast):
@@ -1331,6 +1355,9 @@ def retr_lcurtess( \
               # Boolean flag to only consider SPOC data
               boolspoconly=False, \
 
+              # Boolean flag to only consider FFI
+              boolffimonly=False, \
+
               ## subset of sectors to retrieve
               listtsecsele=None, \
               
@@ -1359,29 +1386,34 @@ def retr_lcurtess( \
         # get the list of sectors for which TESS SPOC data are available
         listtsecffim, temp, temp = retr_listtsec(rasctarg, decltarg)
 
-    print('Retrieving the list of available TESS sectors for which there is SPOC TPF data...')
-    # get observation tables
-    listtablobsv = retr_listtablobsv(strgmast)
-    listprodspoc = []
-    for k, tablobsv in enumerate(listtablobsv):
-        
-        listprodspoctemp = astroquery.mast.Observations.get_product_list(tablobsv)
-        
-        if listtablobsv['distance'][k] > 0:
-            continue
+    print('Retrieving the list of available TESS sectors for which there is SPOC light curve data...')
+    #listtsecspoc, listpath = retr_tsectici()
+    
+    if not boolffimonly:
+        # get observation tables
+        listtablobsv = retr_listtablobsv(strgmast)
+        listprodspoc = []
+        for k, tablobsv in enumerate(listtablobsv):
+            
+            listprodspoctemp = astroquery.mast.Observations.get_product_list(tablobsv)
+            
+            if listtablobsv['distance'][k] > 0:
+                continue
 
-        strgdesc = 'Light curves'
-        listprodspoctemp = astroquery.mast.Observations.filter_products(listprodspoctemp, description=strgdesc)
-        for a in range(len(listprodspoctemp)):
-            boolfasttemp = listprodspoctemp[a]['obs_id'].endswith('fast')
-            if not boolfasttemp:
-                tsec = int(listprodspoctemp[a]['obs_id'].split('-')[1][1:])
-                listtsecspoc.append(tsec) 
-                listprodspoc.append(listprodspoctemp)
-    
-    listtsecspoc = np.array(listtsecspoc)
-    listtsecspoc = np.sort(listtsecspoc)
-    
+            strgdesc = 'Light curves'
+            listprodspoctemp = astroquery.mast.Observations.filter_products(listprodspoctemp, description=strgdesc)
+            for a in range(len(listprodspoctemp)):
+                boolfasttemp = listprodspoctemp[a]['obs_id'].endswith('fast')
+                if not boolfasttemp:
+                    tsec = int(listprodspoctemp[a]['obs_id'].split('-')[1][1:])
+                    listtsecspoc.append(tsec) 
+                    listprodspoc.append(listprodspoctemp)
+        
+        listtsecspoc = np.array(listtsecspoc)
+        listtsecspoc = np.sort(listtsecspoc)
+    else:
+        listtsecspoc = np.array([])
+
     print('listtsecspoc')
     print(listtsecspoc)
     
@@ -1965,7 +1997,34 @@ def retr_rsma(radiplan, radistar, smax):
     return rsma
 
 
-def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0., sinw=0., booltrap=True):
+def retr_rflxtranmodl( \
+                      # times at which to evaluate the relative flux
+                      time, \
+                      # host
+                      ## radius of the host star
+                      radistar, \
+                      # companions
+                      ## orbital periods of the companions
+                      peri, \
+                      ## mid-transit epochs of the companions
+                      epoc, \
+                      ## sum of stellar and companion radius
+                      rsma, \
+                      ## cosine of the orbital inclination
+                      cosi, \
+                      ## eccentricity of the orbit
+                      ecce=0., \
+                      ## sine of 
+                      sinw=0., \
+                      ## radii of the companions
+                      radicomp=None, \
+                      # moons
+                      ## orbital periods
+                      perimoon=None, \
+                      # Boolean flag to model transits as trapezoid
+                      booltrap=True, \
+                      # verbosity level
+                      typeverb=1):
     
     timeinit = timemodu.time()
 
@@ -1975,8 +2034,8 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     if isinstance(epoc, list):
         epoc = np.array(epoc)
 
-    if isinstance(radiplan, list):
-        radiplan = np.array(radiplan)
+    if isinstance(radicomp, list):
+        radicomp = np.array(radicomp)
 
     if isinstance(rsma, list):
         rsma = np.array(rsma)
@@ -1990,6 +2049,12 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     if isinstance(sinw, list):
         sinw = np.array(sinw)
     
+    numbcomp = peri.size
+    if perimoon is not None:
+        indxcomp = np.arange(indxcomp)
+        numbmoon = np.empty(len(perimoon), dtype=int)
+        indxmoon = [np.arange(numbmoon[j]) for j in indxcomp]
+    
     boolinptphys = True#False
 
     minmtime = np.amin(time)
@@ -1999,12 +2064,12 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     dictfact = retr_factconv()
     
     if boolinptphys:
-        smax = (radistar + radiplan / dictfact['rsre']) / rsma / dictfact['aurs']
+        smax = (radistar + radicomp / dictfact['rsre']) / rsma / dictfact['aurs']
     
     rs2a = radistar / smax / dictfact['aurs']
     imfa = retr_imfa(cosi, rs2a, ecce, sinw)
     sini = np.sqrt(1. - cosi**2)
-    rrat = radiplan / dictfact['rsre'] / radistar
+    rrat = radicomp / dictfact['rsre'] / radistar
     dept = rrat**2 * 1e3
     
     rflxtranmodl = np.ones_like(time)
@@ -2021,10 +2086,10 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
     # Boolean flag that indicates whether there is any transit
     booltran = np.isfinite(duratotl)
     
-    numbplan = radiplan.size
+    numbplan = radicomp.size
     indxplan = np.arange(numbplan)
     
-    if True:
+    if typeverb > 1:
         print('time')
         summgene(time)
         print('epoc')
@@ -2057,60 +2122,74 @@ def retr_rflxtranmodl(time, peri, epoc, radiplan, radistar, rsma, cosi, ecce=0.,
         
         if booltran[j]:
             
-            minmindxtran = int(np.floor((minmtime - epoc[j]) / peri[j]))
-            maxmindxtran = int(np.ceil((maxmtime - epoc[j]) / peri[j]))
-            indxtranthis = np.arange(minmindxtran, maxmindxtran + 1)
-            
-            if True:
-                print('minmindxtran')
-                print(minmindxtran)
-                print('maxmindxtran')
-                print(maxmindxtran)
-                print('indxtranthis')
-                print(indxtranthis)
+            if perimoon is not None:
+                phas = (time - epoc[j]) % peri[j]
+                indxtimemoontrantotl = np.where(posi[j][jj] + radimoon[j][jj] < -radistar)[0]
+                distcomp = phas * 2. * np.pi * smax[j]
+                for jj in indxmoon[j]:
+                    phasmoon[j][jj] = (time - epocmoon[j][jj]) % perimoon[j][jj]
+                    distcomp[j][jj] = phasmoon[j][jj] * 2. * np.pi * smaxmoon[j][jj]
+                    posimoon[j][jj] = distcomp + distcomp[j][jj]
+                    indxtimemoontrantotl = np.where(posimoon[j][jj] + radimoon[j][jj] < -radistar)[0]
+                
+            else:
+                    
 
-            for n in indxtranthis:
-                timetran = epoc[j] + peri[j] * n
-                timeshft = time - timetran
-                timeshftnega = -timeshft
-                timeshftabso = abs(timeshft)
+                minmindxtran = int(np.floor((minmtime - epoc[j]) / peri[j]))
+                maxmindxtran = int(np.ceil((maxmtime - epoc[j]) / peri[j]))
+                indxtranthis = np.arange(minmindxtran, maxmindxtran + 1)
                 
-                indxtimetotl = np.where(timeshftabso < duratotlhalf[j] / 24.)[0]
-                if booltrap:
-                    indxtimefull = indxtimetotl[np.where(timeshftabso[indxtimetotl] < durafullhalf[j] / 24.)]
-                    indxtimeinre = indxtimetotl[np.where((timeshftnega[indxtimetotl] < duratotlhalf[j] / 24.) & \
-                                                                                        (timeshftnega[indxtimetotl] > durafullhalf[j] / 24.))]
-                    indxtimeegre = indxtimetotl[np.where((timeshft[indxtimetotl] < duratotlhalf[j] / 24.) & (timeshft[indxtimetotl] > durafullhalf[j] / 24.))]
-                
-                    rflxtranmodl[indxtimeinre] += 1e-3 * dept[j] * ((timeshftnega[indxtimeinre] - duratotlhalf[j] / 24.) / duraineg[j] / 24.)
-                    rflxtranmodl[indxtimeegre] += 1e-3 * dept[j] * ((timeshft[indxtimeegre] - duratotlhalf[j] / 24.) / duraineg[j])
-                    rflxtranmodl[indxtimefull] -= 1e-3 * dept[j]
-                else:
-                    rflxtranmodl[indxtimetotl] -= 1e-3 * dept[j]
-                
-                if True:
-                    print('n')
-                    print(n)
-                    print('timetran')
-                    summgene(timetran)
-                    print('timeshft[indxtimetotl]')
-                    summgene(timeshft[indxtimetotl])
-                    print('timeshftabso[indxtimetotl]')
-                    summgene(timeshftabso[indxtimetotl])
-                    print('timeshftnega[indxtimetotl]')
-                    summgene(timeshftnega[indxtimetotl])
-                    print('duratotlhalf[j]')
-                    print(duratotlhalf[j])
-                    print('durafullhalf[j]')
-                    print(durafullhalf[j])
-                    print('indxtimetotl')
-                    summgene(indxtimetotl)
-                    print('indxtimefull')
-                    summgene(indxtimefull)
-                    print('indxtimeinre')
-                    summgene(indxtimeinre)
-                    print('indxtimeegre')
-                    summgene(indxtimeegre)
+                if typeverb > 1:
+                    print('minmindxtran')
+                    print(minmindxtran)
+                    print('maxmindxtran')
+                    print(maxmindxtran)
+                    print('indxtranthis')
+                    print(indxtranthis)
+
+                for n in indxtranthis:
+                    timetran = epoc[j] + peri[j] * n
+                    timeshft = time - timetran
+                    timeshftnega = -timeshft
+                    timeshftabso = abs(timeshft)
+                    
+                    indxtimetotl = np.where(timeshftabso < duratotlhalf[j] / 24.)[0]
+                    if booltrap:
+                        indxtimefull = indxtimetotl[np.where(timeshftabso[indxtimetotl] < durafullhalf[j] / 24.)]
+                        indxtimeinre = indxtimetotl[np.where((timeshftnega[indxtimetotl] < duratotlhalf[j] / 24.) & \
+                                                                                            (timeshftnega[indxtimetotl] > durafullhalf[j] / 24.))]
+                        indxtimeegre = indxtimetotl[np.where((timeshft[indxtimetotl] < duratotlhalf[j] / 24.) & (timeshft[indxtimetotl] > durafullhalf[j] / 24.))]
+                    
+                        rflxtranmodl[indxtimeinre] += 1e-3 * dept[j] * ((timeshftnega[indxtimeinre] - duratotlhalf[j] / 24.) / duraineg[j] / 24.)
+                        rflxtranmodl[indxtimeegre] += 1e-3 * dept[j] * ((timeshft[indxtimeegre] - duratotlhalf[j] / 24.) / duraineg[j])
+                        rflxtranmodl[indxtimefull] -= 1e-3 * dept[j]
+                    else:
+                        rflxtranmodl[indxtimetotl] -= 1e-3 * dept[j]
+                    
+                    if typeverb > 1:
+                        print('n')
+                        print(n)
+                        print('timetran')
+                        summgene(timetran)
+                        print('timeshft[indxtimetotl]')
+                        summgene(timeshft[indxtimetotl])
+                        print('timeshftabso[indxtimetotl]')
+                        summgene(timeshftabso[indxtimetotl])
+                        print('timeshftnega[indxtimetotl]')
+                        summgene(timeshftnega[indxtimetotl])
+                        print('indxtimetotl')
+                        summgene(indxtimetotl)
+                        if booltrap:
+                            print('duratotlhalf[j]')
+                            print(duratotlhalf[j])
+                            print('durafullhalf[j]')
+                            print(durafullhalf[j])
+                            print('indxtimefull')
+                            summgene(indxtimefull)
+                            print('indxtimeinre')
+                            summgene(indxtimeinre)
+                            print('indxtimeegre')
+                            summgene(indxtimeegre)
     
     timetotl = timemodu.time() - timeinit
     timeredu = timetotl / numbtime
@@ -2136,7 +2215,8 @@ def retr_massfromradi( \
             listradiplan = listradiplan[indxgood]
             if indxgood.size == 0:
                 print('No good radius.')
-                raise Exception('')
+                print('temp')
+                return np.zeros(listradiplan.size)
 
         if len(listradiplan) > 0:
             if boolinptsamp:
@@ -2543,6 +2623,23 @@ def retr_smaxkepl(peri, masstotl):
     return smax
 
 
+def retr_perikepl(smax, masstotl):
+    
+    """
+    Get the period of a Keplerian orbit (in days) from the semi-major axis (in AU) and total mass (in Solar masses).
+
+    Arguments
+        smax: the semi-major axis of a Keplerian orbit [AU]
+        masstotl: total mass of the system [Solar Masses]
+    Returns
+        peri: orbital period [days]
+    """
+    
+    peri = np.sqrt(smax**3 / 7.496e-6 / masstotl)
+    
+    return peri
+
+
 def retr_duratran(peri, rsma, cosi):
     """
     Return the transit duration in the unit of the input orbital period (peri).
@@ -2556,6 +2653,34 @@ def retr_duratran(peri, rsma, cosi):
     dura = 24. * peri / np.pi * np.arcsin(np.sqrt(rsma**2 - cosi**2)) # [hours]
     
     return dura
+
+
+def retr_radiroch(radistar, densstar, denscomp):
+    """
+    Return the Roche limit
+
+    Arguments
+        radistar: radius of the primary star
+        densstar: density of the primary star
+        denscomp: density of the companion
+    """    
+    radiroch = radistar (2. * densstar / denscomp)**(1. / 3.)
+    
+    return radiroch
+
+
+def retr_radihill(smax, masscomp, massstar):
+    """
+    Return the Hill radius of a companion
+
+    Arguments
+        peri: orbital period
+        rsma: the sum of radii of the two bodies divided by the semi-major axis
+        cosi: cosine of the inclination
+    """    
+    radihill = smax * (masscomp / 3. / massstar)**(1. / 3.) # [AU]
+    
+    return radihill
 
 
 # massplan in M_E
