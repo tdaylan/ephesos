@@ -2005,34 +2005,81 @@ def retr_rflxtranmodl( \
                       radistar, \
                       # companions
                       ## orbital periods of the companions
-                      peri, \
+                      pericomp, \
                       ## mid-transit epochs of the companions
-                      epoc, \
-                      ## sum of stellar and companion radius
-                      rsma, \
+                      epoccomp, \
+                      
+                      ## orbital inclination
+                      inclcomp=None, \
                       ## cosine of the orbital inclination
-                      cosi, \
+                      cosicomp=None, \
+                      
                       ## eccentricity of the orbit
-                      ecce=0., \
+                      eccecomp=0., \
                       ## sine of 
-                      sinw=0., \
+                      sinwcomp=0., \
+                      
                       ## radii of the companions
                       radicomp=None, \
+                      ## mass of the companions
+                      masscomp=None, \
+                      
+                      ## type of the companion
+                      typecomp='plan', \
+                      
+                      # type of limb-darkening
+                      typelmdk='none', \
+                      # lineaer limd-darkening coefficient 
+                      coeflmdklinr=0.2, \
+                      # quadratic limd-darkening coefficient 
+                      coeflmdkquad=0.2, \
+                      # mass of star
+                      massstar=None, \
+
+                      ## sum of stellar and companion radius
+                      rsma=None, \
+                      
                       # moons
+                      ## radii
+                      radimoon=None, \
                       ## orbital periods
                       perimoon=None, \
+                      ## mid-transit epochs
+                      epocmoon=None, \
+                      ## sum of planetary and moon radius
+                      rsmamoon=None, \
+                      ## cosine of the orbital inclination
+                      cosimoon=None, \
+                      ## eccentricity of the orbit
+                      eccemoon=None, \
+                      ## sine of 
+                      sinwmoon=None, \
                       # Boolean flag to model transits as trapezoid
                       booltrap=True, \
+
+                      # type of calculation
+                      typecalc='inte', \
+                    
+                      # path to animate the integration in
+                      pathanim=None, \
+
+                      # string for the animation
+                      strgextn='', \
+
                       # verbosity level
-                      typeverb=1):
-    
+                      typeverb=2, \
+                     ):
+    '''
+    Calculate the relative flux light curve of a star due to list of transiting companions and their orbiting moons.
+    When limb-darkening and/or moons are turned on, the result is interpolated based on star-to-companion radius, companion-to-moon radius
+    '''
     timeinit = timemodu.time()
 
-    if isinstance(peri, list):
-        peri = np.array(peri)
+    if isinstance(pericomp, list):
+        pericomp = np.array(pericomp)
 
-    if isinstance(epoc, list):
-        epoc = np.array(epoc)
+    if isinstance(epoccomp, list):
+        epoccomp = np.array(epoccomp)
 
     if isinstance(radicomp, list):
         radicomp = np.array(radicomp)
@@ -2040,22 +2087,33 @@ def retr_rflxtranmodl( \
     if isinstance(rsma, list):
         rsma = np.array(rsma)
 
-    if isinstance(cosi, list):
-        cosi = np.array(cosi)
+    if isinstance(cosicomp, list):
+        cosicomp = np.array(cosicomp)
 
-    if isinstance(ecce, list):
-        ecce = np.array(ecce)
+    if isinstance(eccecomp, list):
+        eccecomp = np.array(eccecomp)
 
-    if isinstance(sinw, list):
-        sinw = np.array(sinw)
+    if isinstance(sinwcomp, list):
+        sinwcomp = np.array(sinwcomp)
     
-    numbcomp = peri.size
+    if inclcomp is not None and cosicomp is not None:
+        raise Exception('')
+    
+    if inclcomp is not None:
+        cosicomp = np.cos(inclcomp * np.pi / 180.)
+
+    numbcomp = pericomp.size
     if perimoon is not None:
-        indxcomp = np.arange(indxcomp)
-        numbmoon = np.empty(len(perimoon), dtype=int)
+        indxcomp = np.arange(numbcomp)
+        numbmoon = np.empty(numbcomp, dtype=int)
+        for j in indxcomp:
+            numbmoon[j] = len(perimoon[j])
         indxmoon = [np.arange(numbmoon[j]) for j in indxcomp]
     
-    boolinptphys = True#False
+    if rsma is not None:
+        typeinpt = 'rsma'
+    else:
+        typeinpt = 'perimass'
 
     minmtime = np.amin(time)
     maxmtime = np.amax(time)
@@ -2063,80 +2121,242 @@ def retr_rflxtranmodl( \
     
     dictfact = retr_factconv()
     
-    if boolinptphys:
-        smax = (radistar + radicomp / dictfact['rsre']) / rsma / dictfact['aurs']
+    if pathanim is not None and strgextn != '':
+        strgextn = '_' + strgextn
+
+    if typeinpt == 'rsma':
+        smaxcomp = (radistar + radicomp / dictfact['rsre']) / rsma / dictfact['aurs']
+    elif typeinpt == 'perimass':
+        smaxcomp = retr_smaxkepl(pericomp, massstar)
+        #masstotl = massstar + np.sum(masscomp)
+        #smaxcomp = retr_smaxkepl(pericomp, masstotl)
+        
+        if perimoon is not None:
+            smaxmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
+            for j in indxcomp:
+                smaxmoon[j] = retr_smaxkepl(perimoon[j], masscomp[j] / dictfact['msme'])
     
-    rs2a = radistar / smax / dictfact['aurs']
-    imfa = retr_imfa(cosi, rs2a, ecce, sinw)
-    sini = np.sqrt(1. - cosi**2)
-    rrat = radicomp / dictfact['rsre'] / radistar
+    numbcomp = radicomp.size
+    indxcomp = np.arange(numbcomp)
+    
+    if eccecomp is None:
+        eccecomp = np.zeros(numbcomp)
+    if sinwcomp is None:
+        sinwcomp = np.zeros(numbcomp)
+    
+    radistareart = radistar * dictfact['rsre']
+        
+    rs2a = radistar / smaxcomp / dictfact['aurs']
+    imfa = retr_imfa(cosicomp, rs2a, eccecomp, sinwcomp)
+    sini = np.sqrt(1. - cosicomp**2)
+    rrat = radicomp / radistareart
     dept = rrat**2 * 1e3
     
-    rflxtranmodl = np.ones_like(time)
-    
     if booltrap:
-        durafull = retr_duratranfull(peri, rs2a, sini, rrat, imfa)
-        duratotl = retr_duratrantotl(peri, rs2a, sini, rrat, imfa)
+        durafull = retr_duratranfull(pericomp, rs2a, sini, rrat, imfa)
+        duratotl = retr_duratrantotl(pericomp, rs2a, sini, rrat, imfa)
         duraineg = (duratotl - durafull) / 2.
         durafullhalf = durafull / 2.
     else:
-        duratotl = retr_duratran(peri, rsma, cosi)
+        duratotl = retr_duratran(pericomp, rsma, cosicomp)
     duratotlhalf = duratotl / 2.
 
     # Boolean flag that indicates whether there is any transit
     booltran = np.isfinite(duratotl)
     
-    numbplan = radicomp.size
-    indxplan = np.arange(numbplan)
-    
     if typeverb > 1:
         print('time')
         summgene(time)
-        print('epoc')
-        print(epoc)
-        print('peri')
-        print(peri)
-        print('cosi')
-        print(cosi)
+        
+        print('radistar')
+        print(radistar)
+        
+        print('epoccomp')
+        print(epoccomp)
+        print('pericomp')
+        print(pericomp)
+        print('radicomp')
+        print(radicomp)
+        print('cosicomp')
+        print(cosicomp)
+        print('radicomp')
+        print(radicomp)
+        print('smaxcomp')
+        print(smaxcomp)
+        print('smaxcomp * dictfact[aurs] [R_S]')
+        print(smaxcomp * dictfact['aurs'])
+        print('masscomp')
+        print(masscomp)
         print('rsma')
         print(rsma)
         print('imfa')
         print(imfa)
-        print('radistar')
-        print(radistar)
         print('rrat')
         print(rrat)
         print('rs2a')
         print(rs2a)
-        print('duratotl')
-        print(duratotl)
-        if booltrap:
-            print('durafull')
-            print(durafull)
+        if typecalc != 'inte':
+            print('duratotl')
+            print(duratotl)
+            if booltrap:
+                print('durafull')
+                print(durafull)
         print('booltran')
         print(booltran)
-        print('indxplan')
-        print(indxplan)
+        print('indxcomp')
+        print(indxcomp)
+        if perimoon is not None:
+            print('perimoon')
+            print(perimoon)
+            print('radimoon')
+            print(radimoon)
+            print('smaxmoon * dictfact[aurs] * dictfact[rsre] [R_E]')
+            for smaxmoontemp in smaxmoon:
+                print(smaxmoontemp * dictfact['aurs'] * dictfact['rsre'])
     
-    for j in indxplan:
+    if typecalc == 'inte':
+        masstotl = np.sum(masscomp) / dictfact['msme'] + massstar
         
-        if booltran[j]:
-            
-            if perimoon is not None:
-                phas = (time - epoc[j]) % peri[j]
-                indxtimemoontrantotl = np.where(posi[j][jj] + radimoon[j][jj] < -radistar)[0]
-                distcomp = phas * 2. * np.pi * smax[j]
-                for jj in indxmoon[j]:
-                    phasmoon[j][jj] = (time - epocmoon[j][jj]) % perimoon[j][jj]
-                    distcomp[j][jj] = phasmoon[j][jj] * 2. * np.pi * smaxmoon[j][jj]
-                    posimoon[j][jj] = distcomp + distcomp[j][jj]
-                    indxtimemoontrantotl = np.where(posimoon[j][jj] + radimoon[j][jj] < -radistar)[0]
-                
-            else:
-                    
+        numbtime = time.size
+        indxtime = np.arange(numbtime)
+        
+        # grid
+        numbside = 1000
+        arry = np.linspace(-1., 1., numbside) * radistareart
+        xposgrid, yposgrid = np.meshgrid(arry, arry)
+        
+        # distance to the center of the star
+        diststar = np.sqrt(xposgrid**2 + yposgrid**2)
+        
+        print('xposgrid')
+        summgene(xposgrid)
+        
+        # grid of stellar brightness
+        brgt = np.zeros_like(xposgrid)
+        boolstar = diststar < radistareart
+        print('boolstar')
+        summgene(boolstar)
+        indxgridstar = np.where(boolstar)
+        
+        brgt[indxgridstar] = retr_brgtlmdk(1. - diststar[indxgridstar] / radistareart, coeflmdklinr, coeflmdkquad, typelmdk=typelmdk)
+        print('brgt')
+        summgene(brgt)
+        
+        maxmbrgt = np.amax(brgt)
+        
+        if pathanim is not None:
+            pathgiff = pathanim + 'anim%s.gif' % strgextn
+            pathtime = [[] for t in indxtime]
 
-                minmindxtran = int(np.floor((minmtime - epoc[j]) / peri[j]))
-                maxmindxtran = int(np.ceil((maxmtime - epoc[j]) / peri[j]))
+        rflxtranmodl = np.sum(brgt) * np.ones(numbtime)
+        
+        boolnocccomp = [[] for j in indxcomp]
+        xposcomp = [[] for j in indxcomp]
+        yposcomp = [[] for j in indxcomp]
+        phascomp = [[] for j in indxcomp]
+        if perimoon is not None:
+            boolnoccmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
+            xposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
+            yposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
+        
+        for j in indxcomp:
+            #velocomp = 0.017 * np.sqrt(masstotl / smaxcomp[j]) # [AU/day]
+            phascomp[j] = ((time - epoccomp[j]) / pericomp[j]) % 1.
+            xposcomp[j] = smaxcomp[j] * np.sin(2. * np.pi * phascomp[j]) * dictfact['aurs'] * dictfact['rsre']
+            yposcomp[j] = np.cos(inclcomp[j] * np.pi / 180.) * smaxcomp[j]
+
+            if perimoon is not None:
+                for jj in indxmoon[j]:
+                    #velomoon = 2.9e-5 * np.sqrt(masscomp[j] / smaxcomp[j]) # [AU/day]
+                    xposmoon[j][jj] = xposcomp[j] + smaxmoon[j][jj] * np.cos(2. * np.pi * (time - epocmoon[j][jj]) / perimoon[j][jj]) * dictfact['aurs'] * dictfact['rsre']
+                    yposmoon[j][jj] = yposcomp[j] + smaxmoon[j][jj] * np.sin(2. * np.pi * (time - epocmoon[j][jj]) / perimoon[j][jj]) * dictfact['aurs'] * dictfact['rsre']
+        
+        if pathanim is not None:
+            cmnd = 'convert -delay 5 -density 200'
+        
+        for t in indxtime:
+            boolnocc = np.copy(boolstar)
+            booleval = False
+            for j in indxcomp:
+                
+                if np.sqrt(xposcomp[j][t]**2 + yposcomp[j]**2) < radistareart + radicomp[j] and (phascomp[j][t] < 0.25 or phascomp[j][t] > 0.75):
+                
+                    booleval = True
+
+                    xposgridcomp = xposgrid - xposcomp[j][t]
+                    yposgridcomp = yposgrid - yposcomp[j]
+                    
+                    if typecomp == 'plan' or typecomp == 'plandiskedgehori' or typecomp == 'plandiskedgevert' or typecomp == 'plandiskface':
+                        distcomp = np.sqrt(xposgridcomp**2 + yposgridcomp**2)
+                        boolnocccomp[j] = distcomp > radicomp[j]
+                    
+                    if typecomp == 'plandiskedgehori':
+                        booldisk = (xposgridcomp / 1.75 / radicomp[j])**2 + (yposgridcomp / 0.2 / radicomp[j])**2 > 1.
+                        boolnocccomp[j] = boolnocccomp[j] & booldisk
+                       
+                    if typecomp == 'plandiskedgevert':
+                        booldisk = (yposgridcomp / 1.75 / radicomp[j])**2 + (xposgridcomp / 0.2 / radicomp[j])**2 > 1.
+                        boolnocccomp[j] = boolnocccomp[j] & booldisk
+                       
+                    if typecomp == 'plandiskface':
+                        boolnocccomp[j] = boolnocccomp[j] & ((distcomp > 1.5 * radicomp[j]) & (distcomp < 1.75 * radicomp[j]))
+    
+                    boolnocc = boolnocc & boolnocccomp[j]
+
+                if perimoon is not None:
+                    for jj in indxmoon[j]:
+                        
+                        if np.sqrt(xposmoon[j][jj][t]**2 + yposmoon[j][jj][t]**2) < radistareart + radimoon[j][jj]:
+                            
+                            booleval = True
+
+                            xposgridmoon = xposgrid - xposmoon[j][jj][t]
+                            yposgridmoon = yposgrid - yposmoon[j][jj][t]
+                            
+                            distmoon = np.sqrt(xposgridmoon**2 + yposgridmoon**2)
+                            boolnoccmoon[j][jj] = distmoon > radimoon[j][jj]
+                            boolnocc = boolnocc & boolnoccmoon[j][jj]
+            
+            if booleval:
+                indxgridnocc = np.where(boolnocc)
+                rflxtranmodl[t] = np.sum(brgt[indxgridnocc])
+        
+                if pathanim is not None and not os.path.exists(pathgiff):
+                    pathtime[t] = pathanim + 'imag%s_%04d.pdf' % (strgextn, t)
+                    cmnd+= ' %s' % pathtime[t]
+                    figr, axis = plt.subplots(figsize=(4, 3))
+                    brgttemp = np.zeros_like(brgt)
+                    brgttemp[boolnocc] = brgt[boolnocc]
+                    imag = axis.imshow(brgttemp, origin='lower', interpolation='nearest', cmap='magma', vmin=0., vmax=maxmbrgt)
+                    axis.axis('off')
+                    print('Writing to %s...' % pathtime[t])
+                    plt.savefig(pathtime[t], dpi=200)
+                    plt.close()
+    
+        if pathanim is not None:
+            # make animation
+            cmnd += ' %s' % pathgiff
+            print('Writing to %s...' % pathgiff)
+            os.system(cmnd)
+            
+            # delete images
+            cmnd = 'rm'
+            for t in indxtime:
+                if len(pathtime[t]) > 0:
+                    cmnd += ' %s' % pathtime[t]
+            if cmnd != 'rm':
+                os.system(cmnd)
+
+        rflxtranmodl /= np.amax(rflxtranmodl)
+    else:
+        
+        rflxtranmodl = np.ones_like(time)
+    
+        for j in indxcomp:
+            if booltran[j]:
+                    
+                minmindxtran = int(np.floor((minmtime - epoccomp[j]) / pericomp[j]))
+                maxmindxtran = int(np.ceil((maxmtime - epoccomp[j]) / pericomp[j]))
                 indxtranthis = np.arange(minmindxtran, maxmindxtran + 1)
                 
                 if typeverb > 1:
@@ -2148,7 +2368,7 @@ def retr_rflxtranmodl( \
                     print(indxtranthis)
 
                 for n in indxtranthis:
-                    timetran = epoc[j] + peri[j] * n
+                    timetran = epoccomp[j] + pericomp[j] * n
                     timeshft = time - timetran
                     timeshftnega = -timeshft
                     timeshftabso = abs(timeshft)
@@ -2223,8 +2443,6 @@ def retr_massfromradi( \
                 listmass = mr_forecast.Rpost2M(listradiplan)
             else:
                 listmass = np.empty_like(listradiplan)
-                print('listradiplan')
-                summgene(listradiplan)
                 for k in range(len(listradiplan)):
                     listmass[k] = mr_forecast.Rpost2M(listradiplan[k, None])
                 
@@ -2664,7 +2882,7 @@ def retr_radiroch(radistar, densstar, denscomp):
         densstar: density of the primary star
         denscomp: density of the companion
     """    
-    radiroch = radistar (2. * densstar / denscomp)**(1. / 3.)
+    radiroch = radistar * (2. * densstar / denscomp)**(1. / 3.)
     
     return radiroch
 

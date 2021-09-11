@@ -1,4 +1,4 @@
-import sys
+import sys, os
 
 import numpy as np
 
@@ -6,7 +6,7 @@ import ephesus
 from tdpy.util import summgene
 import tdpy
 
-def make_rflx( \
+def make_rflxmoon( \
               # type of orbital architecture
               ## 'plan'
               ## 'bhol'
@@ -18,9 +18,13 @@ def make_rflx( \
     Make relative flux light curves of stars with companions
     '''
     
+    np.random.seed(0)
+
     # time axis
     time = np.linspace(0., 30., 10000)
-    
+    minmtime = np.amin(time)
+    maxmtime = np.amax(time)
+
     # dictionary of conversion factors
     dictfact = ephesus.retr_factconv()
     
@@ -36,72 +40,128 @@ def make_rflx( \
     indxcomp = np.arange(numbcomp)
     
     ## orbital periods
-    peri = np.array([3., 5.])
+    pericomp = np.array([3., 5.])
     ## mid-transit epochs
-    epoc = np.array([200., 600.])
+    epoccomp = np.array([200., 600.])
     ## cosine of inclination
-    cosi = np.array([0.03, 0.05])
-    if typeobar == 'planmoon' or typeobar == 'plan':
-        ## radii of the planets [R_E]
-        radicomp = np.array([1.2, 3.4])
-        ## mass of the planets [M_E]
-        masscomp = ephesus.retr_massfromradi(radicomp) / dictfact['msme'] # [M_S]
+    cosicomp = np.array([0.03, 0.05])
+    ## inclination
+    inclcomp = 180. / np.pi * np.arccos(cosicomp)
     
+    pathmoon = os.environ['EPHESUS_DATA_PATH'] + '/imag/moon/'
+    os.system('mkdir -p %s' % pathmoon)
+    if typeobar == 'planmoon' or typeobar == 'plan':
+        ## planet properties
+        ## radii [R_E]
+        radicomp = np.array([3., 10.])
+        ## masses [M_E]
+        masscomp = ephesus.retr_massfromradi(radicomp)
+        ## densities [d_E]
+        denscomp = masscomp / radicomp**3
+
     # approximate total mass of the system
     masstotl = massstar
 
     ## semi-major axes [AU] 
-    smax = ephesus.retr_smaxkepl(peri, masstotl)
+    smaxcomp = ephesus.retr_smaxkepl(pericomp, masstotl)
     ## sum of radii divided by the semi-major axis
-    rsma = ephesus.retr_rsma(radicomp, radistar, smax)
+    #rsma = ephesus.retr_rsma(radicomp, radistar, smax)
     
     if typeobar.endswith('moon'):
         # exomoons to companions
         
         numbmoon = np.empty(numbcomp, dtype=int)
-        smaxmoon = [[] for j in indxcomp]
+        radimoon = [[] for j in indxcomp]
+        massmoon = [[] for j in indxcomp]
+        densmoon = [[] for j in indxcomp]
         perimoon = [[] for j in indxcomp]
+        epocmoon = [[] for j in indxcomp]
+        smaxmoon = [[] for j in indxcomp]
+        indxmoon = [[] for j in indxcomp]
+
+        # Hill radius of the companion
+        radihill = ephesus.retr_radihill(smaxcomp, masscomp / dictfact['msme'], massstar)
+        # maximum semi-major axis of the moons 
+        maxmsmaxmoon = 0.5 * radihill
         
+        masstotl = np.sum(masscomp) / dictfact['msme'] + massstar
+            
         for j in indxcomp:
             # number of moons
             arry = np.arange(1, 10)
             prob = arry**(-2.)
             prob /= np.sum(prob)
             numbmoon[j] = np.random.choice(arry, p=prob)
-        
-            ## radii of the moons [R_E]
-            radimoon = np.array([0.2, 0.4])
-            ## mass of the moons [M_E]
-            massmoon = ephesus.retr_massfromradi(radimoon)
+            indxmoon[j] = np.arange(numbmoon[j])
+            smaxmoon[j] = np.empty(numbmoon[j])
+            # properties of the moons
+            ## radii [R_E]
+            radimoon[j] = radicomp[j] * tdpy.icdf_powr(np.random.rand(numbmoon[j]), 0.05, 0.3, 2.)
+            ## mass [M_E]
+            massmoon[j] = ephesus.retr_massfromradi(radimoon[j])
+            ## densities [d_E]
+            densmoon[j] = massmoon[j] / radimoon[j]**3
+            # minimum semi-major axes
+            minmsmaxmoon = ephesus.retr_radiroch(radicomp[j], denscomp[j], densmoon[j])
             
-            # Hill radius of the companion
-            radihill = ephesus.retr_radihill(smax[j], masscomp[j], massstar)
-            
-            # minimum semi-major axis of the moons 
-            minmsmaxmoon = radicomp[j] + radimoon[j]
-            # maximum semi-major axis of the moons 
-            maxmsmaxmoon = 0.5 * radihill
             # semi-major axes of the moons
-            smaxmoon[j] = tdpy.icdf_powr(np.random.rand(numbmoon[j]), minmsmaxmoon, maxmsmaxmoon, 2.)
+            for jj in indxmoon[j]:
+                smaxmoon[j][jj] = tdpy.icdf_powr(np.random.rand(), minmsmaxmoon[jj], maxmsmaxmoon[j], 2.)
             # orbital period of the moons
             perimoon[j] = ephesus.retr_perikepl(smaxmoon[j], masstotl)
-    
-    # total mass
-    masstotl = massstar + masscomp
-    
-    for j in indxcomp:
-        if (smaxmoon[j] > smax[j] / 1.2).any():
-            print('smax[j]')
-            print(smax[j])
-            print('smaxmoon[j]')
-            print(smaxmoon[j])
-            raise Exception('')
+            # mid-transit times of the moons
+            epocmoon[j] = tdpy.icdf_self(np.random.rand(numbmoon[j]), minmtime, maxmtime)
         
-        # generate light curve
-        rfxl = ephesus.retr_rflxtranmodl(time, radistar, peri, epoc, rsma, cosi, radicomp=radicomp, perimoon=perimoon)
-        
-        print('rfxl')
-        summgene(rfxl)
+        print('smaxcomp')
+        print(smaxcomp)
+        print('radicomp')
+        print(radicomp)
+        print('pericomp')
+        print(pericomp)
+        print('radihill')
+        print(radihill)
+        print('minmsmaxmoon')
+        print(minmsmaxmoon)
+        print('maxmsmaxmoon')
+        print(maxmsmaxmoon)
+        print('masstotl')
+        print(masstotl)
+        print('smaxmoon')
+        print(smaxmoon)
+        print('perimoon')
+        print(perimoon)
+        print('')
+        #raise Exception('')
+
+    if (smaxmoon[j] > smaxcomp[j] / 1.2).any():
+        print('smaxcomp[j]')
+        print(smaxcomp[j])
+        print('radihill[j]')
+        print(radihill[j])
+        print('smaxmoon[j]')
+        print(smaxmoon[j])
+        raise Exception('')
+    
+    strgextn = '%s' % (typeobar)
+    
+    # generate light curve
+    rflx = ephesus.retr_rflxtranmodl(time, radistar, pericomp, epoccomp, inclcomp=inclcomp, massstar=massstar, \
+                        radicomp=radicomp, masscomp=masscomp, \
+                        perimoon=perimoon, epocmoon=epocmoon, radimoon=radimoon, \
+                        pathanim=pathmoon, strgextn=strgextn, \
+                        )
+    
+    print('rflx')
+    summgene(rflx)
+    
+    dictmodl = dict()
+    dictmodl[strgextn] = dict()
+    dictmodl[strgextn]['time'] = time
+    dictmodl[strgextn]['lcur'] = rflx
+
+    pathplot = ephesus.plot_lcur(pathmoon, dictmodl=dictmodl, strgextn=strgextn, \
+                                    #titl=titlraww, \
+                                )
     
 
 globals().get(sys.argv[1])(*sys.argv[2:])
