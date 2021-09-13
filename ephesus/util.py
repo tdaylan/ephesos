@@ -2159,17 +2159,17 @@ def retr_rflxtranmodl( \
     rrat = radicomp / radistareart
     dept = rrat**2 * 1e3
     
-    if booltrap:
-        durafull = retr_duratranfull(pericomp, rs2a, sini, rrat, imfa)
-        duratotl = retr_duratrantotl(pericomp, rs2a, sini, rrat, imfa)
-        duraineg = (duratotl - durafull) / 2.
-        durafullhalf = durafull / 2.
-    else:
-        duratotl = retr_duratran(pericomp, rsma, cosicomp)
-    duratotlhalf = duratotl / 2.
+    #if booltrap:
+    #    durafull = retr_duratranfull(pericomp, rs2a, sini, rrat, imfa)
+    #    duratotl = retr_duratrantotl(pericomp, rs2a, sini, rrat, imfa)
+    #    duraineg = (duratotl - durafull) / 2.
+    #    durafullhalf = durafull / 2.
+    #else:
+    #    duratotl = retr_duratran(pericomp, rsma, cosicomp)
+    #duratotlhalf = duratotl / 2.
 
-    # Boolean flag that indicates whether there is any transit
-    booltran = np.isfinite(duratotl)
+    ## Boolean flag that indicates whether there is any transit
+    #booltran = np.isfinite(duratotl)
     
     if typeverb > 1:
         print('time')
