@@ -53,7 +53,7 @@ def make_rflxmoon( \
     if typeobar == 'planmoon' or typeobar == 'plan':
         ## planet properties
         ## radii [R_E]
-        radicomp = np.array([3., 10.])
+        radicomp = np.array([8., 16.])
         ## masses [M_E]
         masscomp = ephesus.retr_massfromradi(radicomp)
         ## densities [d_E]
@@ -112,25 +112,25 @@ def make_rflxmoon( \
             # mid-transit times of the moons
             epocmoon[j] = tdpy.icdf_self(np.random.rand(numbmoon[j]), minmtime, maxmtime)
         
-        print('smaxcomp')
-        print(smaxcomp)
-        print('radicomp')
-        print(radicomp)
-        print('pericomp')
-        print(pericomp)
-        print('radihill')
-        print(radihill)
-        print('minmsmaxmoon')
-        print(minmsmaxmoon)
-        print('maxmsmaxmoon')
-        print(maxmsmaxmoon)
-        print('masstotl')
-        print(masstotl)
-        print('smaxmoon')
-        print(smaxmoon)
-        print('perimoon')
-        print(perimoon)
-        print('')
+        #print('smaxcomp')
+        #print(smaxcomp)
+        #print('radicomp')
+        #print(radicomp)
+        #print('pericomp')
+        #print(pericomp)
+        #print('radihill')
+        #print(radihill)
+        #print('minmsmaxmoon')
+        #print(minmsmaxmoon)
+        #print('maxmsmaxmoon')
+        #print(maxmsmaxmoon)
+        #print('masstotl')
+        #print(masstotl)
+        #print('smaxmoon')
+        #print(smaxmoon)
+        #print('perimoon')
+        #print(perimoon)
+        #print('')
         #raise Exception('')
 
     if (smaxmoon[j] > smaxcomp[j] / 1.2).any():
@@ -148,11 +148,8 @@ def make_rflxmoon( \
     rflx = ephesus.retr_rflxtranmodl(time, radistar, pericomp, epoccomp, inclcomp=inclcomp, massstar=massstar, \
                         radicomp=radicomp, masscomp=masscomp, \
                         perimoon=perimoon, epocmoon=epocmoon, radimoon=radimoon, \
-                        pathanim=pathmoon, strgextn=strgextn, \
+                        #pathanim=pathmoon, strgextn=strgextn, \
                         )
-    
-    print('rflx')
-    summgene(rflx)
     
     dictmodl = dict()
     dictmodl[strgextn] = dict()

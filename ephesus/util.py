@@ -773,7 +773,7 @@ def bdtr_tser( \
                     timeknot = np.linspace(minmtime, maxmtime, numbknot)
                     
                     if numbknot >= 2:
-                        print('%d knots used. Knot separation: %.3g hours' % (timeknot.size, 24 * (timeknot[1] - timeknot[0])))
+                        print('Region %d. %d knots used. Knot separation: %.3g hours' % (i, timeknot.size, 24 * (timeknot[1] - timeknot[0])))
                         timeknot = timeknot[1:-1]
                     
                         objtspln = scipy.interpolate.LSQUnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], timeknot, k=ordrspln)
@@ -972,7 +972,7 @@ def srch_pbox(arry, \
               minmdcyc=0.01, \
               
               # Boolean flag to enable multiprocessing
-              boolmult=True, \
+              boolmult=False, \
               
               # number of processes
               numbproc=None, \
@@ -1048,10 +1048,10 @@ def srch_pbox(arry, \
         dictfact = retr_factconv()
         
         timepboxmeta = arrysrch[:, 0]
-        numbtime = arrymeta[:, 0].size
+        numbtime = arrysrch[:, 0].size
         
-        minmtime = np.amin(arrymeta[:, 0])
-        maxmtime = np.amax(arrymeta[:, 0])
+        minmtime = np.amin(arrysrch[:, 0])
+        maxmtime = np.amax(arrysrch[:, 0])
         delttime = maxmtime - minmtime
         deltfreq = 1. / delttime / factosam
         minmfreq = 2. / delttime
@@ -1086,13 +1086,13 @@ def srch_pbox(arry, \
         listnumboffs = (3. / listdcyc).astype(int)
         listoffs = [np.linspace(minmoffs, maxmoffs, numboffs) for numboffs in listnumboffs]
         
-        dflx = arrymeta[:, 1] - 1.
-        stdvdflx = arrymeta[:, 2]
+        dflx = arrysrch[:, 1] - 1.
+        stdvdflx = arrysrch[:, 2]
         varidflx = stdvdflx**2
         
         indxdcyc = np.arange(numbdcyc)
         
-        arrymeta = np.copy(arry)
+        arrymeta = np.copy(arrysrch)
 
         while True:
             
@@ -1104,7 +1104,6 @@ def srch_pbox(arry, \
 
             # mask out the detected transit
             if j == 0:
-                lcurpboxmeta 
                 arrymeta[:, 1] = np.copy(arrysrch[:, 1])
             else:
                 arrymeta[:, 1] -= dictpboxoutp['rflxtsermodl'][j-1]
@@ -1145,7 +1144,7 @@ def srch_pbox(arry, \
                     
                     if numbproc is None:
                         #numbproc = multiprocessing.cpu_count() - 1
-                        numbproc = int(0.3 * multiprocessing.cpu_count())
+                        numbproc = int(0.8 * multiprocessing.cpu_count())
                     
                     print('Generating %d processes...' % numbproc)
                     
@@ -1154,7 +1153,7 @@ def srch_pbox(arry, \
                     indxproc = np.arange(numbproc)
 
                     listperiproc = [[] for i in indxproc]
-                    indxprocperi = np.linspace(0, numbproc - 1, numbperi).astype(int)
+                    indxprocperi = np.linspace(0, numbproc * (1. - 1. / numbperi), numbperi).astype(int)
                     for i in indxproc:
                         indx = np.where(indxprocperi == i)[0]
                         listperiproc[i] = listperi[indx]
@@ -1191,8 +1190,8 @@ def srch_pbox(arry, \
                 numbtimemodl = 100000
                 arrymetamodl = np.empty((numbtimemodl, 3))
                 arrymetamodl[:, 0] = np.linspace(minmtime, maxmtime, 100000)
-                arrymetamodl[:, 1] = retr_rflxtranmodl(arrymetamodl[:, 0], 1. / dictfact['rsre'], [dictpboxoutp['peri']], [dictpboxoutp['epoc']], [rsma], \
-                                                                        [cosi], radicomp=[rrat], booltrap=False)
+                arrymetamodl[:, 1] = retr_rflxtranmodl(arrymetamodl[:, 0], 1. / dictfact['rsre'], [dictpboxoutp['peri']], [dictpboxoutp['epoc']], rsma=[rsma], \
+                                                                        cosicomp=[cosi], radicomp=[rrat], booltrap=False)
 
                 arrypsermodl = fold_tser(arrymetamodl, dictpboxoutp['epoc'], dictpboxoutp['peri'], phasshft=0.5)
                 arrypserdata = fold_tser(arrymeta, dictpboxoutp['epoc'], dictpboxoutp['peri'], phasshft=0.5)
@@ -1245,6 +1244,7 @@ def srch_pbox(arry, \
                 
                 # plot light curve + TLS model
                 figr, axis = plt.subplots(figsize=figrsizeydobskin)
+                lcurpboxmeta = arrymeta[:, 1]
                 if boolpuls:
                     lcurpboxmetatemp = 2. - lcurpboxmeta
                 else:
@@ -1284,6 +1284,10 @@ def srch_pbox(arry, \
                 plt.savefig(path)
                 plt.close()
             
+            print('dictpboxoutp[sdee]')
+            print(dictpboxoutp['sdee'])
+            print('thrssdee')
+            print(thrssdee)
             if dictpboxoutp['sdee'] > thrssdee:
                 dictpboxoutp['listdictpboxoutp'].append(dictpboxoutp)
             else:
@@ -2057,9 +2061,6 @@ def retr_rflxtranmodl( \
                       # Boolean flag to model transits as trapezoid
                       booltrap=True, \
 
-                      # type of calculation
-                      typecalc='inte', \
-                    
                       # path to animate the integration in
                       pathanim=None, \
 
@@ -2067,7 +2068,7 @@ def retr_rflxtranmodl( \
                       strgextn='', \
 
                       # verbosity level
-                      typeverb=2, \
+                      typeverb=1, \
                      ):
     '''
     Calculate the relative flux light curve of a star due to list of transiting companions and their orbiting moons.
@@ -2114,6 +2115,12 @@ def retr_rflxtranmodl( \
         typeinpt = 'rsma'
     else:
         typeinpt = 'perimass'
+    
+    # type of calculation
+    if typelmdk == 'none' and perimoon is None:
+        typecalc = 'trap'
+    else:
+        typecalc = 'inte'
 
     minmtime = np.amin(time)
     maxmtime = np.amax(time)
@@ -2228,19 +2235,12 @@ def retr_rflxtranmodl( \
         # distance to the center of the star
         diststar = np.sqrt(xposgrid**2 + yposgrid**2)
         
-        print('xposgrid')
-        summgene(xposgrid)
-        
         # grid of stellar brightness
         brgt = np.zeros_like(xposgrid)
         boolstar = diststar < radistareart
-        print('boolstar')
-        summgene(boolstar)
         indxgridstar = np.where(boolstar)
         
         brgt[indxgridstar] = retr_brgtlmdk(1. - diststar[indxgridstar] / radistareart, coeflmdklinr, coeflmdkquad, typelmdk=typelmdk)
-        print('brgt')
-        summgene(brgt)
         
         maxmbrgt = np.amax(brgt)
         
@@ -2279,7 +2279,10 @@ def retr_rflxtranmodl( \
             booleval = False
             for j in indxcomp:
                 
-                if np.sqrt(xposcomp[j][t]**2 + yposcomp[j]**2) < radistareart + radicomp[j] and (phascomp[j][t] < 0.25 or phascomp[j][t] > 0.75):
+                if phascomp[j][t] > 0.25 and phascomp[j][t] < 0.75:
+                    continue
+
+                if np.sqrt(xposcomp[j][t]**2 + yposcomp[j]**2) < radistareart + radicomp[j]:
                 
                     booleval = True
 
@@ -2302,7 +2305,7 @@ def retr_rflxtranmodl( \
                         boolnocccomp[j] = boolnocccomp[j] & ((distcomp > 1.5 * radicomp[j]) & (distcomp < 1.75 * radicomp[j]))
     
                     boolnocc = boolnocc & boolnocccomp[j]
-
+                
                 if perimoon is not None:
                     for jj in indxmoon[j]:
                         
@@ -2316,7 +2319,7 @@ def retr_rflxtranmodl( \
                             distmoon = np.sqrt(xposgridmoon**2 + yposgridmoon**2)
                             boolnoccmoon[j][jj] = distmoon > radimoon[j][jj]
                             boolnocc = boolnocc & boolnoccmoon[j][jj]
-            
+                
             if booleval:
                 indxgridnocc = np.where(boolnocc)
                 rflxtranmodl[t] = np.sum(brgt[indxgridnocc])
