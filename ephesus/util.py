@@ -1739,7 +1739,7 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
     
     boollegd = False
 
-    figr, axis = plt.subplots(figsize=(6, 3.5))
+    figr, axis = plt.subplots(figsize=(8, 2.5))
     
     # raw data
     if timedata is not None:
@@ -1796,8 +1796,8 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
     if boollegd:
         axis.legend()
 
-    #plt.subplots_adjust(bottom=0.15)
-    print(f'Writing to {path}...')
+    plt.subplots_adjust(bottom=0.2)
+    print('Writing to {path}...')
     plt.savefig(path)
     plt.close()
     
@@ -1999,6 +1999,21 @@ def retr_rsma(radiplan, radistar, smax):
     dictfact = retr_factconv()
     rsma = (radistar + radiplan / dictfact['rsre']) / (smax * dictfact['aurs'])
     return rsma
+
+
+def retr_rflxmodlrise(time, timerise, coeflinerise, coefquadrise, coefline):
+    
+    timeoffs = time - timerise
+    
+    dflxline = coefline * timeoffs
+    
+    indxpost = np.where(timeoffs > 0)[0]
+    dflxrise = np.zeros_like(time)
+    dflxrise[indxpost] = coeflinerise * timeoffs[indxpost] + coefquadrise * timeoffs[indxpost]**2
+    
+    rflx = 1. + dflxrise + dflxline
+    
+    return rflx, dflxline, dflxrise
 
 
 def retr_rflxtranmodl( \
@@ -2448,8 +2463,6 @@ def retr_massfromradi( \
                 listmass = np.empty_like(listradiplan)
                 for k in range(len(listradiplan)):
                     listmass[k] = mr_forecast.Rpost2M(listradiplan[k, None])
-                
-            #listmass = mr_forecast.Rpost2M(listradiplan, unit='Jupiter', classify='Yes')
         else:
             listmass = np.ones_like(listradiplan) + np.nan
 
