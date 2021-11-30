@@ -21,7 +21,7 @@ def make_rflxmoon( \
     np.random.seed(0)
 
     # time axis
-    time = np.linspace(0., 30., 10000)
+    time = np.linspace(0., 10., 10000)
     minmtime = np.amin(time)
     maxmtime = np.amax(time)
 
@@ -84,8 +84,6 @@ def make_rflxmoon( \
         # maximum semi-major axis of the moons 
         maxmsmaxmoon = 0.5 * radihill
         
-        masstotl = np.sum(masscomp) / dictfact['msme'] + massstar
-            
         for j in indxcomp:
             # number of moons
             arry = np.arange(1, 10)
@@ -108,7 +106,7 @@ def make_rflxmoon( \
             for jj in indxmoon[j]:
                 smaxmoon[j][jj] = tdpy.icdf_powr(np.random.rand(), minmsmaxmoon[jj], maxmsmaxmoon[j], 2.)
             # orbital period of the moons
-            perimoon[j] = ephesus.retr_perikepl(smaxmoon[j], masstotl)
+            perimoon[j] = ephesus.retr_perikepl(smaxmoon[j], np.sum(masscomp) / dictfact['msme'])
             # mid-transit times of the moons
             epocmoon[j] = tdpy.icdf_self(np.random.rand(numbmoon[j]), minmtime, maxmtime)
         
@@ -145,20 +143,38 @@ def make_rflxmoon( \
     strgextn = '%s' % (typeobar)
     
     # generate light curve
-    rflx = ephesus.retr_rflxtranmodl(time, radistar, pericomp, epoccomp, inclcomp=inclcomp, massstar=massstar, \
+    dictoutp = ephesus.retr_rflxtranmodl(time, radistar, pericomp, epoccomp, inclcomp=inclcomp, massstar=massstar, \
                         radicomp=radicomp, masscomp=masscomp, \
                         perimoon=perimoon, epocmoon=epocmoon, radimoon=radimoon, \
-                        #pathanim=pathmoon, strgextn=strgextn, \
+                        boolcompmoon=True, \
+                        pathanim=pathmoon, \
+                        strgextn=strgextn, \
                         )
     
     dictmodl = dict()
     dictmodl[strgextn] = dict()
+    
     dictmodl[strgextn]['time'] = time
-    dictmodl[strgextn]['lcur'] = rflx
-
+    dictmodl[strgextn]['lcur'] = dictoutp['rflx']
+    boolwritover = True
     pathplot = ephesus.plot_lcur(pathmoon, dictmodl=dictmodl, strgextn=strgextn, \
+                                    boolwritover=boolwritover, \
                                     #titl=titlraww, \
                                 )
     
+    dictmodl[strgextn]['lcur'] = dictoutp['rflxcomp']
+    pathplot = ephesus.plot_lcur(pathmoon, dictmodl=dictmodl, strgextn=strgextn+'_comp', \
+                                    boolwritover=boolwritover, \
+                                    #titl=titlraww, \
+                                )
+    
+    dictmodl[strgextn]['lcur'] = dictoutp['rflxmoon']
+    pathplot = ephesus.plot_lcur(pathmoon, dictmodl=dictmodl, strgextn=strgextn+'_moon', \
+                                    boolwritover=boolwritover, \
+                                    #titl=titlraww, \
+                                )
+    
+
+
 
 globals().get(sys.argv[1])(*sys.argv[2:])
