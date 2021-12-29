@@ -13,14 +13,14 @@ from numba import jit, prange
 import h5py
 import fnmatch
 
+import pandas as pd
+
 import astropy
 import astropy as ap
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 import astropy.timeseries
-
-import pandas as pd
 
 import multiprocessing
 from functools import partial
@@ -31,6 +31,7 @@ import scipy.interpolate
 import astroquery
 import astroquery.mast
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 # own modules
@@ -101,13 +102,14 @@ def xmat_tici(listtici):
 
 
 def retr_dictpopltic8(typepopl, numbsyst=None, typeverb=1):
-    """
-    Get a dictionary of the sources in the TIC8 with the fields in the TIC8
+    '''
+    Get a dictionary of the sources in the TIC8 with the fields in the TIC8.
     
     Keyword arguments   
         typepopl: type of the population
-            'ffimhcon': TESS targets with contamination larger than
-            'ffimm135': TESS targets brighter than mag 13.5
+            'ticihcon': TESS targets with contamination larger than
+            'ticim110': TESS targets brighter than mag 11
+            'ticim135': TESS targets brighter than mag 13.5
             'tessnomi2min': 2-minute TESS targets obtained by merging the SPOC 2-min bulk downloads
 
     Returns a dictionary with keys:
@@ -116,7 +118,7 @@ def retr_dictpopltic8(typepopl, numbsyst=None, typeverb=1):
         tmag: TESS magnitude
         radistar: radius of the star
         massstar: mass of the star
-    """
+    '''
     
     if typeverb > 0:
         print('Retrieving a dictionary of TIC8 for population %s...' % typepopl)
@@ -205,26 +207,38 @@ def retr_dictpopltic8(typepopl, numbsyst=None, typeverb=1):
             if typeverb > 0:
                 print('%d observed 2-min targets...' % numbtarg)
             
-        elif typepopl.startswith('ffim'):
-            if typepopl == 'ffimhcon':
+        elif typepopl.startswith('tici'):
+            if typepopl == 'ticihcon':
                 request = {'service':'Mast.Catalogs.Filtered.Tic.Rows', 'format':'json', 'params':{ \
-                #"columns":"c.*", \
-                'columns':'rad, mass, ID, contratio', \
+                'columns':'ID, Tmag, rad, mass, contratio', \
                                                              'filters':[{'paramName':'contratio', 'values':[{"min":10., "max":1e3}]}]}}
-            if typepopl == 'ffimm135':
+            if typepopl == 'ticim110':
                 request = {'service':'Mast.Catalogs.Filtered.Tic.Rows', 'format':'json', 'params':{ \
-                #"columns":"c.*", \
-                'columns':'rad, mass, ID', \
-                                                             'filters':[{'paramName':'Tmag', 'values':[{"min":5., "max":8.5}]}]}}
+                'columns':'ID, Tmag, rad, mass', \
+                                                             'filters':[{'paramName':'Tmag', 'values':[{"min":-100., "max":11}]}]}}
+            if typepopl == 'ticim135':
+                request = {'service':'Mast.Catalogs.Filtered.Tic.Rows', 'format':'json', 'params':{ \
+                'columns':'ID, Tmag, rad, mass', \
+                                                             'filters':[{'paramName':'Tmag', 'values':[{"min":-100., "max":13.5}]}]}}
             headers, outString = quer_mast(request)
             listdictquer = json.loads(outString)['data']
             if typeverb > 0:
                 print('%d matches...' % len(listdictquer))
             dictquer = dict()
+            print('listdictquer[0].keys()')
+            print(listdictquer[0].keys())
             for name in listdictquer[0].keys():
-                dictquer[name] = np.empty(len(listdictquer))
+                if name == 'ID':
+                    namedict = 'tici'
+                if name == 'Tmag':
+                    namedict = 'tmag'
+                if name == 'rad':
+                    namedict = 'radi'
+                if name == 'mass':
+                    namedict = 'mass'
+                dictquer[namedict] = np.empty(len(listdictquer))
                 for k in range(len(listdictquer)):
-                    dictquer[name][k] = listdictquer[k][name]
+                    dictquer[namedict][k] = listdictquer[k][name]
         else:
             print('Unrecognized population name: %s' % typepopl)
             raise Exception('')
@@ -232,7 +246,8 @@ def retr_dictpopltic8(typepopl, numbsyst=None, typeverb=1):
         if typeverb > 0:
             #print('%d targets...' % numbtarg)
             print('Writing to %s...' % path)
-        pd.DataFrame.from_dict(dictquer).to_csv(path)
+        #columns = ['tici', 'radi', 'mass']
+        pd.DataFrame.from_dict(dictquer).to_csv(path, index=False)#, columns=columns)
     else:
         if typeverb > 0:
             print('Reading from %s...' % path)
@@ -240,7 +255,7 @@ def retr_dictpopltic8(typepopl, numbsyst=None, typeverb=1):
         
         for name in dictquer.keys():
             dictquer[name] = np.array(dictquer[name])
-        del dictquer['Unnamed: 0']
+        #del dictquer['Unnamed: 0']
 
     return dictquer
 
@@ -272,13 +287,27 @@ def retr_objtlinefade(x, y, colr='black', initalph=1., alphfinl=0.):
     return lc
 
 
+def retr_liststrgcomp(numbcomp):
+    
+    liststrgcomp = np.array(['b', 'c', 'd', 'e', 'f', 'g'])[:numbcomp]
+
+    return liststrgcomp
+
+
+def retr_listcolrcomp(numbcomp):
+    
+    listcolrcomp = np.array(['magenta', 'orange', 'red', 'green', 'purple', 'cyan'])[:numbcomp]
+
+    return listcolrcomp
+
+
 def plot_orbt( \
               # path to write the plot
               path, \
               # radius of the planets [R_E]
-              radiplan, \
+              radicomp, \
               # sum of radius of planet and star divided by the semi-major axis
-              rsma, \
+              rsmacomp, \
               # epoc of the planets [BJD]
               epoc, \
               # orbital periods of the planets [days]
@@ -307,6 +336,7 @@ def plot_orbt( \
               listcolrcomp=None, \
               liststrgcomp=None, \
               boolsingside=True, \
+              ## file type of the plot
               typefileplot='pdf', \
 
               # verbosity level
@@ -317,13 +347,13 @@ def plot_orbt( \
     
     mpl.use('Agg')
 
-    numbcomp = len(radiplan)
+    numbcomp = len(radicomp)
     
-    if isinstance(radiplan, list):
-        radiplan = np.array(radiplan)
+    if isinstance(radicomp, list):
+        radicomp = np.array(radicomp)
 
-    if isinstance(rsma, list):
-        rsma = np.array(rsma)
+    if isinstance(rsmacomp, list):
+        rsmacomp = np.array(rsmacomp)
 
     if isinstance(epoc, list):
         epoc = np.array(epoc)
@@ -341,7 +371,7 @@ def plot_orbt( \
         liststrgcomp = retr_liststrgcomp(numbcomp)
     
     # semi-major axes of the planets [AU]
-    smax = (radiplan / dictfact['rsre'] + radistar) / dictfact['aurs'] / rsma
+    smax = (radicomp / dictfact['rsre'] + radistar) / dictfact['aurs'] / rsmacomp
     indxcomp = np.arange(numbcomp)
     
     # perspective factor
@@ -359,7 +389,7 @@ def plot_orbt( \
     if typevisu == 'cartmerc':
         # Mercury
         smaxmerc = 0.387 # [AU]
-        radiplanmerc = 0.3829 # [R_E]
+        radicompmerc = 0.3829 # [R_E]
     
     # scaled radius of the star [AU]
     radistarscal = radistar / dictfact['aurs'] * factstar
@@ -382,9 +412,9 @@ def plot_orbt( \
         numbtimespan = 100
 
     # get transit model based on TESS ephemerides
-    rrat = radiplan / radistar
+    rratcomp = radicomp / radistar
     
-    rflxtranmodl = retr_rflxmodl(time, peri, epoc, radiplan, radistar, rsma, cosi) - 1.
+    rflxtranmodl = retr_rflxtranmodl(time, pericomp=peri, epoccomp=epoc, rsmacomp=rsmacomp, cosicomp=cosi, rratcomp=rratcomp)['rflx'] - 1.
     
     lcur = rflxtranmodl + np.random.randn(numbtime) * 1e-6
     ylimrflx = [np.amin(lcur), np.amax(lcur)]
@@ -440,7 +470,7 @@ def plot_orbt( \
                     colrplan = 'k'
                 else:
                     colrplan = 'black'
-            radi = radiplan[j] / dictfact['rsre'] / dictfact['aurs'] * factplan
+            radi = radicomp[j] / dictfact['rsre'] / dictfact['aurs'] * factplan
             w1 = mpl.patches.Circle((xposelli[indxtimeiter[k], j], yposelli[indxtimeiter[k], j], 0), radius=radi, color=colrplan, zorder=3)
             axis.add_artist(w1)
             
@@ -451,7 +481,7 @@ def plot_orbt( \
         if typevisu == 'cartmerc':
             ## add Mercury
             axis.text(.387, 0.01, 'Mercury', color='grey', ha='right')
-            radi = radiplanmerc / dictfact['rsre'] / dictfact['aurs'] * factplan
+            radi = radicompmerc / dictfact['rsre'] / dictfact['aurs'] * factplan
             w1 = mpl.patches.Circle((smaxmerc, 0), radius=radi, color='grey')
             axis.add_artist(w1)
         
@@ -546,14 +576,15 @@ def retr_dictpoplrvel():
     return dictcatl
 
 
-def retr_dicthostplan(namepopl):
+def retr_dicthostplan(namepopl, typeverb=1):
     
-    pathlygo = os.environ['LYGOS_DATA_PATH'] + '/'
+    pathlygo = os.environ['EPHESUS_DATA_PATH'] + '/'
     path = pathlygo + 'data/dicthost%s.csv' % namepopl
     if os.path.exists(path):
-        print('Reading from %s...' % path)
+        if typeverb > 0:
+            print('Reading from %s...' % path)
         dicthost = pd.read_csv(path).to_dict(orient='list')
-        del dicthost['Unnamed: 0']
+        #del dicthost['Unnamed: 0']
         for name in dicthost.keys():
             dicthost[name] = np.array(dicthost[name])
         
@@ -569,7 +600,7 @@ def retr_dicthostplan(namepopl):
         indxstar = np.arange(numbstar)
         
         listnamefeatstar = ['numbplanstar', 'numbplantranstar', 'radistar', 'massstar']
-        listnamefeatcomp = ['epoc', 'peri', 'duratran', 'radicomp', 'masscomp']
+        listnamefeatcomp = ['epoc', 'peri', 'duratrantotl', 'radicomp', 'masscomp']
         for namefeat in listnamefeatstar:
             dicthost[namefeat] = np.empty(numbstar)
         for namefeat in listnamefeatcomp:
@@ -582,7 +613,7 @@ def retr_dicthostplan(namepopl):
                 dicthost[namefeat][k] = dictplan[namefeat][indx]
                 
         print('Writing to %s...' % path)
-        pd.DataFrame.from_dict(dicthost).to_csv(path)
+        pd.DataFrame.from_dict(dicthost).to_csv(path, index=False)
 
     return dicthost
 
@@ -591,7 +622,7 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
     
     dictfact = retr_factconv()
     
-    pathlygo = os.environ['LYGOS_DATA_PATH'] + '/'
+    pathlygo = os.environ['EPHESUS_DATA_PATH'] + '/'
     pathexof = pathlygo + 'data/exofop_tess_tois.csv'
     if typeverb > 0:
         print('Reading from %s...' % pathexof)
@@ -649,7 +680,7 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
                                                dec=dicttoii['declstar'], frame='icrs', unit='deg')
         
         # transit duration
-        dicttoii['duratran'] = objtexof['Duration (hours)'].values[indxcomp] # [hours]
+        dicttoii['duratrantotl'] = objtexof['Duration (hours)'].values[indxcomp] # [hours]
         
         # galactic longitude
         dicttoii['lgalstar'] = np.array([objticrs.galactic.l])[0, :]
@@ -678,7 +709,7 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
         dicttoii['stdvtmagsyst'] = objtexof['TESS Mag err'][indxcomp].values
 
         # transit duty cycle
-        dicttoii['dcyc'] = dicttoii['duratran'] / dicttoii['peri'] / 24.
+        dicttoii['dcyc'] = dicttoii['duratrantotl'] / dicttoii['peri'] / 24.
         
         boolfrst = np.zeros(numbcomp)
         dicttoii['numbplanstar'] = np.zeros(numbcomp)
@@ -747,17 +778,17 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
                     stdvvarb = dicttoii['stdvradicomp'][k]
                 
                 # sample from a truncated Gaussian
-                listradiplan = tdpy.samp_gaustrun(1000, dicttoii['radicomp'][k], stdvvarb, 0., np.inf)
+                listradicomp = tdpy.samp_gaustrun(1000, dicttoii['radicomp'][k], stdvvarb, 0., np.inf)
                 
                 # estimate the mass from samples
-                listmassplan = retr_massfromradi(listradiplan)
+                listmassplan = retr_massfromradi(listradicomp)
                 
                 dicttemp['masscomp'][k] = np.mean(listmassplan)
                 dicttemp['stdvmasscomp'][k] = np.std(listmassplan)
                 
             if typeverb > 0:
                 print('Writing to %s...' % path)
-            pd.DataFrame.from_dict(dicttemp).to_csv(path)
+            pd.DataFrame.from_dict(dicttemp).to_csv(path, index=False)
         else:
             if typeverb > 0:
                 print('Reading from %s...' % path)
@@ -815,19 +846,9 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
         indx = np.where(dicttoii['tsmmacwg'] == 0)[0]
         dicttoii['tsmmacwg'][indx] = np.nan
         
-        print('dicttoii[tsmmacwg]')
-        summgene(dicttoii['tsmmacwg'])
-        print('indx where it is 0')
-        summgene(indx)
-        
         indx = np.where(dicttoii['esmmacwg'] == 0)[0]
         dicttoii['esmmacwg'][indx] = np.nan
 
-        print('dicttoii[esmmacwg]')
-        summgene(dicttoii['esmmacwg'])
-        print('indx where it is 0')
-        summgene(indx)
-        
     return dicttoii
 
 
@@ -838,7 +859,7 @@ def calc_tsmmesmm(dictpopl, boolsamp=False):
     else:
         numbsamp = 1
 
-    numbcomp = dictpopl['radicomp'].size
+    numbcomp = dictpopl['masscomp'].size
     listtsmm = np.empty((numbsamp, numbcomp)) + np.nan
     listesmm = np.empty((numbsamp, numbcomp)) + np.nan
     
@@ -855,7 +876,7 @@ def calc_tsmmesmm(dictpopl, boolsamp=False):
                 stdv = dictpopl['radicomp'][n]
             else:
                 stdv = dictpopl['stdvradicomp'][n]
-            listradiplan = tdpy.samp_gaustrun(numbsamp, dictpopl['radicomp'][n], stdv, 0., np.inf)
+            listradicomp = tdpy.samp_gaustrun(numbsamp, dictpopl['radicomp'][n], stdv, 0., np.inf)
             
             listmassplan = tdpy.samp_gaustrun(numbsamp, dictpopl['masscomp'][n], dictpopl['stdvmasscomp'][n], 0., np.inf)
 
@@ -876,7 +897,7 @@ def calc_tsmmesmm(dictpopl, boolsamp=False):
             listtmptstar = tdpy.samp_gaustrun(numbsamp, dictpopl['tmptstar'][n], dictpopl['stdvtmptstar'][n], 0., np.inf)
         
         else:
-            listradiplan = dictpopl['radicomp'][None, n]
+            listradicomp = dictpopl['radicomp'][None, n]
             listtmptplan = dictpopl['tmptplan'][None, n]
             listmassplan = dictpopl['masscomp'][None, n]
             listradistar = dictpopl['radistar'][None, n]
@@ -885,14 +906,14 @@ def calc_tsmmesmm(dictpopl, boolsamp=False):
             listtmptstar = dictpopl['tmptstar'][None, n]
         
         # TSM
-        listtsmm[:, n] = retr_tsmm(listradiplan, listtmptplan, listmassplan, listradistar, listjmagsyst)
+        listtsmm[:, n] = retr_tsmm(listradicomp, listtmptplan, listmassplan, listradistar, listjmagsyst)
 
         # ESM
-        listesmm[:, n] = retr_esmm(listtmptplan, listtmptstar, listradiplan, listradistar, listkmagsyst)
+        listesmm[:, n] = retr_esmm(listtmptplan, listtmptstar, listradicomp, listradistar, listkmagsyst)
         
         #if (listesmm[:, n] < 1e-10).any():
-        #    print('listradiplan')
-        #    summgene(listradiplan)
+        #    print('listradicomp')
+        #    summgene(listradicomp)
         #    print('listtmptplan')
         #    summgene(listtmptplan)
         #    print('listmassplan')
@@ -988,7 +1009,10 @@ def retr_dilu(tmpttarg, tmptcomp, strgwlentype='tess'):
     return dilu
 
 
-def anim_tmptdete(timefull, lcurfull, meantimetmpt, lcurtmpt, pathimag, listindxtimeposimaxm, corrprod, corr, strgextn='', colr=None):
+def anim_tmptdete(timefull, lcurfull, meantimetmpt, lcurtmpt, pathimag, listindxtimeposimaxm, corrprod, corr, strgextn='', \
+                  ## file type of the plot
+                  typefileplot='pdf', \
+                  colr=None):
     
     numbtimefull = timefull.size
     numbtimekern = lcurtmpt.size
@@ -1004,7 +1028,7 @@ def anim_tmptdete(timefull, lcurfull, meantimetmpt, lcurtmpt, pathimag, listindx
 
     for tt in indxtimefullrunsanim:
         
-        path = pathimag + 'lcur%s_%08d.pdf' % (strgextn, tt)
+        path = pathimag + 'lcur%s_%08d.%s' % (strgextn, tt, typefileplot)
         listpath.append(path)
         if not os.path.exists(path):
             plot_tmptdete(timefull, lcurfull, tt, meantimetmpt, lcurtmpt, path, listindxtimeposimaxm, corrprod, corr)
@@ -1156,9 +1180,9 @@ def corr_arryprod(lcurtemp, lcurtmpt, numbkern):
 
 #@jit(parallel=True)
 def corr_copy(indxtimefullruns, lcurstan, indxtimekern, numbkern):
-    """
+    '''
     Make a matrix with rows as the shifted and windowed copies of the time series.
-    """
+    '''
     print('corr_copy()')
     listlcurtemp = [[] for k in range(numbkern)]
     for k in range(numbkern):
@@ -1180,7 +1204,11 @@ def corr_copy(indxtimefullruns, lcurstan, indxtimekern, numbkern):
     return listlcurtemp
 
 
-def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, typeverb=2, thrs=None, strgextn='', pathimag=None, boolplot=True, boolanim=False):
+def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, typeverb=2, thrs=None, strgextn='', pathimag=None, boolplot=True, \
+              ## file type of the plot
+              typefileplot='pdf', \
+              boolanim=False, \
+             ):
     
     timeoffs = np.amin(time) // 1000
     timeoffs *= 1000
@@ -1396,7 +1424,7 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, typeverb=2, thrs=None, str
                 axis[1].set_ylabel('C')
                 axis[1].set_xlabel('Time [BJD-%d]' % timeoffs)
                 
-                path = pathimag + 'lcurflar_ch%02d%s.pdf' % (l, strgextntotl)
+                path = pathimag + 'lcurflar_ch%02d%s.%s' % (l, strgextntotl, typefileplot)
                 plt.subplots_adjust(left=0.2, bottom=0.2, hspace=0)
                 print('Writing to %s...' % path)
                 plt.savefig(path)
@@ -1407,7 +1435,7 @@ def corr_tmpt(time, lcur, meantimetmpt, listlcurtmpt, typeverb=2, thrs=None, str
                     for i in range(numbdeteplot):
                         indxtimeplot = indxtimekern[k] + listindxtimeposimaxm[l][k][i]
                         proc_axiscorr(timechun, lcurchun, axis, listindxtimeposimaxm[l][k], indxtime=indxtimeplot, timeoffs=timeoffs)
-                    path = pathimag + 'lcurflar_ch%02d%s_det.pdf' % (l, strgextntotl)
+                    path = pathimag + 'lcurflar_ch%02d%s_det.%s' % (l, strgextntotl, typefileplot)
                     print('Writing to %s...' % path)
                     plt.savefig(path)
                     plt.close()
@@ -1463,43 +1491,45 @@ def read_qlop(path, pathcsvv=None, stdvcons=None):
 
 
 # transits
-def retr_indxtran(time, epoc, peri, duratotl=None):
+def retr_indxtran(time, epoc, peri, duratrantotl=None):
     '''
-    Find the transit indices for a given time axis, epoch, period, and optionally transit duration
+    Find the transit indices for a given time axis, epoch, period, and optionally transit duration.
     '''
 
     if np.isfinite(peri):
-        if duratotl is None:
+        if duratrantotl is None:
             duratemp = 0.
         else:
-            duratemp = duratotl
+            duratemp = duratrantotl
         intgminm = np.ceil((np.amin(time) - epoc - duratemp / 48.) / peri)
         intgmaxm = np.ceil((np.amax(time) - epoc - duratemp / 48.) / peri)
-        indxtran = np.arange(intgminm, intgmaxm + 1)
+        indxtran = np.arange(intgminm, intgmaxm)
     else:
         indxtran = np.arange(1)
     
     return indxtran
 
 
-def retr_indxtimetran(time, epoc, peri, duratotl, durafull=None, \
+def retr_indxtimetran(time, epoc, peri, \
+                      # total transit duration [hours]
+                      duratrantotl, \
+                      duratranfull=None, \
                       # type of the in-transit phase interval
                       typeineg=None, \
                       booloutt=False, boolseco=False):
     '''
-    Return the indices of times during transit
-    Duration is in hours.
+    Return the indices of times during transit.
     '''
 
     if not np.isfinite(time).all():
         raise Exception('')
     
-    if not np.isfinite(duratotl).all():
-        print('duratotl')
-        print(duratotl)
+    if not np.isfinite(duratrantotl).all():
+        print('duratrantotl')
+        print(duratrantotl)
         raise Exception('')
     
-    indxtran = retr_indxtran(time, epoc, peri, duratotl)
+    indxtran = retr_indxtran(time, epoc, peri, duratrantotl)
 
     if boolseco:
         offs = 0.5
@@ -1508,11 +1538,11 @@ def retr_indxtimetran(time, epoc, peri, duratotl, durafull=None, \
 
     listindxtimetran = []
     for n in indxtran:
-        timetotlinit = epoc + (n + offs) * peri - duratotl / 48.
-        timetotlfinl = epoc + (n + offs) * peri + duratotl / 48.
-        if durafull is not None:
-            timefullinit = epoc + (n + offs) * peri - durafull / 48.
-            timefullfinl = epoc + (n + offs) * peri + durafull / 48.
+        timetotlinit = epoc + (n + offs) * peri - duratrantotl / 48.
+        timetotlfinl = epoc + (n + offs) * peri + duratrantotl / 48.
+        if duratranfull is not None:
+            timefullinit = epoc + (n + offs) * peri - duratranfull / 48.
+            timefullfinl = epoc + (n + offs) * peri + duratranfull / 48.
             timeingrhalf = (timetotlinit + timefullinit) / 2.
             timeeggrhalf = (timetotlfinl + timefullfinl) / 2.
             if typeineg == 'inge':
@@ -1532,9 +1562,12 @@ def retr_indxtimetran(time, epoc, peri, duratotl, durafull=None, \
         else:
             indxtime = np.where((time > timetotlinit) & (time < timetotlfinl))[0]
         listindxtimetran.append(indxtime)
-    indxtimetran = np.concatenate(listindxtimetran)
-    indxtimetran = np.unique(indxtimetran)
-    
+    if len(listindxtimetran) > 0:
+        indxtimetran = np.concatenate(listindxtimetran)
+        indxtimetran = np.unique(indxtimetran)
+    else:
+        indxtimetran = np.array([])
+
     if booloutt:
         indxtimeretr = np.setdiff1d(np.arange(time.size), indxtimetran)
     else:
@@ -1581,11 +1614,12 @@ def retr_timeedge(time, lcur, timebrek, \
     return timeedge
 
 
-def retr_tsecticibase(tici):
+def retr_tsecticibase(tici, typeverb=1):
     '''
     Retrieve the list of sectors for which SPOC light curves are available for target, using the predownloaded database of light curves
-    as opposed to individual download calls over internet
+    as opposed to individual download calls over internet.
     '''
+    
     pathbase = os.environ['TESS_DATA_PATH'] + '/data/lcur/'
     path = pathbase + 'tsec/tsec_spoc_%016d.csv' % tici
     if not os.path.exists(path):
@@ -1608,7 +1642,8 @@ def retr_tsecticibase(tici):
             objtfile.write('%d,%s\n' % (listtsec[k], listpath[k]))
         objtfile.close()
     else:
-        print('Reading from %s...' % path)
+        if typeverb > 0:
+            print('Reading from %s...' % path)
         objtfile = open(path, 'r')
         listtsec = []
         listpath = []
@@ -1653,7 +1688,7 @@ def bdtr_tser( \
               timescalbdtrmedi=None, \
              ):
     '''
-    Baseline-detrend a time-series.
+    Detrend the baseline of time-series data.
     '''
     
     if typebdtr is None:
@@ -1742,9 +1777,10 @@ def bdtr_tser( \
                     timeknot = timeknot[1:-1]
                     
                     if numbknot >= 4:
-                        print('Region %d. %d knots used.' % (i, timeknot.size))
-                        if numbknot > 1:
-                            print('Knot separation: %.3g hours' % (24 * (timeknot[1] - timeknot[0])))
+                        if typeverb > 1:
+                            print('Region %d. %d knots used.' % (i, timeknot.size))
+                            if numbknot > 1:
+                                print('Knot separation: %.3g hours' % (24 * (timeknot[1] - timeknot[0])))
                     
                         objtspln = scipy.interpolate.LSQUnivariateSpline(timeregi[indxtimeregioutt[i]], lcurregi[indxtimeregioutt[i]], timeknot, k=ordrspln)
                         lcurbdtrregi[i] = lcurregi - objtspln(timeregi) + 1.
@@ -1833,31 +1869,20 @@ def srch_pbox_work_loop(m, phas, phasdiff, dydchalf):
     return indxitra
 
 
-def srch_pbox_work(listperi, listarrytser, listdcyc, listepoc, listduratranlevl, i):
+def srch_pbox_work(listperi, listarrytser, listdcyc, listepoc, listduratrantotllevl, i):
     
     numbperi = len(listperi[i])
     numbdcyc = len(listdcyc[0])
     
-    numblevlrebn = len(listduratranlevl)
+    numblevlrebn = len(listduratrantotllevl)
     indxlevlrebn = np.arange(numblevlrebn)
     
-    listminmtime = np.empty(numblevlrebn)
-    listmedirflx = np.empty(numblevlrebn)
-    for b in indxlevlrebn:
-        #stdvrflx = 0.01 + 0 * arrytser[:, 1]
-        #vari = stdvrflx**2
-        #weig = 1. / vari / np.sum(1. / vari)
-        listminmtime[b] = np.amin(listarrytser[b][:, 0])
-        listmedirflx[b] = np.median(listarrytser[b][:, 1])
-
     #conschi2 = np.sum(weig * arrytser[:, 1]**2)
     #listtermchi2 = np.empty(numbperi)
     
-    lists2nr = np.zeros(numbperi) - 1e100
-    
-    listdeptmaxm = np.empty(numbperi)
-    listdcycmaxm = np.empty(numbperi)
-    listepocmaxm = np.empty(numbperi)
+    rflxitraminm = np.zeros(numbperi) + 1e100
+    dcycmaxm = np.zeros(numbperi)
+    epocmaxm = np.zeros(numbperi)
     
     listphas = [[] for b in indxlevlrebn]
     for k in tqdm(range(len(listperi[i]))):
@@ -1869,11 +1894,11 @@ def srch_pbox_work(listperi, listarrytser, listdcyc, listepoc, listduratranlevl,
         
         for l in range(len(listdcyc[k])):
             
-            b = np.digitize(listdcyc[k][l] * peri * 24., listduratranlevl) - 1
+            b = np.digitize(listdcyc[k][l] * peri * 24., listduratrantotllevl) - 1
             #b = 0
             
-            #print('listduratranlevl')
-            #print(listduratranlevl)
+            #print('listduratrantotllevl')
+            #print(listduratrantotllevl)
             #print('listdcyc[k][l] * peri * 24.')
             #print(listdcyc[k][l] * peri * 24.)
             #print('b')
@@ -1881,7 +1906,7 @@ def srch_pbox_work(listperi, listarrytser, listdcyc, listepoc, listduratranlevl,
 
             dydchalf = listdcyc[k][l] / 2.
 
-            phasdiff = (listepoc[k][l] - listminmtime[b]) / peri
+            phasdiff = (listepoc[k][l] % peri) / peri
             
             #print('listphas[b]')
             #summgene(listphas[b])
@@ -1894,22 +1919,14 @@ def srch_pbox_work(listperi, listarrytser, listdcyc, listepoc, listduratranlevl,
                 if indxitra.size == 0:
                     continue
     
-                dept = listmedirflx[b] - np.mean(listarrytser[b][:, 1][indxitra])
+                rflxitra = np.mean(listarrytser[b][:, 1][indxitra])
                 
-                stdv = np.std(listarrytser[b][:, 1][indxitra])
+                if rflxitra < rflxitraminm[k]:
+                    rflxitraminm[k] = rflxitra
+                    dcycmaxm[k] = listdcyc[k][l]
+                    epocmaxm[k] = listepoc[k][l][m]
                 
-                if stdv != 0:
-                    s2nr = dept / stdv
-                else:
-                    s2nr = 1.
-                
-                if s2nr > lists2nr[k]:
-                    lists2nr[k] = s2nr
-                    listdeptmaxm[k] = dept
-                    listdcycmaxm[k] = listdcyc[k][l]
-                    listepocmaxm[k] = listepoc[k][l][m]
-                
-                if not np.isfinite(s2nr):
+                if not np.isfinite(rflxitra):
                     print('b')
                     print(b)
                     print('listarrytser[b][:, 1]')
@@ -1956,39 +1973,68 @@ def srch_pbox_work(listperi, listarrytser, listdcyc, listepoc, listduratranlevl,
                 #print('s2nr')
                 #print(s2nr)
                 #print('')
-
-                #figr, axis = plt.subplots(2, 1, figsize=(8, 8))
-                #axis[0].plot(time, rflx, color='b', ls='', marker='o', rasterized=True, ms=0.3)
-                #axis[0].plot(time[indxitra], rflx[indxitra], color='r', ls='', marker='o', ms=0.3, rasterized=True)
-                #indxtran = retr_indxtran(time, epoc, peri)
-                #for indx in indxtran:
-                #    axis[0].axvline(epoc + peri * indx, ls='--', alpha=0.5, lw=0.5)
-                ##axis[1].set_xlabel('Time [BJD]')
-                #
-                #axis[1].plot(phas, rflx, color='b', ls='', marker='o', rasterized=True, ms=0.3)
-                #axis[1].plot(phas[indxitra], rflx[indxitra], color='r', ls='', marker='o', ms=0.3, rasterized=True)
-                ##axis[1].set_xlabel('Phase')
-                #titl = '$P$=%.3g days, $T_0$=%g BJD, $q_{tr}$=%.3g, $D_{tr}$=%.3g, SNR=%.3g' % (peri, epoc, dcyc, dept, s2nr)
-                ##axis[0].set_title(titl, usetex=False)
-                #path = '/Users/tdaylan/Documents/work/data/troia/tessnomi2min_mock/TIC198486253/imag/rflx_tria_diag_%04d%04d.pdf' % (l, m)
-                #print('Writing to %s...' % path)
-                #plt.savefig(path, usetex=False)
-                #plt.close()
+                
+                #if True:
+                if False:
+                    figr, axis = plt.subplots(2, 1, figsize=(8, 8))
+                    axis[0].plot(listarrytser[b][:, 0], listarrytser[b][:, 1], color='b', ls='', marker='o', rasterized=True, ms=0.3)
+                    axis[0].plot(listarrytser[b][:, 0][indxitra], listarrytser[b][:, 1][indxitra], color='r', ls='', marker='o', ms=2., rasterized=True)
+                    axis[0].axhline(1., ls='-.', alpha=0.3, color='k')
+                    axis[0].set_xlabel('Time [BJD]')
+                    
+                    axis[1].plot(listphas[b], listarrytser[b][:, 1], color='b', ls='', marker='o', rasterized=True, ms=0.3)
+                    axis[1].plot(listphas[b][indxitra], listarrytser[b][:, 1][indxitra], color='r', ls='', marker='o', ms=2., rasterized=True)
+                    axis[1].plot(np.mean(listphas[b][indxitra]), rflxitra, color='g', ls='', marker='o', ms=4., rasterized=True)
+                    axis[1].axhline(1., ls='-.', alpha=0.3, color='k')
+                    axis[1].set_xlabel('Phase')
+                    titl = '$P$=%.3f, $T_0$=%.3f, $q_{tr}$=%.3g, $f$=%.6g' % (peri, listepoc[k][l][m], listdcyc[k][l], rflxitra)
+                    axis[0].set_title(titl, usetex=False)
+                    path = '/Users/tdaylan/Documents/work/data/troia/toyy_tessnomi2min_TESS/mock0001/imag/rflx_tria_diag_%04d%04d.pdf' % (l, m)
+                    print('Writing to %s...' % path)
+                    plt.savefig(path, usetex=False)
+                    plt.close()
         
-        if not np.isfinite(lists2nr[k]):
-            raise Exception('')
+    return rflxitraminm, dcycmaxm, epocmaxm
 
-    listdeptmaxm *= 1e3  # [ppt]
+
+def retr_stdvwind(ydat, sizewind, boolcuttpeak=False):
+    '''
+    Return the standard deviation of a series inside a running windown.
+    '''
     
-    #listdept = listsigr / np.sqrt(terr * (1. - terr)) * 1e3 # [ppt]
+    numbdata = ydat.size
     
-    return lists2nr, listdeptmaxm, listdcycmaxm, listepocmaxm
+    if sizewind % 2 != 1 or sizewind > numbdata:
+        raise Exception('')
+
+    sizewindhalf = int((sizewind - 1) / 2)
+    
+    indxdata = np.arange(numbdata)
+    
+    stdv = np.empty_like(ydat)
+    for k in indxdata:
+        
+        minmindx = max(0, k - sizewindhalf)
+        maxmindx = min(numbdata - 1, k + sizewindhalf)
+        
+        if boolcuttpeak:
+            indxdatawind = np.arange(minmindx, maxmindx+1)
+            indxdatawind = indxdatawind[np.where(ydat[indxdatawind] < np.percentile(ydat[indxdatawind], 70.))]
+        
+        else:
+            if k > minmindx and k+1 < maxmindx:
+                indxdatawind = np.concatenate((np.arange(minmindx, k), np.arange(k+1, maxmindx+1)))
+            elif k > minmindx:
+                indxdatawind = np.arange(minmindx, k)
+            elif k+1 < maxmindx:
+                indxdatawind = np.arange(k+1, maxmindx+1)
+
+        stdv[k] = np.std(ydat[indxdatawind])
+    
+    return stdv
 
 
 def srch_pbox(arry, \
-              
-              # Boolean flag to search for positive boxes
-              boolpuls=False, \
               
               ### maximum number of transiting objects
               maxmnumbpbox=1, \
@@ -2004,20 +2050,35 @@ def srch_pbox(arry, \
               # maximum period
               maxmperi=None, \
 
+              # oversampling factor (wrt to transit duration) when rebinning data to decrease the time resolution
+              factduracade=2., \
+
               # factor by which to oversample the frequency grid
               factosam=1., \
-                
-              # minimum duty cycle
-              minmdcyc=0.01, \
               
-              # Boolean flag to enable multiprocessing
-              boolprocmult=False, \
+              # Boolean flag to search for positive boxes
+              boolsrchposi=False, \
+
+              # number of duty cycle samples  
+              numbdcyc=3, \
+              
+              # spread in the logarithm of duty cycle
+              deltlogtdcyc=None, \
+              
+              # density of the star
+              densstar=None, \
+
+              # epoc steps divided by trial duration
+              factdeltepocdura=0.5, \
+
+              # detection threshold
+              thrssdee=7.1, \
               
               # number of processes
               numbproc=None, \
               
-              # detection threshold
-              thrssdee=7.1, \
+              # Boolean flag to enable multiprocessing
+              boolprocmult=False, \
               
               # string extension to output files
               strgextn='', \
@@ -2027,6 +2088,7 @@ def srch_pbox(arry, \
               # plotting
               ## path where the output images will be stored
               pathimag=None, \
+              ## file type of the plot
               typefileplot='pdf', \
               ## figure size
               figrsizeydobskin=(8, 2.5), \
@@ -2041,9 +2103,12 @@ def srch_pbox(arry, \
               # Boolean flag to turn on diagnostic mode
               booldiag=True, \
 
+              # Boolean flag to force rerun and overwrite previous data and plots 
+              boolover=True, \
+
              ):
     '''
-    Search for periodic boxes in time-series data
+    Search for periodic boxes in time-series data.
     '''
     
     boolproc = False
@@ -2056,18 +2121,35 @@ def srch_pbox(arry, \
             pathsave = pathdata + 'pbox_%s.csv' % strgextn
         if not os.path.exists(pathsave):
             boolproc = True
+        
+        dictpathplot = dict()
+        for strg in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+            dictpathplot[strg] = []
+            
+        if os.path.exists(pathsave):
+            if typeverb > 0:
+                print('Reading from %s...' % pathsave)
+            
+            dictpboxoutp = pd.read_csv(pathsave).to_dict(orient='list')
+            for name in dictpboxoutp.keys():
+                dictpboxoutp[name] = np.array(dictpboxoutp[name])
+                if len(dictpboxoutp[name]) == 0:
+                    dictpboxoutp[name] = np.array([])
+            
+            if not pathimag is None:
+                for strg in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+                    for j in range(len(dictpboxoutp['peri'])):
+                        dictpathplot[strg].append(pathimag + strg + '_pbox_tce%d_%s.%s' % (j, strgextn, typefileplot))
+         
+                        if not os.path.exists(dictpathplot[strg][j]):
+                            boolproc = True
+            
+    if boolproc:
+        dictpboxoutp = dict()
+        if pathimag is not None:
+            for name in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+                dictpboxoutp['listpathplot%s' % name] = []
     
-    if not boolproc:
-        if typeverb > 0:
-            print('Reading %s...' % pathsave)
-        
-        dictpboxoutp = pd.read_csv(pathsave).to_dict(orient='list')
-        for name in dictpboxoutp.keys():
-            dictpboxoutp[name] = np.array(dictpboxoutp[name])
-            if len(dictpboxoutp[name]) == 0:
-                dictpboxoutp[name] = np.array([])
-        
-    else:
         print('Searching for periodic boxes in time-series data...')
         
         print('factosam')
@@ -2081,14 +2163,13 @@ def srch_pbox(arry, \
         # temp
         #ab, mass, mass_min, mass_max, radius, radius_min, radius_max = transitleastsquares.catalog_info(TIC_ID=int(ticitarg))
         
-        dictpboxoutp = dict()
         dictpboxinte = dict()
         liststrgvarbsave = ['peri', 'epoc', 'dept', 'dura', 'sdee']
         for strg in liststrgvarbsave:
             dictpboxoutp[strg] = []
         
         arrysrch = np.copy(arry)
-        if boolpuls:
+        if boolsrchposi:
             arrysrch[:, 1] = 2. - arrysrch[:, 1]
 
         j = 0
@@ -2105,6 +2186,14 @@ def srch_pbox(arry, \
 
         delttime = maxmtime - minmtime
         deltfreq = 0.1 / delttime / factosam
+        
+        print('Initial:')
+        print('minmperi')
+        print(minmperi)
+        print('maxmperi')
+        print(maxmperi)
+        #raise Exception('')
+
         if maxmperi is None:
             minmfreq = 2. / delttime
         else:
@@ -2140,12 +2229,19 @@ def srch_pbox(arry, \
         print('maxmperi')
         print(maxmperi)
         
-        numbdcyc = 4
         indxdcyc = np.arange(numbdcyc)
         listdcyc = [[] for k in indxperi]
         listperilogt = np.log10(listperi)
-        minmdcyclogt = -2. / 3. * listperilogt - 1. - 0.5
-        maxmdcyclogt = -2. / 3. * listperilogt - 1. + 0.5
+        
+        if deltlogtdcyc is None:
+            deltlogtdcyc = np.log10(2.)
+        
+        # assuming Solar density
+        maxmdcyclogt = -2. / 3. * listperilogt - 1. + deltlogtdcyc
+        if densstar is not None:
+            maxmdcyclogt += -1. / 3. * np.log10(densstar)
+
+        minmdcyclogt = maxmdcyclogt - 2. * deltlogtdcyc
         for k in indxperi:
             listdcyc[k] = np.logspace(minmdcyclogt[k], maxmdcyclogt[k], numbdcyc)
         print('Trial transit duty cycles at the smallest period')
@@ -2161,13 +2257,19 @@ def srch_pbox(arry, \
         cade = np.amin(arrysrch[1:, 0] - arrysrch[:-1, 0]) * 24. # [hr]
         
         # minimum transit duration
-        minmduratran = listdcyc[-1][0] * listperi[-1] * 24
+        minmduratrantotl = listdcyc[-1][0] * listperi[-1] * 24
         
         # maximum transit duration
-        maxmduratran = listdcyc[0][-1] * listperi[0] * 24
+        maxmduratrantotl = listdcyc[0][-1] * listperi[0] * 24
         
-        if minmduratran < 5. * cade:
+        if minmduratrantotl < factduracade * cade:
             print('Either the minimum transit duration is too small or the cadence is too large.')
+            print('minmduratrantotl')
+            print(minmduratrantotl)
+            print('factduracade')
+            print(factduracade)
+            print('cade [hr]')
+            print(cade)
             raise Exception('')
         
         # number of rebinned data sets
@@ -2175,16 +2277,16 @@ def srch_pbox(arry, \
         indxlevlrebn = np.arange(numblevlrebn)
         
         # list of transit durations when rebinned data sets will be used
-        listduratranlevl = np.linspace(minmduratran, maxmduratran, numblevlrebn)
+        listduratrantotllevl = np.linspace(minmduratrantotl, maxmduratrantotl, numblevlrebn)
         
-        print('listduratranlevl')
-        print(listduratranlevl)
+        print('listduratrantotllevl')
+        print(listduratrantotllevl)
         
         # rebinned data sets
         print('Number of data points: %d...' % numbtime)
         listarrysrch = []
         for b in indxlevlrebn:
-            delt = 0.5 * listduratranlevl[b] / 24.
+            delt = listduratrantotllevl[b] / 24. / factduracade
             arryrebn = rebn_tser(arrysrch, delt=delt)
             indx = np.where(np.isfinite(arryrebn[:, 1]))[0]
             print('Number of data points in binned data set for Delta time %g [min]: %d' % (delt * 24. * 60., arryrebn.shape[0]))
@@ -2196,7 +2298,7 @@ def srch_pbox(arry, \
         numbtria = np.zeros(numbperi, dtype=int)
         for k in indxperi:
             for l in indxdcyc:
-                diffepoc = max(cade / 24., 0.5 * listperi[k] * listdcyc[k][l])
+                diffepoc = max(cade / 24., factdeltepocdura * listperi[k] * listdcyc[k][l])
                 listepoc[k][l] = np.arange(minmtime, minmtime + listperi[k], diffepoc)
                 numbtria[k] += len(listepoc[k][l])
                 
@@ -2219,10 +2321,22 @@ def srch_pbox(arry, \
 
             # mask out the detected transit
             if j > 0:
-                arrysrch[:, 1] -= (dictpboxinte['rflxtsermodl'] - 1.)
+                ## remove previously detected periodic box from the rebinned data
+                pericomp = [dictpboxoutp['peri'][j]]
+                epoccomp = [dictpboxoutp['epoc'][j]]
+                radicomp = [dictfact['rsre'] * np.sqrt(dictpboxoutp['dept'][j] * 1e-3)]
+                cosicomp = [0]
+                rsmacomp = [retr_rsmacomp(dictpboxoutp['peri'][j], dictpboxoutp['dura'][j], cosicomp[0])]
+                    
+                for b in indxlevlrebn:
+                    ## evaluate model at all resolutions
+                    dictoutp = retr_rflxtranmodl(listarrysrch[b][:, 0], pericomp=pericomp, epoccomp=epoccomp, \
+                                                                                        rsmacomp=rsmacomp, cosicomp=cosicomp, rratcomp=rratcomp, booltrap=False)
+                    ## subtract it from data
+                    listarrysrch[b][:, 1] -= (dictoutp['rflx'][b] - 1.)
                 
-                if (dictpboxinte['rflxtsermodl'] == 1.).all():
-                    raise Exception('')
+                    if (dictpboxinte['rflx'][b] == 1.).all():
+                        raise Exception('')
 
             if booltlsq:
                 objtmodltlsq = transitleastsquares.transitleastsquares(arrysrch[:, 0], lcurpboxmeta)
@@ -2279,22 +2393,25 @@ def srch_pbox(arry, \
                     for i in indxproc:
                         indx = np.where(indxprocperi == i)[0]
                         listperiproc[i] = listperi[indx]
-                    data = objtpool.map(partial(srch_pbox_work, listperiproc, listarrysrch, listdcyc, listepoc, listduratranlevl), indxproc)
-                    listsigr = np.concatenate([data[k][0] for k in indxproc])
+                    data = objtpool.map(partial(srch_pbox_work, listperiproc, listarrysrch, listdcyc, listepoc, listduratrantotllevl), indxproc)
+                    listrflxitra = np.concatenate([data[k][0] for k in indxproc])
                     listdeptmaxm = np.concatenate([data[k][1] for k in indxproc])
                     listdcycmaxm = np.concatenate([data[k][2] for k in indxproc])
                     listepocmaxm = np.concatenate([data[k][3] for k in indxproc])
                 else:
-                    listsigr, listdeptmaxm, listdcycmaxm, listepocmaxm = srch_pbox_work([listperi], listarrysrch, listdcyc, listepoc, listduratranlevl, 0)
+                    listrflxitra, listdcycmaxm, listepocmaxm = srch_pbox_work([listperi], listarrysrch, listdcyc, listepoc, listduratrantotllevl, 0)
                 
+                listdept = (np.median(listarrysrch[b][:, 1]) - listrflxitra) * 1e3 # [ppt])
+                listsigr = listdept
                 if (~np.isfinite(listsigr)).any():
                     raise Exception('')
 
-                sizekern = 9
-                resisigr = listsigr - scipy.ndimage.median_filter(listsigr, size=sizekern)
-                indx = np.where(resisigr < np.percentile(resisigr, 95.))
-                listsdee = resisigr / np.std(resisigr[indx])
-                listsdee -= np.amin(listsdee)
+                sizekern = 23
+                listresisigr = listsigr - scipy.ndimage.median_filter(listsigr, size=sizekern)
+                #listresisigr = listresisigr**2
+                liststdvresisigr = retr_stdvwind(listresisigr, sizekern, boolcuttpeak=True)
+                listsdee = listresisigr / liststdvresisigr
+                #listsdee -= np.amin(listsdee)
                 
                 indxperimpow = np.argmax(listsdee)
                 sdee = listsdee[indxperimpow]
@@ -2306,7 +2423,7 @@ def srch_pbox(arry, \
                 dictpboxoutp['peri'].append(listperi[indxperimpow])
                 dictpboxoutp['dura'].append(24. * listdcycmaxm[indxperimpow] * listperi[indxperimpow]) # [hours]
                 dictpboxoutp['epoc'].append(listepocmaxm[indxperimpow])
-                dictpboxoutp['dept'].append(listdeptmaxm[indxperimpow])
+                dictpboxoutp['dept'].append(listdept[indxperimpow])
                 
                 print('sdee')
                 print(sdee)
@@ -2315,40 +2432,51 @@ def srch_pbox(arry, \
                 dictpboxinte['listperi'] = listperi
                 
                 print('temp: assuming power is SNR')
-                dictpboxinte['listsdee'] = listsdee
                 dictpboxinte['listsigr'] = listsigr
+                dictpboxinte['listresisigr'] = listresisigr
+                dictpboxinte['liststdvresisigr'] = liststdvresisigr
+                dictpboxinte['listsdee'] = listsdee
                 
-                radistar = 1.
-                pericomp = [dictpboxoutp['peri'][j]]
-                epoccomp = [dictpboxoutp['epoc'][j]]
-                radicomp = [dictfact['rsre'] * np.sqrt(dictpboxoutp['dept'][j] * 1e-3)]
-                cosicomp = [0]
-                rsma = [retr_rsma(dictpboxoutp['peri'][j], dictpboxoutp['dura'][j], cosicomp[0])]
-                print('rsma')
-                print(rsma)
-                print('cosicomp')
-                print(cosicomp)
-                print('radicomp')
-                print(radicomp)
-                print('epoccomp')
-                print(epoccomp)
-                dictpboxinte['rflxtsermodl'] = [[] for b in indxlevlrebn]
-                print('radicomp')
-                print(radicomp)
-                for b in indxlevlrebn:
-                    dictpboxinte['rflxtsermodl'][b] = retr_rflxtranmodl(listarrysrch[b][:, 0], radistar, pericomp=pericomp, epoccomp=epoccomp, \
-                                                                                            rsma=rsma, cosicomp=cosicomp, radicomp=radicomp, booltrap=False)
-                    
-                    if booldiag and (dictpboxinte['rflxtsermodl'][b] == 1).all():
-                        raise Exception('')
+                # to be deleted because these are rebinned and model may be all 1s
+                #if booldiag and (dictpboxinte['rflxtsermodl'][b] == 1).all():
+                #    print('listarrysrch[b][:, 0]')
+                #    summgene(listarrysrch[b][:, 0])
+                #    print('radistar')
+                #    print(radistar)
+                #    print('pericomp')
+                #    print(pericomp)
+                #    print('epoccomp')
+                #    print(epoccomp)
+                #    print('rsmacomp')
+                #    print(rsmacomp)
+                #    print('cosicomp')
+                #    print(cosicomp)
+                #    print('radicomp')
+                #    print(radicomp)
+                #    print('dictpboxinte[rflxtsermodl[b]]')
+                #    summgene(dictpboxinte['rflxtsermodl'][b])
+                #    raise Exception('')
 
                 if pathimag is not None:
+                    for strg in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+                        for j in range(len(dictpboxoutp['peri'])):
+                            pathplot = pathimag + strg + '_pbox_tce%d_%s.%s' % (j, strgextn, typefileplot)
+                            dictpathplot[strg].append(pathplot)
+            
+                    pericomp = [dictpboxoutp['peri'][j]]
+                    epoccomp = [dictpboxoutp['epoc'][j]]
+                    cosicomp = [0]
+                    rsmacomp = [retr_rsmacomp(dictpboxoutp['peri'][j], dictpboxoutp['dura'][j], cosicomp[0])]
+                    rratcomp = [np.sqrt(dictpboxoutp['dept'][j] * 1e-3)]
+                    dictoutp = retr_rflxtranmodl(timemodlplot, pericomp=pericomp, epoccomp=epoccomp, \
+                                                                                            rsmacomp=rsmacomp, cosicomp=cosicomp, rratcomp=rratcomp, typesyst='psys', booltrap=False)
+                    dictpboxinte['rflxtsermodl'] = dictoutp['rflx']
+                    
                     arrymetamodl = np.zeros((numbtimeplot, 3))
                     arrymetamodl[:, 0] = timemodlplot
-                    arrymetamodl[:, 1] = retr_rflxtranmodl(timemodlplot, radistar, pericomp=pericomp, epoccomp=epoccomp, \
-                                                                                            rsma=rsma, cosicomp=cosicomp, radicomp=radicomp, booltrap=False)
+                    arrymetamodl[:, 1] = dictpboxinte['rflxtsermodl']
                     arrypsermodl = fold_tser(arrymetamodl, dictpboxoutp['epoc'][j], dictpboxoutp['peri'][j], phasshft=0.5)
-                    arrypserdata = fold_tser(listarrysrch[b], dictpboxoutp['epoc'][j], dictpboxoutp['peri'][j], phasshft=0.5)
+                    arrypserdata = fold_tser(listarrysrch[0], dictpboxoutp['epoc'][j], dictpboxoutp['peri'][j], phasshft=0.5)
                         
                     dictpboxinte['timedata'] = listarrysrch[0][:, 0]
                     dictpboxinte['rflxtserdata'] = listarrysrch[0][:, 1]
@@ -2359,23 +2487,28 @@ def srch_pbox(arry, \
                     dictpboxinte['phasmodl'] = arrypsermodl[:, 0]
                     dictpboxinte['rflxpsermodl'] = arrypsermodl[:, 1]
                 
-            if boolpuls:
-                dictpboxinte['rflxtsermodl'] = 2. - dictpboxinte['rflxtsermodl']
-                if pathimag is not None:
-                    arrymetamodl[:, 1] = 2. - arrymetamodl[:, 1]
-                    dictpboxinte['rflxpserdata'] = 2. - dictpboxinte['rflxpserdata']
-                    dictpboxinte['rflxpsermodl'] = 2. - dictpboxinte['rflxpsermodl']
+                    print('boolsrchposi')
+                    print(boolsrchposi)
+                    if boolsrchposi:
+                        dictpboxinte['rflxpsermodl'] = 2. - dictpboxinte['rflxpsermodl']
+                        dictpboxinte['rflxtsermodl'] = 2. - dictpboxinte['rflxtsermodl']
+                        dictpboxinte['rflxpserdata'] = 2. - dictpboxinte['rflxpserdata']
            
             if pathimag is not None:
-                strgtitl = 'P=%.3g d, Dep=%.2g ppt, Dur=%.2g hr, SDE=%.3g' % \
-                            (dictpboxoutp['peri'][j], dictpboxoutp['dept'][j], dictpboxoutp['dura'][j], dictpboxoutp['sdee'][j])
-                for a in range(2):
+                strgtitl = 'P=%.3f d, $T_0$=%.3f, Dep=%.2g ppt, Dur=%.2g hr, SDE=%.3g' % \
+                            (dictpboxoutp['peri'][j], dictpboxoutp['epoc'][j], dictpboxoutp['dept'][j], dictpboxoutp['dura'][j], dictpboxoutp['sdee'][j])
+                
+                # plot power spectra
+                for a in range(4):
                     if a == 0:
                         strg = 'sigr'
-                    else:
+                    if a == 1:
+                        strg = 'resisigr'
+                    if a == 2:
+                        strg = 'stdvresisigr'
+                    if a == 3:
                         strg = 'sdee'
 
-                    # plot TLS power spectrum
                     figr, axis = plt.subplots(figsize=figrsizeydobskin)
                     
                     axis.axvline(dictpboxoutp['peri'][j], alpha=0.4, lw=3)
@@ -2398,20 +2531,21 @@ def srch_pbox(arry, \
                     axis.plot(dictpboxinte['listperi'], dictpboxinte['list' + strg], color='black', lw=0.5)
                     axis.set_title(strgtitl)
                     plt.subplots_adjust(bottom=0.2)
-                    path = pathimag + strg + '_pbox_tce%d_%s.%s' % (j, strgextn, typefileplot)
+                    path = dictpathplot[strg][j]
+                    dictpboxoutp['listpathplot%s' % strg].append(path)
                     print('Writing to %s...' % path)
                     plt.savefig(path)
                     plt.close()
                 
-                # plot light curve + TLS model
+                # plot data and model time-series
                 figr, axis = plt.subplots(figsize=figrsizeydobskin)
                 lcurpboxmeta = listarrysrch[0][:, 1]
-                if boolpuls:
+                if boolsrchposi:
                     lcurpboxmetatemp = 2. - lcurpboxmeta
                 else:
                     lcurpboxmetatemp = lcurpboxmeta
                 axis.plot(listarrysrch[0][:, 0] - timeoffs, lcurpboxmetatemp, alpha=alphraww, marker='o', ms=1, ls='', color='grey')
-                axis.plot(dictpboxinte['timemodl'] - timeoffs, arrymetamodl[:, 1], color='b')
+                axis.plot(dictpboxinte['timemodl'] - timeoffs, dictpboxinte['rflxtsermodl'], color='b')
                 if timeoffs == 0:
                     axis.set_xlabel('Time [days]')
                 else:
@@ -2423,12 +2557,13 @@ def srch_pbox(arry, \
                     axis.set_ylim(ylimtserinit)
                 axis.set_title(strgtitl)
                 plt.subplots_adjust(bottom=0.2)
-                path = pathimag + 'rflx_pbox_tce%d_%s.%s' % (j, strgextn, typefileplot)
+                path = dictpathplot['rflx'][j]
+                dictpboxoutp['listpathplotrflx'].append(path)
                 print('Writing to %s...' % path)
                 plt.savefig(path, dpi=200)
                 plt.close()
 
-                # plot phase curve + TLS model
+                # plot data and model phase-series
                 figr, axis = plt.subplots(figsize=figrsizeydobskin)
                 axis.plot(dictpboxinte['phasdata'], dictpboxinte['rflxpserdata'], marker='o', ms=1, ls='', alpha=alphraww, color='grey')
                 axis.plot(dictpboxinte['phasmodl'], dictpboxinte['rflxpsermodl'], color='b')
@@ -2440,7 +2575,8 @@ def srch_pbox(arry, \
                     axis.set_ylim(ylimpserinit)
                 axis.set_title(strgtitl)
                 plt.subplots_adjust(bottom=0.2)
-                path = pathimag + 'pcur_pbox_tce%d_%s.%s' % (j, strgextn, typefileplot)
+                path = dictpathplot['pcur'][j]
+                dictpboxoutp['listpathplotpcur'].append(path)
                 print('Writing to %s...' % path)
                 plt.savefig(path, dpi=200)
                 plt.close()
@@ -2460,7 +2596,6 @@ def srch_pbox(arry, \
         
         print('dictpboxoutp')
         print(dictpboxoutp)
-        
         pd.DataFrame.from_dict(dictpboxoutp).to_csv(pathsave, index=False)
                 
         timefinl = timemodu.time()
@@ -2515,13 +2650,12 @@ def retr_lcurtess( \
               ## type of SPOC light curve: 'PDC', 'SAP'
               typedataspoc='PDC', \
               
+              # type of verbosity
+              typeverb=0, \
              ):
     '''
-    Pipeline to retrieve TESS light curve of a target
+    Pipeline to retrieve TESS light curve of a target.
     '''
-    
-    print('typelcurtpxftess')
-    print(typelcurtpxftess)
     
     #strgmast, rasctarg, decltarg = setp_coorstrgmast(rasctarg, decltarg, strgmast)
     
@@ -2538,34 +2672,33 @@ def retr_lcurtess( \
                     print(decltarg)
                     raise Exception('')
     
-    # determine the MAST keyword to be used for the target
-    if strgmast is not None:
-        strgmasttemp = strgmast
-    elif rasctarg is not None:
-        strgmasttemp = '%g %g' % (rasctarg, decltarg)
-    else:
-        strgmasttemp = 'TIC %d' % ticitarg
-    
-    # determine the TIC ID to be used to search for available sectors
     ticitsec = None
-    if ticitarg is None:
-        listdictcatl = astroquery.mast.Catalogs.query_object(strgmasttemp, catalog='TIC', radius='40s')
-        if len(listdictcatl) > 0 and listdictcatl[0]['dstArcSec'] < 1.:
-            ticitsec = int(listdictcatl[0]['ID'])
+    if strgmast is not None or ticitarg is not None:
+        # determine the MAST keyword to be used for the target
+        if strgmast is not None:
+            strgmasttemp = strgmast
+        if ticitarg is not None:
+            strgmasttemp = 'TIC %d' % ticitarg
+    
+        # determine the TIC ID to be used to search for available sectors
+        if ticitarg is None:
+            print('Determining the TIC ID to be used to search for available sectors using MAST keyword %s...' % strgmasttemp)
+            listdictcatl = astroquery.mast.Catalogs.query_object(strgmasttemp, catalog='TIC', radius='40s')
+            if len(listdictcatl) > 0 and listdictcatl[0]['dstArcSec'] < 1.:
+                ticitsec = int(listdictcatl[0]['ID'])
+            else:
+                print('Warning! No TIC match to the MAST keyword: %s' % strgmasttemp)
         else:
-            print('Warning! No TIC match to the MAST keyword: %s' % strgmasttemp)
-    else:
-        ticitsec = ticitarg
-    print('ticitsec')
-    print(ticitsec)
-
+            ticitsec = ticitarg
+    
     if not booltpxfonly:
+        if rasctarg is not None:
+            strgmasttemp = '%g %g' % (rasctarg, decltarg)
+
         # get the list of sectors for which TESS FFI data are available
         listtsecffim, temp, temp = retr_listtsec(strgmasttemp)
     
     # get the list of sectors for which TESS SPOC data are available
-    print('typelcurtpxftess')
-    print(typelcurtpxftess)
     if typelcurtpxftess == 'lygos' or ticitsec is None:
         listtsecspoc = np.array([], dtype=int)
         listpathspoc = np.array([])
@@ -2592,8 +2725,9 @@ def retr_lcurtess( \
     else:
         listtsec = listtsecmerg
     
-    print('listtsec')
-    print(listtsec)
+    if typeverb > 0:
+        print('listtsec')
+        print(listtsec)
     
     numbtsec = len(listtsec)
     indxtsec = np.arange(numbtsec)
@@ -2603,8 +2737,10 @@ def retr_lcurtess( \
     
     # determine whether sectors have 2-minute cadence data
     booltpxf = retr_booltpxf(listtsec, listtsecspoc)
-    print('booltpxf')
-    print(booltpxf)
+    
+    if typeverb > 0:
+        print('booltpxf')
+        print(booltpxf)
     
     if typelcurtpxftess == 'lygos':
         boollygo = np.ones(numbtsec, dtype=bool)
@@ -2616,10 +2752,11 @@ def retr_lcurtess( \
         listtseclygo = listtsec[boollygo]
     listtseclygo = listtsec[boollygo]
     
-    print('booltpxflygo')
-    print(booltpxflygo)
-    print('listtseclygo')
-    print(listtseclygo)
+    if typeverb > 0:
+        print('booltpxflygo')
+        print(booltpxflygo)
+        print('listtseclygo')
+        print(listtseclygo)
     
     listarrylcur = [[] for o in indxtsec]
     if len(listtseclygo) > 0:
@@ -2634,26 +2771,18 @@ def retr_lcurtess( \
         if not 'boolmaskqual' in dictlygoinpt:
             dictlygoinpt['boolmaskqual'] = boolmaskqual
         
-        print('Will run lygos on the target...')
+        if typeverb > 0:
+            print('Will run lygos on the target...')
         dictlygooutp = lygos.main.init( \
                                        **dictlygoinpt, \
                                       )
         
-        print('listtsec')
-        print(listtsec)
         for o, tseclygo in enumerate(listtsec):
             indx = np.where(dictlygooutp['listtsec'] == tseclygo)[0]
-            print('indx')
-            print(indx)
             if indx.size > 0:
-                if len(dictlygooutp['listarry'][indx[0]]) == 0:
-                    print('listtseclygo')
-                    print(listtseclygo)
-                    print('booltpxflygo')
-                    print(booltpxflygo)
-                    #raise Exception('')
-                else:
-                    listarrylcur[o] = dictlygooutp['listarry'][indx[0]]
+                if len(dictlygooutp['listarry'][indx[0]]) > 0:
+                    indxtimegood = np.where(np.isfinite(dictlygooutp['listarry'][indx[0]][:, 1]) & np.isfinite(dictlygooutp['listarry'][indx[0]][:, 2]))[0]
+                    listarrylcur[o] = dictlygooutp['listarry'][indx[0]][indxtimegood, :]
                     listtcam[o] = dictlygooutp['listtcam'][indx[0]]
                     listtccd[o] = dictlygooutp['listtccd'][indx[0]]
     
@@ -2662,16 +2791,17 @@ def retr_lcurtess( \
     arrylcursapp = None
     arrylcurpdcc = None
     
-    #listpathdownspoclcur = []
-    print('listtsecspoc')
-    print(listtsecspoc)
+    if typeverb > 0:
+        print('listtsecspoc')
+        print(listtsecspoc)
     if len(listtsecspoc) > 0 and typelcurtpxftess == 'SPOC':
         
         pathdatatess = os.environ['TESS_DATA_PATH'] + '/'
         # download data from MAST
         os.system('mkdir -p %s' % pathdatatess)
         
-        print('Downloading SPOC data products...')
+        if typeverb > 0:
+            print('Downloading SPOC data products...')
         
         listhdundataspoc = [[] for o in indxtsecspoc]
         #listpathdownspoc = []
@@ -2716,10 +2846,11 @@ def retr_lcurtess( \
         #listpathdownspoclcur.sort()
         
         ## read SPOC light curves
-        if typedataspoc == 'SAP':
-            print('Reading the SAP light curves...')
-        else:
-            print('Reading the PDC light curves...')
+        if typeverb > 0:
+            if typedataspoc == 'SAP':
+                print('Reading the SAP light curves...')
+            else:
+                print('Reading the PDC light curves...')
         listarrylcursapp = [[] for o in indxtsec] 
         listarrylcurpdcc = [[] for o in indxtsec] 
         for o in indxtsec:
@@ -2739,30 +2870,34 @@ def retr_lcurtess( \
                     arrylcur = listarrylcurpdcc[indx]
                 listarrylcur[o] = arrylcur
             
-        if numbtsec == 0:
-            print('No data have been retrieved.' % (numbtsec, strgtemp))
-        else:
-            if numbtsec == 1:
-                strgtemp = ''
+        if typeverb > 0:
+            if numbtsec == 0:
+                    print('No data have been retrieved.' % (numbtsec, strgtemp))
             else:
-                strgtemp = 's'
-            print('%d sector%s of data retrieved.' % (numbtsec, strgtemp))
+                if numbtsec == 1:
+                    strgtemp = ''
+                else:
+                    strgtemp = 's'
+                print('%d sector%s of data retrieved.' % (numbtsec, strgtemp))
         
         # merge light curves from different sectors
         arrylcursapp = np.concatenate([arry for arry in listarrylcursapp if len(arry) > 0], 0)
         arrylcurpdcc = np.concatenate([arry for arry in listarrylcurpdcc if len(arry) > 0], 0)
     
-    # merge light curves from different sectors
-    if [] in listarrylcur:
-        print('listarrylcur contains an empty element. Will remove it.')
+    boolbadd = False
+    for arrylcur in listarrylcur:
+        if len(arrylcur) == 0:
+            boolbadd = True
+
+    if boolbadd:
+        if typeverb > 0:
+            print('listarrylcur contains an empty element. Will remove it.')
         listarrylcurtemp = []
         listindxtsecgood = []
         for o in indxtsec:
             if len(listarrylcur[o]) > 0:
                 listindxtsecgood.append(o)
         listindxtsecgood = np.array(listindxtsecgood, dtype=int)
-        print('listindxtsecgood')
-        summgene(listindxtsecgood)
         listtsec = listtsec[listindxtsecgood]
         listtcam = listtcam[listindxtsecgood]
         listtccd = listtccd[listindxtsecgood]
@@ -2772,30 +2907,37 @@ def retr_lcurtess( \
 
     if len(listarrylcur) > 0:
         arrylcur = np.concatenate(listarrylcur, 0)
-        
-        #if not np.isfinite(arrylcur).all():
-        #    indxbadd = np.where(~np.isfinite(arrylcur))[0]
-        #    print('arrylcur')
-        #    summgene(arrylcur)
-        #    print('indxbadd')
-        #    summgene(indxbadd)
-        #    raise Exception('')
     else:
         arrylcur = []
 
-    for o, tseclygo in enumerate(listtsec):
+    for o, tsec in enumerate(listtsec):
+        if len(listarrylcur[o]) == 0:
+            print('o')
+            print(o)
+            print('listtsec')
+            print(listtsec)
+            print('listarrylcur')
+            print(listarrylcur)
+            print('listtsecspoc')
+            print(listtsecspoc)
+            print('listtseclygo')
+            print(listtseclygo)
+            print('tsec')
+            print(tsec)
+            raise Exception('')
+        
         if not np.isfinite(listarrylcur[o][:, 1]).all():
             print('listtsec')
             print(listtsec)
-            print('tseclygo')
-            print(tseclygo)
+            print('tsec')
+            print(tsec)
             indxbadd = np.where(~np.isfinite(listarrylcur[o][:, 1]))[0]
             print('listarrylcur[o][:, 1]')
             summgene(listarrylcur[o][:, 1])
             print('indxbadd')
             summgene(indxbadd)
             raise Exception('')
-    
+
     return arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc, listtsec, listtcam, listtccd, listpathspoc
    
 
@@ -2809,25 +2951,34 @@ def retr_subp(dictpopl, dictnumbsamp, dictindxsamp, namepoplinit, namepoplfinl, 
     dictindxsamp[namepoplfinl] = dict()
 
 
-def retr_dictpoplstarcomp(typepoplstar, typecomp, numbsyst=None, timeepoc=None):
+def retr_dictpoplstarcomp(typepoplstar, typesyst, numbsyst=None, timeepoc=None):
     '''
     Get a dictionary with features of stars and their companions.
     '''
+    
+    strgpoplstar = 'star' + typepoplstar
+    strgpoplstarcomp = 'starcomp' + typepoplstar
+    strgpoplcomp = 'comp' + typepoplstar
+    
+    # Boolean flag indicating if the system is a compact object transiting a stellar companion
+    boolsystcosctran = typesyst == 'cosctran'
+    # Boolean flag indicating if the system is a compact object with stellar companion
+    boolsystcosc = typesyst == 'cosc' or typesyst == 'cosctran'
 
     dictpopl = dict()
     dictnumbsamp = dict()
     dictindxsamp = dict()
-    dictindxsamp['star'] = dict()
+    dictindxsamp[strgpoplstar] = dict()
     
     dictfact = retr_factconv()
     
     # get the features of the star population
     if typepoplstar == 'tessnomi2min':
-        dictpopl['star'] = retr_dictpopltic8(typepoplstar, numbsyst=numbsyst)
-        dictpopl['star']['densstar'] = 1.41 * dictpopl['star']['massstar'] / dictpopl['star']['radistar']**3
-        dictpopl['star']['idenstar'] = dictpopl['star']['tici']
+        dictpopl[strgpoplstar] = retr_dictpopltic8(typepoplstar, numbsyst=numbsyst)
+        dictpopl[strgpoplstar]['densstar'] = 1.41 * dictpopl[strgpoplstar]['massstar'] / dictpopl[strgpoplstar]['radistar']**3
+        dictpopl[strgpoplstar]['idenstar'] = dictpopl[strgpoplstar]['tici']
     elif typepoplstar == 'lsstwfds' or typepoplstar == 'tessexm2':
-        dictpopl['star'] = dict()
+        dictpopl[strgpoplstar] = dict()
         
         if numbsyst is None:
             if typepoplstar == 'tessexm2':
@@ -2835,142 +2986,195 @@ def retr_dictpoplstarcomp(typepoplstar, typecomp, numbsyst=None, timeepoc=None):
             if typepoplstar == 'lsstwfds':
                 numbsyst = 1000000
         
-        dictpopl['star']['idenstar'] = np.arange(numbsyst)
+        dictpopl[strgpoplstar]['idenstar'] = np.arange(numbsyst)
         
-        dictpopl['star']['distsyst'] = tdpy.icdf_powr(np.random.rand(numbsyst), 100., 7000., -2.)
-        dictpopl['star']['massstar'] = tdpy.icdf_powr(np.random.rand(numbsyst), 0.1, 10., 2.)
+        dictpopl[strgpoplstar]['distsyst'] = tdpy.icdf_powr(np.random.rand(numbsyst), 100., 7000., -2.)
+        dictpopl[strgpoplstar]['massstar'] = tdpy.icdf_powr(np.random.rand(numbsyst), 0.1, 10., 2.)
         
-        dictpopl['star']['densstar'] = 1.4 * (1. / dictpopl['star']['massstar'])**(0.7)
-        dictpopl['star']['radistar'] = (1.4 * dictpopl['star']['massstar'] / dictpopl['star']['densstar'])**(1. / 3.)
+        dictpopl[strgpoplstar]['densstar'] = 1.4 * (1. / dictpopl[strgpoplstar]['massstar'])**(0.7)
+        dictpopl[strgpoplstar]['radistar'] = (1.4 * dictpopl[strgpoplstar]['massstar'] / dictpopl[strgpoplstar]['densstar'])**(1. / 3.)
         
-        dictpopl['star']['lumistar'] = dictpopl['star']['massstar']**4
+        dictpopl[strgpoplstar]['lumistar'] = dictpopl[strgpoplstar]['massstar']**4
         
         if typepoplstar == 'tessexm2':
-            dictpopl['star']['tmag'] = tdpy.icdf_powr(np.random.rand(numbsyst), 6., 14., -2.)
+            dictpopl[strgpoplstar]['tmag'] = tdpy.icdf_powr(np.random.rand(numbsyst), 6., 14., -2.)
         if typepoplstar == 'lsstwfds':
-            dictpopl['star']['rmag'] = -2.5 * np.log10(dictpopl['star']['lumistar'] / dictpopl['star']['distsyst']**2)
+            dictpopl[strgpoplstar]['rmag'] = -2.5 * np.log10(dictpopl[strgpoplstar]['lumistar'] / dictpopl[strgpoplstar]['distsyst']**2)
             
-            indx = np.where((dictpopl['star']['rmag'] < 24.) & (dictpopl['star']['rmag'] > 15.))[0]
+            indx = np.where((dictpopl[strgpoplstar]['rmag'] < 24.) & (dictpopl[strgpoplstar]['rmag'] > 15.))[0]
             for name in ['distsyst', 'rmag', 'massstar', 'densstar', 'radistar', 'lumistar']:
-                dictpopl['star'][name] = dictpopl['star'][name][indx]
+                dictpopl[strgpoplstar][name] = dictpopl[strgpoplstar][name][indx]
 
     else:
         raise Exception('')
     
-    dictnumbsamp['star'] = dictpopl['star']['radistar'].size
+    dictnumbsamp[strgpoplstar] = dictpopl[strgpoplstar]['radistar'].size
 
     # probability of occurence
-    if typecomp == 'cosc':
-        dictpopl['star']['numbcompstarmean'] = tdpy.samp_gaustrun(dictnumbsamp['star'], 1e-6, 1e-4, 0, np.inf)
+    if boolsystcosc:
+        dictpopl[strgpoplstar]['numbcompstarmean'] = tdpy.samp_gaustrun(dictnumbsamp[strgpoplstar], 1e-6, 1e-4, 0, np.inf)
         
-        dictpopl['star']['rsum'] = dictpopl['star']['radistar']
-    if typecomp == 'psys':
+        dictpopl[strgpoplstar]['rsum'] = dictpopl[strgpoplstar]['radistar']
+    if typesyst == 'psys':
         
-        masstemp = np.copy(dictpopl['star']['massstar'])
+        masstemp = np.copy(dictpopl[strgpoplstar]['massstar'])
         masstemp[np.where(~np.isfinite(masstemp))] = 1.
 
-        dictpopl['star']['numbcompstarmean'] = 0.5 * masstemp**(-1.)
+        dictpopl[strgpoplstar]['numbcompstarmean'] = 0.5 * masstemp**(-1.)
         
-        dictpopl['star']['rsum'] = dictpopl['star']['radistar']
-        #dictpopl['star']['rsum'] = dictpopl['star']['radistar'] + dictpopl['star']['radicomp'] / dictfact['rsre']
+        dictpopl[strgpoplstar]['rsum'] = dictpopl[strgpoplstar]['radistar']
+        #dictpopl[strgpoplstar]['rsum'] = dictpopl[strgpoplstar]['radistar'] + dictpopl[strgpoplstar]['radicomp'] / dictfact['rsre']
         
     # number of companions per star
-    dictpopl['star']['numbcompstar'] = np.random.poisson(dictpopl['star']['numbcompstarmean'])
+    dictpopl[strgpoplstar]['numbcompstar'] = np.random.poisson(dictpopl[strgpoplstar]['numbcompstarmean'])
     
     # Boolean flag of occurence
-    dictpopl['star']['booloccu'] = dictpopl['star']['numbcompstar'] > 0
+    dictpopl[strgpoplstar]['booloccu'] = dictpopl[strgpoplstar]['numbcompstar'] > 0
     
     # subpopulation where companions occur
-    indx = np.where(dictpopl['star']['booloccu'])[0]
-    retr_subp(dictpopl, dictnumbsamp, dictindxsamp, 'star', 'starcomp', indx)
+    indx = np.where(dictpopl[strgpoplstar]['booloccu'])[0]
+    retr_subp(dictpopl, dictnumbsamp, dictindxsamp, strgpoplstar, strgpoplstarcomp, indx)
     
-    if typecomp == 'cosc':
+    if boolsystcosc:
         minmmasscomp = 5. # [Solar mass]
         maxmmasscomp = 200. # [Solar mass]
-    if typecomp == 'psys':
+    if typesyst == 'psys':
         minmmasscomp = 0.5 # [Earth mass]
         maxmmasscomp = 1000. # [Earth mass]
     
     print('Sampling companion features...')
     
-    for name in ['cosi', 'masscomp', 'radicomp', 'smax', 'epoc']:
-        dictpopl['starcomp'][name] = [[] for k in range(indx.size)]
+    for name in ['cosi', 'radicomp', 'masscomp', 'smax', 'epoc']:
+        dictpopl[strgpoplstarcomp][name] = [[] for k in range(indx.size)]
     for k in range(indx.size):
         
-        if dictpopl['star']['numbcompstar'][k] == 0:
+        if dictpopl[strgpoplstar]['numbcompstar'][k] == 0:
             continue
 
         # cosine of orbital inclinations
-        dictpopl['starcomp']['cosi'][k] = np.random.rand(dictpopl['star']['numbcompstar'][k])
+        dictpopl[strgpoplstarcomp]['cosi'][k] = np.random.rand(dictpopl[strgpoplstar]['numbcompstar'][k])
     
         # companion mass
-        dictpopl['starcomp']['masscomp'][k] = tdpy.util.icdf_powr(np.random.rand(dictpopl['star']['numbcompstar'][k]), minmmasscomp, maxmmasscomp, 2.)
+        dictpopl[strgpoplstarcomp]['masscomp'][k] = tdpy.util.icdf_powr(np.random.rand(dictpopl[strgpoplstar]['numbcompstar'][k]), minmmasscomp, maxmmasscomp, 2.)
         
         # companion radius
-        if typecomp == 'psys':
-            dictpopl['starcomp']['radicomp'][k] = retr_radifrommass(dictpopl['starcomp']['masscomp'][k])
+        if typesyst == 'psys':
+            dictpopl[strgpoplstarcomp]['radicomp'][k] = retr_radifrommass(dictpopl[strgpoplstarcomp]['masscomp'][k])
     
         # semi-major axes
-        #if np.isfinite(dictpopl['comp']['densstar'][k]):
-        #    densstar = dictpopl['comp']['densstar'][k]
+        #if np.isfinite(dictpopl[strgpoplcomp]['densstar'][k]):
+        #    densstar = dictpopl[strgpoplcomp]['densstar'][k]
         #else:
         #    densstar = 1.
-        #dictpopl['comp']['radiroch'][k] = retr_radiroch(radistar, densstar, denscomp)
-        #minmsmax = 2. * dictpopl['comp']['radiroch'][k]
+        #dictpopl[strgpoplcomp]['radiroch'][k] = retr_radiroch(radistar, densstar, denscomp)
+        #minmsmax = 2. * dictpopl[strgpoplcomp]['radiroch'][k]
         
-        minmsmax = 3.# * dictpopl['comp']['radistar'][k]
-        dictpopl['starcomp']['smax'][k] = dictpopl['starcomp']['radistar'][k] * tdpy.util.icdf_powr(np.random.rand(), minmsmax, 1e4, 2.) / dictfact['aurs']
+        minmsmax = 3.# * dictpopl[strgpoplcomp]['radistar'][k]
+        dictpopl[strgpoplstarcomp]['smax'][k] = dictpopl[strgpoplstarcomp]['radistar'][k] * tdpy.util.icdf_powr(np.random.rand(), minmsmax, 1e4, 2.) / dictfact['aurs']
         
         # epochs
-        dictpopl['starcomp']['epoc'][k] = 1e8 * np.random.rand(dictpopl['star']['numbcompstar'][k])
+        dictpopl[strgpoplstarcomp]['epoc'][k] = 1e8 * np.random.rand(dictpopl[strgpoplstar]['numbcompstar'][k])
         if timeepoc is not None:
-            dictpopl['starcomp']['epoc'][k] = dictpopl['starcomp']['epoc'][k] + dictpopl['starcomp']['peri'][k] * \
-                                                                        np.round((dictpopl['starcomp']['epoc'][k] - timeepoc) / dictpopl['starcomp']['peri'][k])
+            dictpopl[strgpoplstarcomp]['epoc'][k] = dictpopl[strgpoplstarcomp]['epoc'][k] + dictpopl[strgpoplstarcomp]['peri'][k] * \
+                                                                        np.round((dictpopl[strgpoplstarcomp]['epoc'][k] - timeepoc) / dictpopl[strgpoplstarcomp]['peri'][k])
     
-    dictpopl['starcomp']['rsma'] = dictpopl['comp']['radistar'] / dictpopl['comp']['smax'] / dictfact['aurs']
+    dictpopl[strgpoplstarcomp]['rsmacomp'] = dictpopl[strgpoplcomp]['radistar'] / dictpopl[strgpoplcomp]['smax'] / dictfact['aurs']
     
     # load star features into component features
-    dictpopl['comp'] = dict()
-    for name in list(dictpopl['star'].keys()):
-        dictpopl['comp'][name] = np.empty(dictnumbsamp['comp'])
+    dictpopl[strgpoplcomp] = dict()
+    for name in list(dictpopl[strgpoplstar].keys()):
+        dictpopl[strgpoplcomp][name] = np.empty(dictnumbsamp[strgpoplcomp])
     cntr = 0
-    for k in range(dictnumbsamp['star']):
-        numb = dictpopl['star']['numbcompstar'][k]
-        for name in list(dictpopl['star'].keys()):
-            dictpopl['comp'][name][cntr:cntr+numb] = dictpopl['star'][name][k]
+    for k in range(dictnumbsamp[strgpoplstar]):
+        numb = dictpopl[strgpoplstar]['numbcompstar'][k]
+        for name in list(dictpopl[strgpoplstar].keys()):
+            dictpopl[strgpoplcomp][name][cntr:cntr+numb] = dictpopl[strgpoplstar][name][k]
         cntr += numb
     
-    dictnumbsamp['comp'] = np.sum(dictpopl['star']['numbcompstar'])
+    dictnumbsamp[strgpoplcomp] = np.sum(dictpopl[strgpoplstar]['numbcompstar'])
 
     # orbital inclinations
-    dictpopl['comp']['incl'] = 180. / np.pi * np.arccos(dictpopl['comp']['cosi'])
+    dictpopl[strgpoplcomp]['incl'] = 180. / np.pi * np.arccos(dictpopl[strgpoplcomp]['cosi'])
     
     # total mass
-    if typecomp == 'cosc':
-        dictpopl['star']['masstotl'] = dictpopl['star']['massbhol'] + dictpopl['star']['massstar']
-    if typecomp == 'psys':
-        dictpopl['star']['masstotl'] = dictpopl['star']['massstar']
+    if boolsystcosc:
+        dictpopl[strgpoplstar]['masstotl'] = dictpopl[strgpoplstar]['massbhol'] + dictpopl[strgpoplstar]['massstar']
+    if typesyst == 'psys':
+        dictpopl[strgpoplstar]['masstotl'] = dictpopl[strgpoplstar]['massstar']
     
     print('Estimating orbital periods...')
-    dictpopl['comp']['peri'] = retr_perikepl(dictpopl['comp']['smax'], dictpopl['comp']['masstotl'])
+    dictpopl[strgpoplcomp]['peri'] = retr_perikepl(dictpopl[strgpoplcomp]['smax'], dictpopl[strgpoplcomp]['masstotl'])
     
     # subpopulation where object transits
-    dictindxsamp['comp'] = dict()
-    indx = np.where(dictpopl['comp']['rsma'] > dictpopl['comp']['cosi'])[0]
-    retr_subp(dictpopl, dictnumbsamp, dictindxsamp, 'comp', 'comptran', indx)
+    dictindxsamp[strgpoplcomp] = dict()
+    indx = np.where(dictpopl[strgpoplcomp]['rsmacomp'] > dictpopl[strgpoplcomp]['cosi'])[0]
+    retr_subp(dictpopl, dictnumbsamp, dictindxsamp, strgpoplcomp, 'comptran', indx)
 
     # transit duration
-    dictpopl['comptran']['duratran'] = retr_duratran(dictpopl['comptran']['peri'], \
-                                                                   dictpopl['comptran']['rsma'], \
+    dictpopl['comptran']['duratrantotl'] = retr_duratrantotl(dictpopl['comptran']['peri'], \
+                                                                   dictpopl['comptran']['rsmacomp'], \
                                                                    dictpopl['comptran']['cosi'])
-    dictpopl['comptran']['dcyc'] = dictpopl['comptran']['duratran'] / dictpopl['comptran']['peri'] / 24.
-    if typecomp == 'psys':
+    dictpopl['comptran']['dcyc'] = dictpopl['comptran']['duratrantotl'] / dictpopl['comptran']['peri'] / 24.
+    if typesyst == 'psys':
         dictpopl['comptran']['rrat'] = dictpopl['comptran']['radicomp'] / dictpopl['comptran']['radistar'] / dictfact['rsre']
         dictpopl['comptran']['dept'] = 1e3 * dictpopl['comptran']['rrat']**2 # [ppt]
-    if typecomp == 'cosc':
+    if boolsystcosctran:
         dictpopl['comptran']['amplslen'] = retr_amplslen(dictpopl['comptran']['peri'], dictpopl['comptran']['radistar'], \
                                                                             dictpopl['comptran']['massbhol'], dictpopl['comptran']['massstar'])
+
+    if typesyst == 'psysmoon':
+        # exomoons to companions
         
+        numbmoon = np.empty(numbcomp, dtype=int)
+        radimoon = [[] for j in indxcomp]
+        massmoon = [[] for j in indxcomp]
+        densmoon = [[] for j in indxcomp]
+        perimoon = [[] for j in indxcomp]
+        epocmoon = [[] for j in indxcomp]
+        smaxmoon = [[] for j in indxcomp]
+        indxmoon = [[] for j in indxcomp]
+
+        # Hill radius of the companion
+        radihill = retr_radihill(smaxcomp, masscomp / dictfact['msme'], massstar)
+        # maximum semi-major axis of the moons 
+        maxmsmaxmoon = 0.5 * radihill
+        
+        for j in indxcomp:
+            # number of moons
+            arry = np.arange(1, 10)
+            prob = arry**(-2.)
+            prob /= np.sum(prob)
+            numbmoon[j] = np.random.choice(arry, p=prob)
+            indxmoon[j] = np.arange(numbmoon[j])
+            smaxmoon[j] = np.empty(numbmoon[j])
+            # properties of the moons
+            ## radii [R_E]
+            radimoon[j] = radicomp[j] * tdpy.icdf_powr(np.random.rand(numbmoon[j]), 0.05, 0.3, 2.)
+            ## mass [M_E]
+            massmoon[j] = retr_massfromradi(radimoon[j])
+            ## densities [d_E]
+            densmoon[j] = massmoon[j] / radimoon[j]**3
+            # minimum semi-major axes
+            minmsmaxmoon = retr_radiroch(radicomp[j], denscomp[j], densmoon[j])
+            
+            # semi-major axes of the moons
+            for jj in indxmoon[j]:
+                smaxmoon[j][jj] = tdpy.icdf_powr(np.random.rand(), minmsmaxmoon[jj], maxmsmaxmoon[j], 2.)
+            # orbital period of the moons
+            perimoon[j] = retr_perikepl(smaxmoon[j], np.sum(masscomp) / dictfact['msme'])
+            # mid-transit times of the moons
+            epocmoon[j] = tdpy.icdf_self(np.random.rand(numbmoon[j]), minmtime, maxmtime)
+        
+    if (smaxmoon[j] > smaxcomp[j] / 1.2).any():
+        print('smaxcomp[j]')
+        print(smaxcomp[j])
+        print('radihill[j]')
+        print(radihill[j])
+        print('smaxmoon[j]')
+        print(smaxmoon[j])
+        raise Exception('')
+        
+
     return dictpopl, dictnumbsamp, dictindxsamp
        
 
@@ -3017,7 +3221,7 @@ def retr_rascdeclfromstrgmast(strgmast):
     
 def retr_listtsec(strgmast):
     '''
-    Retrieve the list of sectors, cameras, and CCDs for which TESS data are available for the target
+    Retrieve the list of sectors, cameras, and CCDs for which TESS data are available for the target.
     '''
     
     print('Calling TESSCut with keyword %s to get the list of sectors for which TESS data are available...' % strgmast)
@@ -3043,24 +3247,29 @@ def retr_booltpxf(listtsec, listtsecspoc):
     return booltpxf
 
 
-def exec_lspe(arrylcur, pathimag=None, pathdata=None, strgextn='', factnyqt=None, maxmfreq=None, factosam=1.):
+def exec_lspe(arrylcur, pathimag=None, pathdata=None, strgextn='', factnyqt=None, maxmfreq=None, \
+              factosam=3., \
+              ## file type of the plot
+              typefileplot='pdf', \
+              # verbosity level
+              typeverb=0, \
+             ):
     '''
-    Calculate the LS periodogram of a time-series
+    Calculate the LS periodogram of a time-series.
     '''
     
     if maxmfreq is not None and factnyqt is not None:
         raise Exception('')
     
+    dictlspeoutp = dict()
+    
+    if pathimag is not None:
+        pathplot = pathimag + 'lspe_%s.%s' % (strgextn, typefileplot)
+
     if pathdata is not None:
-        path = pathdata + 'spec_lspe_%s.csv' % strgextn
+        pathcsvv = pathdata + 'spec_lspe_%s.csv' % strgextn
     
-    if pathdata is not None and os.path.exists(path):
-        print('Reading from %s...' % path)
-        arry = np.loadtxt(path, delimiter=',')
-        peri = arry[:, 0]
-        powr = arry[:, 1]
-    
-    else:
+    if pathdata is None or not os.path.exists(pathcsvv) or pathimag is not None and not os.path.exists(pathplot):
         print('Calculating LS periodogram...')
         
         # factor by which the maximum frequency is compared to the Nyquist frequency
@@ -3090,16 +3299,26 @@ def exec_lspe(arrylcur, pathimag=None, pathdata=None, strgextn='', factnyqt=None
             arry = np.empty((peri.size, 2))
             arry[:, 0] = peri
             arry[:, 1] = powr
-            print('Writing to %s...' % path)
-            np.savetxt(path, arry, delimiter=',')
+            print('Writing to %s...' % pathcsvv)
+            np.savetxt(pathcsvv, arry, delimiter=',')
+    
+    else:
+        if typeverb > 0:
+            print('Reading from %s...' % pathcsvv)
+        arry = np.loadtxt(pathcsvv, delimiter=',')
+        peri = arry[:, 0]
+        powr = arry[:, 1]
+    
+    #listindxperipeak, _ = scipy.signal.find_peaks(powr)
+    #indxperimpow = listindxperipeak[0]
     indxperimpow = np.argmax(powr)
+    
     perimpow = peri[indxperimpow]
     powrmpow = powr[indxperimpow]
 
     if pathimag is not None:
-        path = pathimag + 'lspe_%s.pdf' % strgextn
-        if not os.path.exists(path):
-            figr, axis = plt.subplots(figsize=(8, 4))
+        if not os.path.exists(pathplot):
+            figr, axis = plt.subplots(figsize=(8.25, 2.5))
             axis.plot(peri, powr, color='k')
             
             axis.axvline(perimpow, alpha=0.4, lw=3)
@@ -3115,15 +3334,21 @@ def exec_lspe(arrylcur, pathimag=None, pathdata=None, strgextn='', factnyqt=None
                 if xpos < minmxaxi:
                     break
                 axis.axvline(xpos, alpha=0.4, lw=1, linestyle='dashed')
-                    
+            
+            strgtitl = '$P_{max}=%.3f$ days, $\eta$=%.3g' % (perimpow, powrmpow)
             axis.set_xscale('log')
             axis.set_xlabel('Period [days]')
             axis.set_ylabel('Power')
-            print('Writing to %s...' % path)
-            plt.savefig(path)
+            axis.set_title(strgtitl)
+            print('Writing to %s...' % pathplot)
+            plt.savefig(pathplot)
             plt.close()
+        dictlspeoutp['pathplot'] = pathplot
+
+    dictlspeoutp['perimpow'] = perimpow
+    dictlspeoutp['powrmpow'] = powrmpow
     
-    return perimpow, powrmpow
+    return dictlspeoutp
 
 
 def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
@@ -3137,16 +3362,20 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
               timeoffs=0., \
               limtxaxi=None, \
               limtyaxi=None, \
-              titl='', listcolrmodl=None):
+              titl='', \
+              ## file type of the plot
+              typefileplot='pdf', \
+              listcolrmodl=None, \
+             ):
     
     if strgextn == '':
         raise Exception('')
     
-    path = pathimag + 'lcur_%s.pdf' % strgextn
+    path = pathimag + 'lcur_%s.%s' % (strgextn, typefileplot)
     
     # skip plotting
     if not boolwritover and os.path.exists(path):
-        return
+        return path
     
     boollegd = False
     
@@ -3227,6 +3456,8 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
 
 
 def plot_pcur(pathimag, arrylcur=None, arrypcur=None, arrypcurbind=None, phascent=0., boolhour=False, epoc=None, peri=None, strgextn='', \
+              ## file type of the plot
+              typefileplot='pdf', \
                                                             boolbind=True, timespan=None, booltime=False, numbbins=100, limtxdat=None):
     
     if arrypcur is None:
@@ -3265,7 +3496,7 @@ def plot_pcur(pathimag, arrylcur=None, arrypcur=None, arrypcurbind=None, phascen
         axis.set_xlim(limtxdat)
     
     plt.subplots_adjust(hspace=0., bottom=0.25, left=0.25)
-    path = pathimag + 'pcur%s.pdf' % strgextn
+    path = pathimag + 'pcur%s.%s' % (strgextn, typefileplot)
     print('Writing to %s...' % path)
     plt.savefig(path)
     plt.close()
@@ -3321,15 +3552,16 @@ def rebn_tser(arry, numbbins=None, delt=None, binsxdat=None):
             arryrebn[k, 2] = np.nan
         else:
             arryrebn[k, 1] = np.mean(arry[indxxdat, 1])
-            arryrebn[k, 2] = np.sqrt(np.nansum(arry[indxxdat, 2]**2)) / indxxdat.size
+            stdvfrst  = np.sqrt(np.nansum(arry[indxxdat, 2]**2)) / indxxdat.size
+            stdvseco = np.std(arry[indxxdat, 1])
+            arryrebn[k, 2] = np.sqrt(stdvfrst**2 + stdvseco**2)
     
     return arryrebn
 
     
 def read_tesskplr_fold(pathfold, pathwrit, boolmaskqual=True, typeinst='tess', strgtype='PDCSAP_FLUX'):
-    
     '''
-    Reads all TESS or Kepler light curves in a folder and returns a data cube with time, flux and flux error
+    Reads all TESS or Kepler light curves in a folder and returns a data cube with time, flux and flux error.
     '''
 
     listpath = fnmatch.filter(os.listdir(pathfold), '%s*' % typeinst)
@@ -3353,9 +3585,8 @@ def read_tesskplr_fold(pathfold, pathwrit, boolmaskqual=True, typeinst='tess', s
 
 
 def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqual=True, boolmasknann=True):
-    
     '''
-    Reads a TESS or Kepler light curve file and returns a data cube with time, flux and flux error
+    Reads a TESS or Kepler light curve file and returns a data cube with time, flux and flux error.
     '''
     
     listhdun = fits.open(path)
@@ -3416,13 +3647,6 @@ def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqu
 #    return fracsars
 
 
-def retr_rsma(radiplan, radistar, smax):
-    
-    dictfact = retr_factconv()
-    rsma = (radistar + radiplan / dictfact['rsre']) / (smax * dictfact['aurs'])
-    return rsma
-
-
 def retr_rflxmodlrise(time, timerise, coeflinerise, coefquadrise, coefline):
     
     timeoffs = time - timerise
@@ -3438,103 +3662,9 @@ def retr_rflxmodlrise(time, timerise, coeflinerise, coefquadrise, coefline):
     return rflx, dflxline, dflxrise
 
 
-def retr_rflxmodlcosc( \
-                      # time axis
-                      time, \
-                      ## epoch of the orbit
-                      epoc, \
-                      ## orbital period in days
-                      peri, \
-                      ## radius of the star in Solar radius
-                      radistar, \
-                      ## mass of the companion in Solar mass
-                      masscomp, \
-                      ## mass of the star in Solar mass
-                      massstar, \
-                      ## inclination of the orbit in degrees
-                      incl, \
-                      # Boolean flag to diagnose
-                      booldiag=True, \
-
-                     ):
-    
-    # phase
-    phas = ((time - epoc) / peri) % 1.
-    
-    # conversion constants
-    dictfact = retr_factconv()
-    
-    ## total mass
-    masstotl = masscomp + massstar
-    ## semi-major axis
-    smax = retr_smaxkepl(peri, masstotl)
-    ## radius of the star divided by the semi-major axis
-    rsma = radistar / smax / dictfact['aurs']
-    ## cosine of the inclination angle
-    cosi = np.cos(incl / 180. * np.pi)
-    
-    ## self-lensing
-    ### duration
-    duratran = retr_duratran(peri, rsma, cosi)
-    ### amplitude
-    amplslen = retr_amplslen(peri, radistar, masscomp, massstar)
-    ### signal
-    dflxslen = np.zeros_like(time)
-    if np.isfinite(duratran):
-        indxtimetran = retr_indxtimetran(time, epoc, peri, duratran)
-        dflxslen[indxtimetran] += 1e-3 * amplslen
-    
-    ## ellipsoidal variation
-    ### density of the star in g/cm3
-    densstar = 1.41 * massstar / radistar**3
-    ### amplitude
-    amplelli = retr_amplelli(peri, densstar, massstar, masscomp)
-    ### signal
-    dflxelli = -1e-3 * amplelli * np.cos(4. * np.pi * phas) 
-    
-    ## beaming
-    amplbeam = retr_amplbeam(peri, massstar, masscomp)
-    ### signal
-    dflxbeam = 1e-3 * amplbeam * np.sin(2. * np.pi * phas)
-    
-    ## total relative flux
-    rflxtotl = 1. + dflxslen + dflxelli + dflxbeam
-    
-    dictoutpbhol = dict()
-    dictoutpbhol['amplslen'] = amplslen
-    dictoutpbhol['duratran'] = duratran
-    dictoutpbhol['rflxelli'] = dflxelli + 1.
-    dictoutpbhol['rflxbeam'] = dflxbeam + 1.
-    dictoutpbhol['rflxslen'] = dflxslen + 1.
-    
-    if booldiag and not np.isfinite(rflxtotl).all():
-        print('peri')
-        print(peri)
-        print('masscomp')
-        print(masscomp)
-        print('massstar')
-        print(massstar)
-        print('masstotl')
-        print(masstotl)
-        print('smax')
-        print(smax)
-        print('cosi')
-        print(cosi)
-        print('rsma')
-        print(rsma)
-        print('duratran')
-        print(duratran)
-        raise Exception('')
-
-    return rflxtotl, dictoutpbhol
-
-
 def retr_rflxtranmodl( \
                       # times at which to evaluate the relative flux
                       time, \
-                      # host
-                      ## radius of the host star
-                      radistar, \
                       # companions
                       ## orbital periods of the companions
                       pericomp, \
@@ -3546,6 +3676,8 @@ def retr_rflxtranmodl( \
                       ## cosine of the orbital inclination
                       cosicomp=None, \
                       
+                      ## radius ratio for the companions
+                      rratcomp=None, \
                       ## eccentricity of the orbit
                       eccecomp=0., \
                       ## sine of 
@@ -3556,8 +3688,8 @@ def retr_rflxtranmodl( \
                       ## mass of the companions
                       masscomp=None, \
                       
-                      ## type of the companion
-                      typecomp='plan', \
+                      ## type of the system
+                      typesyst='psys', \
                       
                       # type of limb-darkening
                       typelmdk='none', \
@@ -3565,11 +3697,13 @@ def retr_rflxtranmodl( \
                       coeflmdklinr=0.2, \
                       # quadratic limd-darkening coefficient 
                       coeflmdkquad=0.2, \
-                      # mass of star
+                      # radius of the host star in Solar radius
+                      radistar=None, \
+                      # mass of the host star in Solar mass
                       massstar=None, \
 
                       ## sum of stellar and companion radius
-                      rsma=None, \
+                      rsmacomp=None, \
                       
                       # moons
                       ## radii
@@ -3587,7 +3721,7 @@ def retr_rflxtranmodl( \
                       ## sine of 
                       sinwmoon=None, \
                       # Boolean flag to model transits as trapezoid
-                      booltrap=True, \
+                      booltrap=None, \
                       
                       # Boolean flag to return separate light curves for the companion and moon
                       boolcompmoon=False, \
@@ -3598,12 +3732,18 @@ def retr_rflxtranmodl( \
                       # string for the animation
                       strgextn='', \
 
+                      # Boolean flag to diagnose
+                      booldiag=True, \
+                      
+                      ## file type of the plot
+                      typefileplot='pdf', \
+
                       # verbosity level
-                      typeverb=1, \
+                      typeverb=0, \
                      ):
     '''
     Calculate the relative flux light curve of a star due to list of transiting companions and their orbiting moons.
-    When limb-darkening and/or moons are turned on, the result is interpolated based on star-to-companion radius, companion-to-moon radius
+    When limb-darkening and/or moons are turned on, the result is interpolated based on star-to-companion radius, companion-to-moon radius.
     '''
     timeinit = timemodu.time()
 
@@ -3616,8 +3756,17 @@ def retr_rflxtranmodl( \
     if isinstance(radicomp, list):
         radicomp = np.array(radicomp)
 
-    if isinstance(rsma, list):
-        rsma = np.array(rsma)
+    if isinstance(rsmacomp, list):
+        rsmacomp = np.array(rsmacomp)
+
+    if isinstance(rratcomp, list):
+        rratcomp = np.array(rratcomp)
+
+    if isinstance(masscomp, list):
+        masscomp = np.array(masscomp)
+
+    if isinstance(inclcomp, list):
+        inclcomp = np.array(inclcomp)
 
     if isinstance(cosicomp, list):
         cosicomp = np.array(cosicomp)
@@ -3628,11 +3777,47 @@ def retr_rflxtranmodl( \
     if isinstance(sinwcomp, list):
         sinwcomp = np.array(sinwcomp)
     
-    if inclcomp is not None and cosicomp is not None:
-        raise Exception('')
+    if rsmacomp is not None:
+        typeinpt = 'rsmacomp'
+    else:
+        typeinpt = 'masstotlradistar'
     
+    # check inputs
+    if booldiag:
+        
+        # inclination
+        if inclcomp is not None and cosicomp is not None:
+            raise Exception('')
+        
+        # eccentricity
+
+        # periods, radii, and masses
+        if typeinpt == 'masstotlradistar':
+            if radistar is None or not np.isfinite(radistar):
+                print('radistar')
+                print(radistar)
+                raise Exception('')
+        if typeinpt == 'rsmacomp':
+            if not np.isfinite(rsmacomp) or rsmacomp is None:
+                print('rsmacomp')
+                print(rsmacomp)
+                raise Exception('')
+        if typesyst == 'cosc':
+            if massstar is None:
+                raise Exception('')
+        
+            if masscomp is None:
+                raise Exception('')
+        
     if inclcomp is not None:
         cosicomp = np.cos(inclcomp * np.pi / 180.)
+    
+    if typesyst == 'cosc':
+        if radicomp is not None:
+            if typeverb > 0:
+                print('Radius provided for the compact object...')
+        else:
+            radicomp = 0.
 
     numbcomp = pericomp.size
     if perimoon is not None:
@@ -3642,18 +3827,28 @@ def retr_rflxtranmodl( \
             numbmoon[j] = len(perimoon[j])
         indxmoon = [np.arange(numbmoon[j]) for j in indxcomp]
     
-    if rsma is not None:
-        typeinpt = 'rsma'
-    else:
-        typeinpt = 'perimass'
-    
+    if booltrap is None:
+        if typesyst == 'psys':
+            booltrap = True
+        if typesyst == 'cosc':
+            booltrap = False
+
+    if typeverb > 0:
+        if booltrap:
+            strgshap = 'trapezoidal'
+        else:
+            strgshap = 'box-like'
+        print('Assuming the transits are %s...' % strgshap)
+
     # output dictionary
     dictoutp = dict()
 
     # type of calculation
     if typelmdk == 'none' and perimoon is None:
-        typecalc = 'trap'
+        # linear based on estimated crossing times
+        typecalc = 'line'
     else:
+        # by integrating the stellar disk
         typecalc = 'inte'
 
     minmtime = np.amin(time)
@@ -3665,20 +3860,25 @@ def retr_rflxtranmodl( \
     if pathanim is not None and strgextn != '':
         strgextn = '_' + strgextn
     
-    print('typeinpt')
-    print(typeinpt)
+    #if typeinpt == 'rsmacomp':
+    #    smaxcomp = (radistar * (rratcomp + 1.) / dictfact['rsre']) / rsmacomp / dictfact['aurs']
+    if typeinpt == 'masstotlradistar':
+        if typesyst == 'psys':
+            masscompsolr = masscomp / dictfact['msme']
+        if typesyst == 'cosc' or typesyst == 'sbin':
+            masscompsolr = masscomp
 
-    if typeinpt == 'rsma':
-        smaxcomp = (radistar + radicomp / dictfact['rsre']) / rsma / dictfact['aurs']
-    elif typeinpt == 'perimass':
-        smaxcomp = retr_smaxkepl(pericomp, massstar)
-        #masstotl = massstar + np.sum(masscomp)
-        #smaxcomp = retr_smaxkepl(pericomp, masstotl)
+        ## total mass of the system
+        masstotl = massstar + np.sum(masscompsolr)
+        ## semi-major axis
+        smaxcomp = retr_smaxkepl(pericomp, masstotl)
+        ## sum of star and companion radius divided by the semi-major axis
+        rsmacomp = (radistar + radicomp / dictfact['rsre']) / (smaxcomp * dictfact['aurs'])
         
         if perimoon is not None:
             smaxmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
             for j in indxcomp:
-                smaxmoon[j] = retr_smaxkepl(perimoon[j], masscomp[j] / dictfact['msme'])
+                smaxmoon[j] = retr_smaxkepl(perimoon[j], masscompsolr[j])
                 
                 for jj in indxmoon[j]:
                     if smaxmoon[j] * dictfact['aurs'] * dictfact['rsre'] <= radicomp[j]:
@@ -3686,41 +3886,22 @@ def retr_rflxtranmodl( \
                         print(smaxmoon[j] * dictfact['aurs'] * dictfact['rsre'])
                         print('masscomp[j]')
                         print(masscomp[j])
+                        print('masscompsolr[j]')
+                        print(masscompsolr[j])
                         print('perimoon[j]')
                         print(perimoon[j])
-                        print('masscomp[j] / dictfact[msme]')
-                        print(masscomp[j] / dictfact['msme'])
                         print('radicomp[j]')
                         print(radicomp[j])
                         raise Exception('')
+        radistareart = radistar * dictfact['rsre']
    
-    numbcomp = radicomp.size
+    numbcomp = pericomp.size
     indxcomp = np.arange(numbcomp)
     
     if eccecomp is None:
         eccecomp = np.zeros(numbcomp)
     if sinwcomp is None:
         sinwcomp = np.zeros(numbcomp)
-    
-    radistareart = radistar * dictfact['rsre']
-        
-    rs2a = radistar / smaxcomp / dictfact['aurs']
-    imfa = retr_imfa(cosicomp, rs2a, eccecomp, sinwcomp)
-    sini = np.sqrt(1. - cosicomp**2)
-    rrat = radicomp / radistareart
-    dept = rrat**2 * 1e3
-    
-    if booltrap:
-        durafull = retr_duratranfull(pericomp, rs2a, sini, rrat, imfa)
-        duratotl = retr_duratrantotl(pericomp, rs2a, sini, rrat, imfa)
-        duraineg = (duratotl - durafull) / 2.
-        durafullhalf = durafull / 2.
-    else:
-        duratotl = retr_duratran(pericomp, rsma, cosicomp)
-    duratotlhalf = duratotl / 2.
-
-    ## Boolean flag that indicates whether there is any transit
-    booltran = np.isfinite(duratotl)
     
     if typeverb > 1:
         print('time')
@@ -3737,30 +3918,11 @@ def retr_rflxtranmodl( \
         print(radicomp)
         print('cosicomp')
         print(cosicomp)
-        print('radicomp')
-        print(radicomp)
         print('smaxcomp')
         print(smaxcomp)
         print('smaxcomp * dictfact[aurs] [R_S]')
         print(smaxcomp * dictfact['aurs'])
-        print('masscomp')
-        print(masscomp)
-        print('rsma')
-        print(rsma)
-        print('imfa')
-        print(imfa)
-        print('rrat')
-        print(rrat)
-        print('rs2a')
-        print(rs2a)
-        if typecalc != 'inte':
-            print('duratotl')
-            print(duratotl)
-            if booltrap:
-                print('durafull')
-                print(durafull)
-        print('booltran')
-        print(booltran)
+        
         print('indxcomp')
         print(indxcomp)
         if perimoon is not None:
@@ -3772,8 +3934,11 @@ def retr_rflxtranmodl( \
             for smaxmoontemp in smaxmoon:
                 print(smaxmoontemp * dictfact['aurs'] * dictfact['rsre'])
     
+    phascomp = [[] for j in indxcomp]
+    for j in indxcomp:
+        phascomp[j] = ((time - epoccomp[j]) / pericomp[j]) % 1.
+    
     if typecalc == 'inte':
-        masstotl = np.sum(masscomp) / dictfact['msme'] + massstar
         
         numbtime = time.size
         indxtime = np.arange(numbtime)
@@ -3800,21 +3965,17 @@ def retr_rflxtranmodl( \
         boolnocccomp = [[] for j in indxcomp]
         xposcomp = [[] for j in indxcomp]
         yposcomp = [[] for j in indxcomp]
-        phascomp = [[] for j in indxcomp]
         if perimoon is not None:
             boolnoccmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
             xposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
             yposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
         
         for j in indxcomp:
-            #velocomp = 0.017 * np.sqrt(masstotl / smaxcomp[j]) # [AU/day]
-            phascomp[j] = ((time - epoccomp[j]) / pericomp[j]) % 1.
             xposcomp[j] = smaxcomp[j] * np.sin(2. * np.pi * phascomp[j]) * dictfact['aurs'] * dictfact['rsre']
             yposcomp[j] = np.cos(inclcomp[j] * np.pi / 180.) * smaxcomp[j]
 
             if perimoon is not None:
                 for jj in indxmoon[j]:
-                    #velomoon = 2.9e-5 * np.sqrt(masscomp[j] / smaxcomp[j]) # [AU/day]
                     xposmoon[j][jj] = xposcomp[j] + smaxmoon[j][jj] * np.cos(2. * np.pi * (time - epocmoon[j][jj]) / perimoon[j][jj]) * dictfact['aurs'] * dictfact['rsre']
                     yposmoon[j][jj] = yposcomp[j] + smaxmoon[j][jj] * np.sin(2. * np.pi * (time - epocmoon[j][jj]) / perimoon[j][jj]) * dictfact['aurs'] * dictfact['rsre']
                     
@@ -3852,11 +4013,6 @@ def retr_rflxtranmodl( \
                 booleval = False
                 for j in indxcomp:
                     
-                    #print('xposcomp[j][t]')
-                    #print(xposcomp[j][t])
-                    #print('radicomp[j]')
-                    #print(radicomp[j])
-                    
                     if phascomp[j][t] > 0.25 and phascomp[j][t] < 0.75:
                         continue
 
@@ -3869,19 +4025,19 @@ def retr_rflxtranmodl( \
                         xposgridcomp = xposgrid - xposcomp[j][t]
                         yposgridcomp = yposgrid - yposcomp[j]
                         
-                        if typecomp == 'plan' or typecomp == 'plandiskedgehori' or typecomp == 'plandiskedgevert' or typecomp == 'plandiskface':
+                        if typesyst == 'psys' or typesyst == 'plandiskedgehori' or typesyst == 'plandiskedgevert' or typesyst == 'plandiskface':
                             distcomp = np.sqrt(xposgridcomp**2 + yposgridcomp**2)
                             boolnocccomp[j] = distcomp > radicomp[j]
                         
-                        if typecomp == 'plandiskedgehori':
+                        if typesyst == 'plandiskedgehori':
                             booldisk = (xposgridcomp / 1.75 / radicomp[j])**2 + (yposgridcomp / 0.2 / radicomp[j])**2 > 1.
                             boolnocccomp[j] = boolnocccomp[j] & booldisk
                            
-                        if typecomp == 'plandiskedgevert':
+                        if typesyst == 'plandiskedgevert':
                             booldisk = (yposgridcomp / 1.75 / radicomp[j])**2 + (xposgridcomp / 0.2 / radicomp[j])**2 > 1.
                             boolnocccomp[j] = boolnocccomp[j] & booldisk
                            
-                        if typecomp == 'plandiskface':
+                        if typesyst == 'plandiskface':
                             boolnocccomp[j] = boolnocccomp[j] & ((distcomp > 1.5 * radicomp[j]) & (distcomp < 1.75 * radicomp[j]))
                         
                         #print('np.sum(boolnocccomp[j])')
@@ -3931,7 +4087,7 @@ def retr_rflxtranmodl( \
                         rflxtranmodlcomp[t] = np.sum(brgt[indxgridnocc])
                         
                     if pathanim is not None and not os.path.exists(pathgiff):
-                        pathtime[t] = pathanim + 'imag%s%s_%04d.pdf' % (strgextn, strgcompmoon, t)
+                        pathtime[t] = pathanim + 'imag%s%s_%04d.%s' % (strgextn, strgcompmoon, t, typefileplot)
                         cmnd+= ' %s' % pathtime[t]
                         figr, axis = plt.subplots(figsize=(4, 3))
                         brgttemp = np.zeros_like(brgt)
@@ -3966,11 +4122,64 @@ def retr_rflxtranmodl( \
             rflxtranmodlmoon = 1. + rflxtranmodl - rflxtranmodlcomp
             dictoutp['rflxmoon'] = rflxtranmodlmoon
 
-    else:
+    if typecalc == 'line':
         
-        rflxtranmodl = np.ones_like(time)
+        if typeinpt == 'masstotlradistar':
+            # determine ratio of stellar radius and semi-major axis
+            #rs2a = radistar / smaxcomp / dictfact['aurs']
+            rratcomp = radicomp / radistareart
+            
+        #if typeinpt == 'rsmacomp':
+            #rs2a = rsmacomp / (1. + rratcomp)
+
+        # impact factor
+        #imfa = retr_imfa(cosicomp, rs2a, eccecomp, sinwcomp)
+        
+        # amplitude of change during transit
+        if typesyst == 'cosc':
+            ampltran = retr_amplslen(pericomp, radistar, masscomp, massstar)
+        else:
+            ampltran = rratcomp**2 * 1e3
+        
+        # duration of transit
+        duratrantotl = retr_duratrantotl(pericomp, rsmacomp, cosicomp)
+        duratrantotlhalf = duratrantotl / 2.
+        if booltrap:
+            duratranfull = retr_duratranfull(pericomp, rsmacomp, cosicomp, rratcomp)
+            duratranfullhalf = duratranfull / 2.
+            duraineg = (duratrantotl - duratranfull) / 2.
+
+        ## Boolean flag that indicates whether there is any transit
+        booltran = np.isfinite(duratrantotl)
     
+        if typeverb > 1:
+            print('rsmacomp')
+            print(rsmacomp)
+            print('imfa')
+            print(imfa)
+            print('rrat')
+            print(rrat)
+            print('rs2a')
+            print(rs2a)
+            print('booltran')
+            print(booltran)
+            print('duratrantotl')
+            print(duratrantotl)
+            if booltrap:
+                print('duratranfull')
+                print(duratranfull)
+        
+        dflxtranmodl = np.zeros_like(time)
+        
+        if typesyst == 'cosc' or typesyst == 'sbin':
+            ### density of the star in g/cm3
+            densstar = 1.41 * massstar / radistar**3
+        
         for j in indxcomp:
+            
+            ## total relative flux
+            rflxtranmodl = 1.
+        
             if booltran[j]:
                     
                 minmindxtran = int(np.floor((minmtime - epoccomp[j]) / pericomp[j]))
@@ -3991,18 +4200,18 @@ def retr_rflxtranmodl( \
                     timeshftnega = -timeshft
                     timeshftabso = abs(timeshft)
                     
-                    indxtimetotl = np.where(timeshftabso < duratotlhalf[j] / 24.)[0]
+                    indxtimetotl = np.where(timeshftabso < duratrantotlhalf[j] / 24.)[0]
                     if booltrap:
-                        indxtimefull = indxtimetotl[np.where(timeshftabso[indxtimetotl] < durafullhalf[j] / 24.)]
-                        indxtimeinre = indxtimetotl[np.where((timeshftnega[indxtimetotl] < duratotlhalf[j] / 24.) & \
-                                                                                            (timeshftnega[indxtimetotl] > durafullhalf[j] / 24.))]
-                        indxtimeegre = indxtimetotl[np.where((timeshft[indxtimetotl] < duratotlhalf[j] / 24.) & (timeshft[indxtimetotl] > durafullhalf[j] / 24.))]
+                        indxtimefull = indxtimetotl[np.where(timeshftabso[indxtimetotl] < duratranfullhalf[j] / 24.)]
+                        indxtimeinre = indxtimetotl[np.where((timeshftnega[indxtimetotl] < duratrantotlhalf[j] / 24.) & \
+                                                                                            (timeshftnega[indxtimetotl] > duratranfullhalf[j] / 24.))]
+                        indxtimeegre = indxtimetotl[np.where((timeshft[indxtimetotl] < duratrantotlhalf[j] / 24.) & (timeshft[indxtimetotl] > duratranfullhalf[j] / 24.))]
                     
-                        rflxtranmodl[indxtimeinre] += 1e-3 * dept[j] * ((timeshftnega[indxtimeinre] - duratotlhalf[j] / 24.) / duraineg[j] / 24.)
-                        rflxtranmodl[indxtimeegre] += 1e-3 * dept[j] * ((timeshft[indxtimeegre] - duratotlhalf[j] / 24.) / duraineg[j])
-                        rflxtranmodl[indxtimefull] -= 1e-3 * dept[j]
+                        dflxtranmodl[indxtimeinre] += 1e-3 * ampltran[j] * ((timeshftnega[indxtimeinre] - duratrantotlhalf[j] / 24.) / duraineg[j] / 24.)
+                        dflxtranmodl[indxtimeegre] += 1e-3 * ampltran[j] * ((timeshft[indxtimeegre] - duratrantotlhalf[j] / 24.) / duraineg[j])
+                        dflxtranmodl[indxtimefull] -= 1e-3 * ampltran[j]
                     else:
-                        rflxtranmodl[indxtimetotl] -= 1e-3 * dept[j]
+                        dflxtranmodl[indxtimetotl] -= 1e-3 * ampltran[j]
                     
                     if typeverb > 1:
                         print('n')
@@ -4018,21 +4227,70 @@ def retr_rflxtranmodl( \
                         print('indxtimetotl')
                         summgene(indxtimetotl)
                         if booltrap:
-                            print('duratotlhalf[j]')
-                            print(duratotlhalf[j])
-                            print('durafullhalf[j]')
-                            print(durafullhalf[j])
+                            print('duratrantotlhalf[j]')
+                            print(duratrantotlhalf[j])
+                            print('duratranfullhalf[j]')
+                            print(duratranfullhalf[j])
                             print('indxtimefull')
                             summgene(indxtimefull)
                             print('indxtimeinre')
                             summgene(indxtimeinre)
                             print('indxtimeegre')
                             summgene(indxtimeegre)
+                
+                if typesyst == 'cosc':
+                    dflxtranmodl *= -1.
+
+            rflxtranmodl += dflxtranmodl
+            
+            if typesyst == 'cosc' or typesyst == 'psyspcur' or typesyst == 'sbin':
+                ## ellipsoidal variation
+                ### amplitude
+                deptelli = retr_deptelli(pericomp[j], densstar, massstar, masscomp[j])
+                ### signal
+                dflxelli = -1e-3 * deptelli * np.cos(4. * np.pi * phascomp[j]) 
+                
+                ## beaming
+                deptbeam = retr_deptbeam(pericomp[j], massstar, masscomp[j])
+                ### signal
+                dflxbeam = 1e-3 * deptbeam * np.sin(2. * np.pi * phascomp[j])
+            
+                rflxtranmodl += dflxelli + dflxbeam
+        
+        dictoutp['duratrantotl'] = duratrantotl
+        if typesyst == 'psys':
+            dictoutp['rflxtran'] = dflxtranmodl + 1.
+        if typesyst == 'cosc':
+            dictoutp['amplslen'] = ampltran
+            dictoutp['rflxslen'] = dflxtranmodl + 1.
+        if typesyst == 'cosc' or typesyst == 'psyspcur' or typesyst == 'sbin':
+            dictoutp['rflxelli'] = dflxelli + 1.
+            dictoutp['rflxbeam'] = dflxbeam + 1.
         dictoutp['rflx'] = rflxtranmodl
     
     timetotl = timemodu.time() - timeinit
     timeredu = timetotl / numbtime
-    print('retr_rflxtranmodl ran in %.3g seconds and %g ns per time sample.' % (timetotl, timeredu * 1e9))
+    if typeverb > 0:
+        print('retr_rflxtranmodl ran in %.3g seconds and %g ns per time sample.' % (timetotl, timeredu * 1e9))
+
+    if booldiag and not np.isfinite(dictoutp['rflx']).all():
+        print('peri')
+        print(peri)
+        print('masscomp')
+        print(masscomp)
+        print('massstar')
+        print(massstar)
+        print('masstotl')
+        print(masstotl)
+        print('smax')
+        print(smax)
+        print('cosi')
+        print(cosi)
+        print('rsmacomp')
+        print(rsmacomp)
+        print('duratrantotl')
+        print(duratrantotl)
+        raise Exception('')
 
     return dictoutp
 
@@ -4044,7 +4302,7 @@ def retr_radifrommass( \
                       strgtype='mine', \
                       ):
     '''
-    Estimate planetary radii from samples of masses
+    Estimate planetary radii from samples of masses.
     '''
     
     if len(listmassplan) == 0:
@@ -4071,31 +4329,66 @@ def retr_radifrommass( \
 
 def retr_massfromradi( \
                       # list of planet radius in units of Earth radius
-                      listradiplan, \
+                      listradicomp, \
                       # type of radius-mass model
                       strgtype='mine', \
+                      # verbosity level
+                      typeverb=1, \
                       ):
     '''
     Estimate planetary mass from samples of radii.
     '''
     
-    if len(listradiplan) == 0:
+    if len(listradicomp) == 0:
         raise Exception('')
 
 
     if strgtype == 'mine':
         # get interpolation data
         path = os.environ['EPHESUS_DATA_PATH'] + '/data/massfromradi.csv'
-        print('Reading from %s...' % path)
-        arry = np.loadtxt(path)
-        
+        if os.path.exists(path):
+            if typeverb > 0:
+                print('Reading from %s...' % path)
+            arry = np.loadtxt(path)
+        else:
+            # features of confirmed exoplanets
+            dictpopl = dict()
+            dictpopl['totl'] = retr_dictexar()
+            ## planets with good measured radii and masses
+            #indx = []
+            #for n  in range(dictpopl['totl']['strgrefrmassplan'].size):
+            #    if not ('Calculated Value' in dictpopl['totl']['strgrefrmassplan'][n] or \
+            #            'Calculated Value' in dictpopl['totl']['strgrefrradicomp'][n]):
+            #        indx.append(n)
+            #indxmeas = np.array(indx)
+            #indxgood = np.where(dictpopl['totl']['stdvmasscomp'] / dictpopl['totl']['stdvmasscomp'] > 5.)[0]
+            #indx = np.setdiff1d(indxmeas, indxgood)
+            #retr_subp(dictpopl, dictnumbsamp, dictindxsamp, 'totl', 'gmas', indxgood)
+            
+            minmradi = np.nanmin(dictpopl['totl']['radicomp'])
+            maxmradi = np.nanmax(dictpopl['totl']['radicomp'])
+            binsradi = np.linspace(minmradi, 24., 15)
+            meanradi = (binsradi[1:] + binsradi[:-1]) / 2.
+            arry = np.empty((meanradi.size, 5))
+            arry[:, 0] = meanradi
+            for l in range(meanradi.size):
+                indx = np.where((dictpopl['totl']['radicomp'] > binsradi[l]) & (dictpopl['totl']['radicomp'] < binsradi[l+1]) & \
+                                                                                            (dictpopl['totl']['masscomp'] / dictpopl['totl']['stdvmasscomp'] > 5.))[0]
+                arry[l, 1] = np.nanmedian(dictpopl['totl']['masscomp'][indx])
+                arry[l, 2] = np.nanstd(dictpopl['totl']['masscomp'][indx])
+                arry[l, 3] = np.nanmedian(dictpopl['totl']['densplan'][indx])
+                arry[l, 4] = np.nanstd(dictpopl['totl']['densplan'][indx])
+            
+            print('Writing to %s...' % path)
+            np.savetxt(path, arry, fmt='%8.4g')
+
         # interpolate masses
-        listmass = np.interp(listradiplan, arry[:, 0], arry[:, 1])
-        liststdvmass = np.interp(listradiplan, arry[:, 0], arry[:, 2])
+        listmass = np.interp(listradicomp, arry[:, 0], arry[:, 1])
+        liststdvmass = np.interp(listradicomp, arry[:, 0], arry[:, 2])
     
     if strgtype == 'wolf2016':
         # (Wolgang+2016 Table 1)
-        listmass = (2.7 * (listradiplan * 11.2)**1.3 + np.random.randn(listradiplan.size) * 1.9) / 317.907
+        listmass = (2.7 * (listradicomp * 11.2)**1.3 + np.random.randn(listradicomp.size) * 1.9) / 317.907
         listmass = np.maximum(listmass, np.zeros_like(listmass))
     
     return listmass
@@ -4112,26 +4405,26 @@ def retr_tmptplandayynigh(tmptirra, epsi):
     return tmptdayy, tmptnigh
 
 
-def retr_esmm(tmptplanequi, tmptstar, radiplan, radistar, kmag):
+def retr_esmm(tmptplanequi, tmptstar, radicomp, radistar, kmag):
     
     tmptplanirra = tmptplanequi
     tmptplandayy, tmptplannigh = retr_tmptplandayynigh(tmptplanirra, 0.1)
-    esmm = 1.1e3 * tdpy.util.retr_specbbod(tmptplandayy, 7.5) / tdpy.util.retr_specbbod(tmptstar, 7.5) * (radiplan / radistar)*2 * 10**(-kmag / 5.)
+    esmm = 1.1e3 * tdpy.util.retr_specbbod(tmptplandayy, 7.5) / tdpy.util.retr_specbbod(tmptstar, 7.5) * (radicomp / radistar)*2 * 10**(-kmag / 5.)
 
     return esmm
 
 
-def retr_tsmm(radiplan, tmptplan, massplan, radistar, jmag):
+def retr_tsmm(radicomp, tmptplan, massplan, radistar, jmag):
     
-    tsmm = 1.53 / 1.2 * radiplan**3 * tmptplan / massplan / radistar**2 * 10**(-jmag / 5.)
+    tsmm = 1.53 / 1.2 * radicomp**3 * tmptplan / massplan / radistar**2 * 10**(-jmag / 5.)
     
     return tsmm
 
 
-def retr_scalheig(tmptplan, massplan, radiplan):
+def retr_scalheig(tmptplan, massplan, radicomp):
     
     # tied to Jupier's scale height for H/He at 110 K   
-    scalheig = 27. * (tmptplan / 160.) / (massplan / radiplan**2) / 71398. # [R_J]
+    scalheig = 27. * (tmptplan / 160.) / (massplan / radicomp**2) / 71398. # [R_J]
 
     return scalheig
 
@@ -4146,133 +4439,16 @@ def retr_rflxfromdmag(dmag, stdvdmag=None):
     return rflx, stdvrflx
 
 
-def retr_lcur_mock(numbplan=100, numbnois=100, numbtime=100, dept=1., nois=1e-3, numbbinsphas=1000, pathplot=None, boollabltime=False, boolflbn=False):
-    
-    '''
-    Function to generate mock light curves.
-    numbplan: number of data samples containing signal, i.e., planet transits
-    numbnois: number of background data samples, i.e., without planet transits
-    numbtime: number of time bins
-    pathplot: path in which plots are to be generated
-    boollabltime: Boolean flag to label each time bin separately (e.g., for using with LSTM)
-    '''
-    
-    # total number of data samples
-    numbdata = numbplan + numbnois
-    
-    indxdata = np.arange(numbdata)
-    indxtime = np.arange(numbtime)
-    
-    minmtime = 0.
-    maxmtime = 27.3
-
-    time = np.linspace(minmtime, maxmtime, numbtime)
-    
-    minmperi = 1.
-    maxmperi = 10.
-    minmdept = 0.1 # [ppt]
-    maxmdept = 10. # [ppt]
-    minmepoc = np.amin(time)
-    maxmepoc = np.amax(time)
-    minmdura = 3. # [hour]
-    maxmdura = 4. # [hour]
-
-    # input data
-    flux = np.zeros((numbdata, numbtime))
-    
-    # planet transit properties
-    ## durations
-    duraplan = minmdura * np.ones(numbplan) + (maxmdura - minmdura) * np.random.rand(numbplan)
-    ## phas  
-    epocplan = minmepoc * np.ones(numbplan) + (maxmepoc - minmepoc) * np.random.rand(numbplan)
-    ## periods
-    periplan = minmperi * np.ones(numbplan) + (maxmperi - minmperi) * np.random.rand(numbplan)
-    ##depths
-    deptplan = minmdept * np.ones(numbplan) + (maxmdept - minmdept) * np.random.rand(numbplan)
-
-    # input signal data
-    fluxplan = np.zeros((numbplan, numbtime))
-    indxplan = np.arange(numbplan)
-    for k in indxplan:
-        phas = (time - epocplan[k]) / periplan[k]
-        for n in range(-1000, 1000):
-            indxphastran = np.where(abs(phas - n) < duraplan[k] / periplan[k] / 24.)[0]
-            fluxplan[k, indxphastran] -= 1e-3 * deptplan[k]
-    
-    # place the signal data
-    flux[:numbplan, :] = fluxplan
-
-    # label the data
-    if boollabltime:
-        outp = np.zeros((numbdata, numbtime))
-        outp[np.where(flux == 1e-3 * dept[0])] = 1.
-    else:
-        outp = np.zeros(numbdata)
-        outp[:numbplan] = 1
-    
-    # add noise to all data
-    flux += nois * np.random.randn(numbtime * numbdata).reshape((numbdata, numbtime))
-    
-    # adjust the units of periods from number of time bins to days
-    peri = peri / 24. / 30.
-    
-    # assign random periods to non-planet data
-    peritemp = np.empty(numbdata)
-    peritemp[:numbplan] = peri
-    peritemp[numbplan:] = 1. + np.random.rand(numbnois) * 9.
-    peri = peritemp
-
-    # phase-fold and bin
-    if boolflbn:
-        binsphas = np.linspace(0., 1., numbbinsphas + 1)
-        fluxflbn = np.empty((numbdata, numbbinsphas))
-        phas = np.empty((numbdata, numbtime))
-        for k in indxdata:
-            phas[k, :] = ((time - epoc[k]) / peri[k] + 0.25) % 1.
-            for n in indxphas:
-                indxtime = np.where((phas < binsphas[n+1]) & (phas > binsphas[n]))[0]
-                fluxflbn[k, n] = np.mean(flux[k, indxtime])
-        inpt = fluxflbn
-        xdat = meanphas
-    else:
-        inpt = flux
-        xdat = time
-
-    if pathplot != None:
-        # generate plots if pathplot is set
-        print ('Plotting the data set...')
-        for k in indxdata:
-            figr, axis = plt.subplots() # figr is unused
-            axis.plot(indxtime, inpt[k, :])
-            axis.set_title(outp[k])
-            if k < numbplan:
-                for t in indxtime:
-                    if (t - phas[k]) % peri[k] == 0:
-                        axis.axvline(t, ls='--', alpha=0.3, color='grey')
-            axis.set_xlabel('$t$')
-            axis.set_ylabel('$f(t)$')
-            path = pathplot + 'data_%04d.pdf' % k
-            print('Writing to %s...' % path)
-            plt.savefig(path)
-            plt.close()
-    
-    # randomize the data set
-    numpstat = np.random.get_state()
-    np.random.seed(0)
-    indxdatarand = np.random.choice(indxdata, size=numbdata, replace=False)
-    inpt = inpt[indxdatarand, :]
-    outp = outp[indxdatarand]
-    peri = peri[indxdatarand]
-    np.random.set_state(numpstat)
-
-    return inpt, xdat, outp, peri, epoc
-
-
-def retr_dictexar(strgexar=None):
+def retr_dictexar( \
+                  strgexar=None, \
+                  # verbosity level
+                  typeverb=1, \
+                 ):
     
     # get NASA Exoplanet Archive data
     path = os.environ['EPHESUS_DATA_PATH'] + '/data/PSCompPars_2021.10.02_11.57.17.csv'
-    print('Reading %s...' % path)
+    if typeverb > 0:
+        print('Reading from %s...' % path)
     objtexar = pd.read_csv(path, skiprows=316)
     if strgexar is None:
         indx = np.arange(objtexar['hostname'].size)
@@ -4316,7 +4492,7 @@ def retr_dictexar(strgexar=None):
         dictexar['smax'] = objtexar['pl_orbsmax'][indx].values # [AU]
         dictexar['epoc'] = objtexar['pl_tranmid'][indx].values # [BJD]
         dictexar['cosi'] = np.cos(objtexar['pl_orbincl'][indx].values / 180. * np.pi)
-        dictexar['duratran'] = objtexar['pl_trandur'][indx].values # [hour]
+        dictexar['duratrantotl'] = objtexar['pl_trandur'][indx].values # [hour]
         dictexar['dept'] = 10. * objtexar['pl_trandep'][indx].values # ppt
         
         # to be deleted
@@ -4330,10 +4506,10 @@ def retr_dictexar(strgexar=None):
         dictexar['booltran'] = dictexar['booltran'].astype(bool)
 
         # radius reference
-        dictexar['strgrefrradiplan'] = objtexar['pl_rade_reflink'][indx].values
-        for a in range(dictexar['strgrefrradiplan'].size):
-            if isinstance(dictexar['strgrefrradiplan'][a], float) and not np.isfinite(dictexar['strgrefrradiplan'][a]):
-                dictexar['strgrefrradiplan'][a] = ''
+        dictexar['strgrefrradicomp'] = objtexar['pl_rade_reflink'][indx].values
+        for a in range(dictexar['strgrefrradicomp'].size):
+            if isinstance(dictexar['strgrefrradicomp'][a], float) and not np.isfinite(dictexar['strgrefrradicomp'][a]):
+                dictexar['strgrefrradicomp'][a] = ''
         
         # mass reference
         dictexar['strgrefrmassplan'] = objtexar['pl_bmasse_reflink'][indx].values
@@ -4343,43 +4519,45 @@ def retr_dictexar(strgexar=None):
 
         for strg in ['radistar', 'massstar', 'tmptstar', 'loggstar', 'radicomp', 'masscomp', 'tmptplan', 'tagestar', \
                      'vmagsyst', 'jmagsyst', 'hmagsyst', 'kmagsyst', 'tmagsyst', 'metastar', 'distsyst', 'lumistar']:
-            strgexar = None
+            strgvarbexar = None
             if strg.endswith('syst'):
-                strgexar = 'sy_'
+                strgvarbexar = 'sy_'
                 if strg[:-4].endswith('mag'):
-                    strgexar += '%smag' % strg[0]
+                    strgvarbexar += '%smag' % strg[0]
                 if strg[:-4] == 'dist':
-                    strgexar += 'dist'
+                    strgvarbexar += 'dist'
             if strg.endswith('star'):
-                strgexar = 'st_'
+                strgvarbexar = 'st_'
                 if strg[:-4] == 'logg':
-                    strgexar += 'logg'
+                    strgvarbexar += 'logg'
                 if strg[:-4] == 'tage':
-                    strgexar += 'age'
+                    strgvarbexar += 'age'
                 if strg[:-4] == 'meta':
-                    strgexar += 'met'
+                    strgvarbexar += 'met'
                 if strg[:-4] == 'radi':
-                    strgexar += 'rad'
+                    strgvarbexar += 'rad'
                 if strg[:-4] == 'mass':
-                    strgexar += 'mass'
+                    strgvarbexar += 'mass'
                 if strg[:-4] == 'tmpt':
-                    strgexar += 'teff'
+                    strgvarbexar += 'teff'
                 if strg[:-4] == 'lumi':
-                    strgexar += 'lum'
-            if strg.endswith('plan'):
-                strgexar = 'pl_'
+                    strgvarbexar += 'lum'
+            if strg.endswith('plan') or strg.endswith('comp'):
+                strgvarbexar = 'pl_'
                 if strg[:-4].endswith('mag'):
-                    strgexar += '%smag' % strg[0]
+                    strgvarbexar += '%smag' % strg[0]
                 if strg[:-4] == 'tmpt':
-                    strgexar += 'eqt'
+                    strgvarbexar += 'eqt'
                 if strg[:-4] == 'radi':
-                    strgexar += 'rade'
+                    strgvarbexar += 'rade'
                 if strg[:-4] == 'mass':
-                    strgexar += 'bmasse'
-            if strgexar is None:
+                    strgvarbexar += 'bmasse'
+            if strgvarbexar is None:
+                print('strg')
+                print(strg)
                 raise Exception('')
-            dictexar[strg] = objtexar[strgexar][indx].values
-            dictexar['stdv%s' % strg] = (objtexar['%serr1' % strgexar][indx].values - objtexar['%serr2' % strgexar][indx].values) / 2.
+            dictexar[strg] = objtexar[strgvarbexar][indx].values
+            dictexar['stdv%s' % strg] = (objtexar['%serr1' % strgvarbexar][indx].values - objtexar['%serr2' % strgvarbexar][indx].values) / 2.
        
         dictexar['vesc'] = retr_vesc(dictexar['masscomp'], dictexar['radicomp'])
         dictexar['masstotl'] = dictexar['massstar'] + dictexar['masscomp'] / dictfact['msme']
@@ -4405,7 +4583,7 @@ def retr_dictexar(strgexar=None):
                                                dec=dictexar['declstar'], frame='icrs', unit='deg')
         
         # transit duty cycle
-        dictexar['dcyc'] = dictexar['duratran'] / dictexar['peri'] / 24.
+        dictexar['dcyc'] = dictexar['duratrantotl'] / dictexar['peri'] / 24.
         
         # galactic longitude
         dictexar['lgalstar'] = np.array([objticrs.galactic.l])[0, :]
@@ -4430,41 +4608,89 @@ def retr_dictexar(strgexar=None):
 
 # physics
 
-def retr_vesc(massplan, radiplan):
+def retr_vesc(massplan, radicomp):
     
-    vesc = 11.2 * np.sqrt(massplan / radiplan) # km/s
+    vesc = 11.2 * np.sqrt(massplan / radicomp) # km/s
 
     return vesc
 
 
-def retr_rs2a(rsma, rrat):
+def retr_rs2a(rsmacomp, rrat):
     
-    rs2a = rsma / (1. + rrat)
+    rs2a = rsmacomp / (1. + rrat)
     
     return rs2a
 
 
-def retr_rsma(peri, dura, cosi):
+#def retr_rsmacomp(radicomp, radistar, smax):
+#    
+#    dictfact = retr_factconv()
+#    rsmacomp = (radistar + radicomp / dictfact['rsre']) / (smax * dictfact['aurs'])
+#    
+#    return rsmacomp
+#
+#
+def retr_rsmacomp(peri, dura, cosi):
     
-    rsma = np.sqrt(np.sin(dura * np.pi / peri / 24.)**2 + cosi**2)
+    rsmacomp = np.sqrt(np.sin(dura * np.pi / peri / 24.)**2 + cosi**2)
     
-    return rsma
+    return rsmacomp
 
 
-def retr_duratranfull(peri, rs2a, sini, rrat, imfa):
+def retr_duratranfull(
+                      # orbital period [days]
+                      pericomp, \
+                      # sum of the radii of th star and the companion divided by the semi-major axis
+                      rsmacomp, \
+                      # cosine of the orbital inclination
+                      cosicomp, \
+                      # radius ratio of the companion and the star
+                      rratcomp, \
+                     ):
+    '''
+    Return the full transit duration in hours.
+    '''    
     
-    durafull = 24. * peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. - rrat)**2 - imfa**2)) # [hours]
+    # radius of the star minus the radius of the companion
+    rdiacomp = rsmacomp * (1. - 2. / (1. + rratcomp))
 
-    return durafull 
+    fact = rdiacomp**2 - cosicomp**2
+    if fact < 0:
+        duratranfull = np.full_like(pericomp, np.nan)
+    else:
+        # sine of inclination
+        sinicomp = np.sqrt(1. - cosicomp**2)
+        
+        #duratranfull = 24. * peri / np.pi * np.arcsin(rs2a / sinicomp * np.sqrt((1. - rrat)**2 - imfa**2)) # [hours]
+        duratranfull = 24. * pericomp / np.pi * np.arcsin(np.sqrt(fact) / sinicomp) # [hours]
+
+    return duratranfull 
 
 
-def retr_duratrantotl(peri, rs2a, sini, rrat, imfa):
+def retr_duratrantotl( \
+                      # orbital period [days]
+                      pericomp, \
+                      # sum of the radii of th star and the companion divided by the semi-major axis
+                      rsmacomp, \
+                      # cosine of the orbital inclination
+                      cosicomp, \
+                     ):
+    '''
+    Return the total transit duration in hours.
+    '''    
     
-    duratotl = 24. * peri / np.pi * np.arcsin(rs2a / sini * np.sqrt((1. + rrat)**2 - imfa**2)) # [hours]
+    fact = rsmacomp**2 - cosicomp**2
+    if fact < 0:
+        duratrantotl = np.full_like(pericomp, np.nan)
+    else:
+        # sine of inclination
+        sinicomp = np.sqrt(1. - cosicomp**2)
     
-    return duratotl
+        duratrantotl = 24. * pericomp / np.pi * np.arcsin(np.sqrt(fact) / sinicomp) # [hours]
+    
+    return duratrantotl
 
-    
+
 def retr_imfa(cosi, rs2a, ecce, sinw):
     
     imfa = cosi / rs2a * (1. - ecce)**2 / (1. + ecce * sinw)
@@ -4472,22 +4698,24 @@ def retr_imfa(cosi, rs2a, ecce, sinw):
     return imfa
 
 
-def retr_amplbeam(peri, massstar, masscomp):
+def retr_deptbeam(peri, massstar, masscomp):
+    '''
+    Calculate the beaming amplitude.
+    '''
     
-    '''Calculates the beaming amplitude'''
+    deptbeam = 2.8 * peri**(-1. / 3.) * (massstar + masscomp)**(-2. / 3.) * masscomp # [ppt]
     
-    amplbeam = 2.8 * peri**(-1. / 3.) * (massstar + masscomp)**(-2. / 3.) * masscomp # [ppt]
-    
-    return amplbeam
+    return deptbeam
 
 
-def retr_amplelli(peri, densstar, massstar, masscomp):
+def retr_deptelli(peri, densstar, massstar, masscomp):
+    '''
+    Calculate the ellipsoidal variation amplitude.
+    '''
     
-    '''Calculates the ellipsoidal variation amplitude'''
+    deptelli = 18.9 * peri**(-2.) / densstar * (1. / (1. + massstar / masscomp)) # [ppt]
     
-    amplelli = 18.9 * peri**(-2.) / densstar * (1. / (1. + massstar / masscomp)) # [ppt]
-    
-    return amplelli
+    return deptelli
 
 
 def retr_masscomp(amplslen, peri):
@@ -4498,20 +4726,19 @@ def retr_masscomp(amplslen, peri):
     return masscomp
 
 
-def retr_amplslen(peri, radistar, masscomp, massstar):
-    
-    """
+def retr_amplslen( \
+                  # orbital period [days]
+                  peri, \
+                  # radistar: radius of the star [Solar radius]
+                  radistar, \
+                  # mass of the companion [Solar mass]
+                  masscomp, \
+                  # mass of the star [Solar mass]
+                  massstar, \
+                 ):
+    '''
     Calculate the self-lensing amplitude.
-
-    Arguments
-        peri: orbital period [days]
-        radistar: radius of the star [Solar radius]
-        masscomp: mass of the companion [Solar mass]
-        massstar: mass of the star [Solar mass]
-
-    Returns
-        amplslen: the fractional amplitude of the self-lensing
-    """
+    '''
     
     amplslen = 7.15e-5 * radistar**(-2.) * peri**(2. / 3.) * masscomp * (masscomp + massstar)**(1. / 3.) * 1e3 # [ppt]
 
@@ -4519,8 +4746,7 @@ def retr_amplslen(peri, radistar, masscomp, massstar):
 
 
 def retr_smaxkepl(peri, masstotl):
-    
-    """
+    '''
     Get the semi-major axis of a Keplerian orbit (in AU) from the orbital period (in days) and total mass (in Solar masses).
 
     Arguments
@@ -4528,7 +4754,7 @@ def retr_smaxkepl(peri, masstotl):
         masstotl: total mass of the system [Solar Masses]
     Returns
         smax: the semi-major axis of a Keplerian orbit [AU]
-    """
+    '''
     
     smax = (7.496e-6 * masstotl * peri**2)**(1. / 3.) # [AU]
     
@@ -4536,8 +4762,7 @@ def retr_smaxkepl(peri, masstotl):
 
 
 def retr_perikepl(smax, masstotl):
-    
-    """
+    '''
     Get the period of a Keplerian orbit (in days) from the semi-major axis (in AU) and total mass (in Solar masses).
 
     Arguments
@@ -4545,51 +4770,36 @@ def retr_perikepl(smax, masstotl):
         masstotl: total mass of the system [Solar Masses]
     Returns
         peri: orbital period [days]
-    """
+    '''
     
     peri = np.sqrt(smax**3 / 7.496e-6 / masstotl)
     
     return peri
 
 
-def retr_duratran(peri, rsma, cosi):
-    """
-    Return the transit duration in the unit of the input orbital period (peri).
-
-    Arguments
-        peri: orbital period
-        rsma: the sum of radii of the two bodies divided by the semi-major axis
-        cosi: cosine of the inclination
-    """    
-    
-    dura = 24. * peri / np.pi * np.arcsin(np.sqrt(rsma**2 - cosi**2)) # [hours]
-    
-    return dura
-
-
 def retr_radiroch(radistar, densstar, denscomp):
-    """
-    Return the Roche limit
+    '''
+    Return the Roche limit.
 
     Arguments
         radistar: radius of the primary star
         densstar: density of the primary star
         denscomp: density of the companion
-    """    
+    '''    
     radiroch = radistar * (2. * densstar / denscomp)**(1. / 3.)
     
     return radiroch
 
 
 def retr_radihill(smax, masscomp, massstar):
-    """
-    Return the Hill radius of a companion
+    '''
+    Return the Hill radius of a companion.
 
     Arguments
         peri: orbital period
-        rsma: the sum of radii of the two bodies divided by the semi-major axis
+        rsmacomp: the sum of radii of the two bodies divided by the semi-major axis
         cosi: cosine of the inclination
-    """    
+    '''    
     radihill = smax * (masscomp / 3. / massstar)**(1. / 3.) # [AU]
     
     return radihill
@@ -4672,15 +4882,15 @@ def plot_anim():
     
     for a in range(2):
     
-        radiplan = [1.6, 2.1, 2.7, 3.1]
-        rsma = [0.0895, 0.0647, 0.0375, 0.03043]
+        radicomp = [1.6, 2.1, 2.7, 3.1]
+        rsmacomp = [0.0895, 0.0647, 0.0375, 0.03043]
         epoc = [2458572.1128, 2458572.3949, 2458571.3368, 2458586.5677]
         peri = [3.8, 6.2, 14.2, 19.6]
         cosi = [0., 0., 0., 0.]
         
         if a == 1:
-            radiplan += [2.0]
-            rsma += [0.88 / (215. * 0.1758)]
+            radicomp += [2.0]
+            rsmacomp += [0.88 / (215. * 0.1758)]
             epoc += [2458793.2786]
             peri += [29.54115]
             cosi += [0.]
@@ -4692,8 +4902,8 @@ def plot_anim():
     
             pexo.main.plot_orbt( \
                                 path, \
-                                radiplan, \
-                                rsma, \
+                                radicomp, \
+                                rsmacomp, \
                                 epoc, \
                                 peri, \
                                 cosi, \
@@ -4701,7 +4911,6 @@ def plot_anim():
                                 radistar=radistar, \
                                 boolsingside=boolsingside, \
                                 boolanim=boolanim, \
-                                #typefileplot='png', \
                                )
         
 
