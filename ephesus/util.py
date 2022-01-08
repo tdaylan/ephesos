@@ -31,7 +31,8 @@ import scipy.interpolate
 import astroquery
 import astroquery.mast
 
-import matplotlib as mpl
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 # own modules
@@ -2019,7 +2020,8 @@ def retr_stdvwind(ydat, sizewind, boolcuttpeak=False):
         
         if boolcuttpeak:
             indxdatawind = np.arange(minmindx, maxmindx+1)
-            indxdatawind = indxdatawind[np.where(ydat[indxdatawind] < np.percentile(ydat[indxdatawind], 70.))]
+            #indxdatawind = indxdatawind[np.where(ydat[indxdatawind] < np.percentile(ydat[indxdatawind], 99.999))]
+            indxdatawind = indxdatawind[np.where(ydat[indxdatawind] != np.amax(ydat[indxdatawind]))]
         
         else:
             if k > minmindx and k+1 < maxmindx:
@@ -2112,6 +2114,7 @@ def srch_pbox(arry, \
     '''
     
     boolproc = False
+    listnameplot = ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']
     if pathdata is None:
         boolproc = True
     else:
@@ -2123,7 +2126,7 @@ def srch_pbox(arry, \
             boolproc = True
         
         dictpathplot = dict()
-        for strg in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+        for strg in listnameplot:
             dictpathplot[strg] = []
             
         if os.path.exists(pathsave):
@@ -2137,7 +2140,7 @@ def srch_pbox(arry, \
                     dictpboxoutp[name] = np.array([])
             
             if not pathimag is None:
-                for strg in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+                for strg in listnameplot:
                     for j in range(len(dictpboxoutp['peri'])):
                         dictpathplot[strg].append(pathimag + strg + '_pbox_tce%d_%s.%s' % (j, strgextn, typefileplot))
          
@@ -2147,7 +2150,7 @@ def srch_pbox(arry, \
     if boolproc:
         dictpboxoutp = dict()
         if pathimag is not None:
-            for name in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+            for name in listnameplot:
                 dictpboxoutp['listpathplot%s' % name] = []
     
         print('Searching for periodic boxes in time-series data...')
@@ -2406,7 +2409,7 @@ def srch_pbox(arry, \
                 if (~np.isfinite(listsigr)).any():
                     raise Exception('')
 
-                sizekern = 23
+                sizekern = 51
                 listresisigr = listsigr - scipy.ndimage.median_filter(listsigr, size=sizekern)
                 #listresisigr = listresisigr**2
                 liststdvresisigr = retr_stdvwind(listresisigr, sizekern, boolcuttpeak=True)
@@ -2417,7 +2420,21 @@ def srch_pbox(arry, \
                 sdee = listsdee[indxperimpow]
                 
                 if not np.isfinite(sdee):
-                    raise Exception('')
+                    print('Warning! SDE is infinite! Making it zero.')
+                    sdee = 0.
+                    print('arry')
+                    summgene(arry)
+                    for b in indxlevlrebn:
+                        print('listarrysrch[b]')
+                        summgene(listarrysrch[b])
+                    print('listsigr')
+                    summgene(listsigr)
+                    indxperizerostdv = np.where(liststdvresisigr == 0)[0]
+                    print('indxperizerostdv')
+                    summgene(indxperizerostdv)
+                    print('liststdvresisigr')
+                    summgene(liststdvresisigr)
+                    #raise Exception('')
 
                 dictpboxoutp['sdee'].append(sdee)
                 dictpboxoutp['peri'].append(listperi[indxperimpow])
@@ -2458,7 +2475,7 @@ def srch_pbox(arry, \
                 #    raise Exception('')
 
                 if pathimag is not None:
-                    for strg in ['sigr', 'resisigr', 'stdvresisigr', 'sdee', 'rflx', 'pcur']:
+                    for strg in listnameplot:
                         for j in range(len(dictpboxoutp['peri'])):
                             pathplot = pathimag + strg + '_pbox_tce%d_%s.%s' % (j, strgextn, typefileplot)
                             dictpathplot[strg].append(pathplot)
