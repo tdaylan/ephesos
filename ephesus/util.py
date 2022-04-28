@@ -619,15 +619,20 @@ def retr_dicthostplan(namepopl, typeverb=1):
     return dicthost
 
 
-def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
+def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1, strgelem='plan'):
     
     dictfact = retr_factconv()
     
     pathlygo = os.environ['EPHESUS_DATA_PATH'] + '/'
-    pathexof = pathlygo + 'data/exofop_tess_tois.csv'
+    pathexof = pathlygo + 'data/exofop_toilists.csv'
     if typeverb > 0:
         print('Reading from %s...' % pathexof)
     objtexof = pd.read_csv(pathexof, skiprows=0)
+    
+    strgradielem = 'radi' + strgelem
+    strgstdvradi = 'stdv' + strgradielem
+    strgmasselem = 'mass' + strgelem
+    strgstdvmass = 'stdv' + strgmasselem
     
     dicttoii = {}
     dicttoii['toii'] = objtexof['TOI'].values
@@ -659,14 +664,14 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
         
         dicttoii['dept'] = objtexof['Depth (ppm)'].values[indxcomp] * 1e-3 # [ppt]
         dicttoii['rrat'] = np.sqrt(dicttoii['dept'] * 1e-3)
-        dicttoii['radicomp'] = objtexof['Planet Radius (R_Earth)'][indxcomp].values
-        dicttoii['stdvradicomp'] = objtexof['Planet Radius (R_Earth) err'][indxcomp].values
+        dicttoii[strgradielem] = objtexof['Planet Radius (R_Earth)'][indxcomp].values
+        dicttoii['stdvradi' + strgelem] = objtexof['Planet Radius (R_Earth) err'][indxcomp].values
         
         rascstarstrg = objtexof['RA'][indxcomp].values
         declstarstrg = objtexof['Dec'][indxcomp].values
-        dicttoii['rascstar'] = np.empty_like(dicttoii['radicomp'])
-        dicttoii['declstar'] = np.empty_like(dicttoii['radicomp'])
-        for k in range(dicttoii['radicomp'].size):
+        dicttoii['rascstar'] = np.empty_like(dicttoii[strgradielem])
+        dicttoii['declstar'] = np.empty_like(dicttoii[strgradielem])
+        for k in range(dicttoii[strgradielem].size):
             objt = astropy.coordinates.SkyCoord('%s %s' % (rascstarstrg[k], declstarstrg[k]), unit=(astropy.units.hourangle, astropy.units.deg))
             dicttoii['rascstar'][k] = objt.ra.degree
             dicttoii['declstar'][k] = objt.dec.degree
@@ -762,30 +767,30 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
         path = pathlygo + 'exofop_toi_mass_saved.csv'
         if not os.path.exists(path):
             dicttemp = dict()
-            dicttemp['masscomp'] = np.ones_like(dicttoii['radicomp']) + np.nan
-            dicttemp['stdvmasscomp'] = np.ones_like(dicttoii['radicomp']) + np.nan
+            dicttemp[strgmasselem] = np.ones_like(dicttoii[strgradielem]) + np.nan
+            dicttemp['stdvmass' + strgelem] = np.ones_like(dicttoii[strgradielem]) + np.nan
             
             numbsamppopl = 10
-            indx = np.where(np.isfinite(dicttoii['radicomp']))[0]
+            indx = np.where(np.isfinite(dicttoii[strgradielem]))[0]
             for n in tqdm(range(indx.size)):
                 k = indx[n]
-                meanvarb = dicttoii['radicomp'][k]
-                stdvvarb = dicttoii['stdvradicomp'][k]
+                meanvarb = dicttoii[strgradielem][k]
+                stdvvarb = dicttoii['stdvradi' + strgelem][k]
                 
                 # if radius uncertainty is not available, assume that it is small, so the mass uncertainty will be dominated by population uncertainty
                 if not np.isfinite(stdvvarb):
-                    stdvvarb = 1e-3 * dicttoii['radicomp'][k]
+                    stdvvarb = 1e-3 * dicttoii[strgradielem][k]
                 else:
-                    stdvvarb = dicttoii['stdvradicomp'][k]
+                    stdvvarb = dicttoii['stdvradi' + strgelem][k]
                 
                 # sample from a truncated Gaussian
-                listradicomp = tdpy.samp_gaustrun(1000, dicttoii['radicomp'][k], stdvvarb, 0., np.inf)
+                listradicomp = tdpy.samp_gaustrun(1000, dicttoii[strgradielem][k], stdvvarb, 0., np.inf)
                 
                 # estimate the mass from samples
                 listmassplan = retr_massfromradi(listradicomp)
                 
-                dicttemp['masscomp'][k] = np.mean(listmassplan)
-                dicttemp['stdvmasscomp'][k] = np.std(listmassplan)
+                dicttemp[strgmasselem][k] = np.mean(listmassplan)
+                dicttemp['stdvmass' + strgelem][k] = np.std(listmassplan)
                 
             if typeverb > 0:
                 print('Writing to %s...' % path)
@@ -800,11 +805,11 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
                 if toiitarg is not None:
                     dicttemp[name] = dicttemp[name][indxcomp]
 
-        dicttoii['masscomp'] = dicttemp['masscomp']
+        dicttoii[strgmasselem] = dicttemp['masscomp']
         
-        dicttoii['stdvmasscomp'] = dicttemp['stdvmasscomp']
+        dicttoii['stdvmass' + strgelem] = dicttemp['stdvmasscomp']
         
-        dicttoii['masstotl'] = dicttoii['massstar'] + dicttoii['masscomp'] / dictfact['msme']
+        dicttoii['masstotl'] = dicttoii['massstar'] + dicttoii[strgmasselem] / dictfact['msme']
         dicttoii['smax'] = retr_smaxkepl(dicttoii['peri'], dicttoii['masstotl'])
         
         dicttoii['inso'] = dicttoii['lumistar'] / dicttoii['smax']**2
@@ -814,10 +819,10 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
         dicttoii['stdvtmptplan'] = np.sqrt((dicttoii['stdvtmptstar'] / dicttoii['tmptstar'])**2 + \
                                                         0.5 * (dicttoii['stdvradistar'] / dicttoii['radistar'])**2) / np.sqrt(2.)
         
-        dicttoii['densplan'] = 5.51 * dicttoii['masscomp'] / dicttoii['radicomp']**3 # [g/cm^3]
+        dicttoii['densplan'] = 5.51 * dicttoii[strgmasselem] / dicttoii[strgradielem]**3 # [g/cm^3]
         dicttoii['booltran'] = np.ones_like(dicttoii['toii'], dtype=bool)
     
-        dicttoii['vesc'] = retr_vesc(dicttoii['masscomp'], dicttoii['radicomp'])
+        dicttoii['vesc'] = retr_vesc(dicttoii[strgmasselem], dicttoii[strgradielem])
         print('temp: vsiistar and projoblq are NaNs')
         dicttoii['vsiistar'] = np.ones(numbcomp) + np.nan
         dicttoii['projoblq'] = np.ones(numbcomp) + np.nan
@@ -841,7 +846,7 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
                     dicttoii[strg] = np.concatenate((dicttoii[strg], dictexar[strg][indxexartici]))
 
         # calculate TSM and ESM
-        calc_tsmmesmm(dicttoii)
+        calc_tsmmesmm(dicttoii, strgelem)
     
         # turn zero TSM ACWG or ESM ACWG into NaN
         indx = np.where(dicttoii['tsmmacwg'] == 0)[0]
@@ -853,14 +858,17 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1):
     return dicttoii
 
 
-def calc_tsmmesmm(dictpopl, boolsamp=False):
+def calc_tsmmesmm(dictpopl, strgelem='plan', boolsamp=False):
     
     if boolsamp:
         numbsamp = 1000
     else:
         numbsamp = 1
 
-    numbcomp = dictpopl['masscomp'].size
+    strgradielem = 'radi' + strgelem
+    strgmasselem = 'mass' + strgelem
+    
+    numbcomp = dictpopl[strgmasselem].size
     listtsmm = np.empty((numbsamp, numbcomp)) + np.nan
     listesmm = np.empty((numbsamp, numbcomp)) + np.nan
     
@@ -869,17 +877,17 @@ def calc_tsmmesmm(dictpopl, boolsamp=False):
         if not np.isfinite(dictpopl['tmptplan'][n]):
             continue
         
-        if not np.isfinite(dictpopl['radicomp'][n]):
+        if not np.isfinite(dictpopl[strgradielem][n]):
             continue
         
         if boolsamp:
-            if not np.isfinite(dictpopl['stdvradicomp'][n]):
-                stdv = dictpopl['radicomp'][n]
+            if not np.isfinite(dictpopl['stdvradi' + strgelem][n]):
+                stdv = dictpopl[strgradielem][n]
             else:
-                stdv = dictpopl['stdvradicomp'][n]
-            listradicomp = tdpy.samp_gaustrun(numbsamp, dictpopl['radicomp'][n], stdv, 0., np.inf)
+                stdv = dictpopl['stdvradi' + strgelem][n]
+            listradicomp = tdpy.samp_gaustrun(numbsamp, dictpopl[strgradielem][n], stdv, 0., np.inf)
             
-            listmassplan = tdpy.samp_gaustrun(numbsamp, dictpopl['masscomp'][n], dictpopl['stdvmasscomp'][n], 0., np.inf)
+            listmassplan = tdpy.samp_gaustrun(numbsamp, dictpopl[strgmasselem][n], dictpopl['stdvmass' + strgelem][n], 0., np.inf)
 
             if not np.isfinite(dictpopl['stdvtmptplan'][n]):
                 stdv = dictpopl['tmptplan'][n]
@@ -898,9 +906,9 @@ def calc_tsmmesmm(dictpopl, boolsamp=False):
             listtmptstar = tdpy.samp_gaustrun(numbsamp, dictpopl['tmptstar'][n], dictpopl['stdvtmptstar'][n], 0., np.inf)
         
         else:
-            listradicomp = dictpopl['radicomp'][None, n]
+            listradicomp = dictpopl[strgradielem][None, n]
             listtmptplan = dictpopl['tmptplan'][None, n]
-            listmassplan = dictpopl['masscomp'][None, n]
+            listmassplan = dictpopl[strgmasselem][None, n]
             listradistar = dictpopl['radistar'][None, n]
             listkmagsyst = dictpopl['kmagsyst'][None, n]
             listjmagsyst = dictpopl['jmagsyst'][None, n]
@@ -1577,21 +1585,21 @@ def retr_indxtimetran(time, epoc, peri, \
     return indxtimeretr
     
 
-def retr_timeedge(time, lcur, timebrek, \
+def retr_timeedge(time, lcur, timebrekregi, \
                   # Boolean flag to add breaks at discontinuties
                   booladdddiscbdtr, \
                   timescal, \
                  ):
     
     difftime = time[1:] - time[:-1]
-    indxtimebrek = np.where(difftime > timebrek)[0]
+    indxtimebrekregi = np.where(difftime > timebrekregi)[0]
     
     if booladdddiscbdtr:
-        listindxtimebrekaddi = []
+        listindxtimebrekregiaddi = []
         for k in range(3, len(time) - 3):
             diff = lcur[k] - lcur[k-1]
             if abs(diff) > 5 * np.std(lcur[k-3:k]) and abs(diff) > 5 * np.std(lcur[k:k+3]):
-                listindxtimebrekaddi.append(k)
+                listindxtimebrekregiaddi.append(k)
                 #print('k')
                 #print(k)
                 #print('diff')
@@ -1601,12 +1609,12 @@ def retr_timeedge(time, lcur, timebrek, \
                 #print('np.std(lcur[k-3:k])')
                 #print(np.std(lcur[k-3:k]))
                 #print('')
-        listindxtimebrekaddi = np.array(listindxtimebrekaddi, dtype=int)
-        indxtimebrek = np.concatenate([indxtimebrek, listindxtimebrekaddi])
-        indxtimebrek = np.unique(indxtimebrek)
+        listindxtimebrekregiaddi = np.array(listindxtimebrekregiaddi, dtype=int)
+        indxtimebrekregi = np.concatenate([indxtimebrekregi, listindxtimebrekregiaddi])
+        indxtimebrekregi = np.unique(indxtimebrekregi)
 
     timeedge = [0, np.inf]
-    for k in indxtimebrek:
+    for k in indxtimebrekregi:
         timeedgeprim = (time[k] + time[k+1]) / 2.
         timeedge.append(timeedgeprim)
     timeedge = np.array(timeedge)
@@ -1624,7 +1632,7 @@ def retr_tsecticibase(tici, typeverb=1):
     pathbase = os.environ['TESS_DATA_PATH'] + '/data/lcur/'
     path = pathbase + 'tsec/tsec_spoc_%016d.csv' % tici
     if not os.path.exists(path):
-        listtsecsele = np.arange(1, 50)
+        listtsecsele = np.arange(1, 60)
         listpath = []
         listtsec = []
         strgtagg = '*-%016d-*.fits' % tici
@@ -1670,8 +1678,11 @@ def bdtr_tser( \
               # verbosity level
               typeverb=1, \
               
+              # Boolean flag to break the time-series into regions
+              boolbrekregi=True, \
+
               # minimum gap to break the time-series into regions
-              timebrek=None, \
+              timebrekregi=None, \
               
               # Boolean flag to add breaks at vertical discontinuties
               booladdddiscbdtr=False, \
@@ -1694,8 +1705,8 @@ def bdtr_tser( \
     
     if typebdtr is None:
         typebdtr = 'spln'
-    if timebrek is None:
-        timebrek = 0.1 # [day]
+    if boolbrekregi and timebrekregi is None:
+        timebrekregi = 0.1 # [day]
     if ordrspln is None:
         ordrspln = 3
     if timescalbdtrspln is None:
@@ -1712,11 +1723,14 @@ def bdtr_tser( \
         if epocmask is not None:
             print('Using a specific ephemeris to mask out transits while detrending...')
         
-    # determine the times at which the light curve will be broken into pieces
-    timeedge = retr_timeedge(time, lcur, timebrek, booladdddiscbdtr, timescal)
-
-    numbedge = len(timeedge)
-    numbregi = numbedge - 1
+    if boolbrekregi:
+        # determine the times at which the light curve will be broken into pieces
+        timeedge = retr_timeedge(time, lcur, timebrekregi, booladdddiscbdtr, timescal)
+        numbedge = len(timeedge)
+        numbregi = numbedge - 1
+    else:
+        timeedge = [np.amin(time), np.amax(time)]
+        numbregi = 1
     indxregi = np.arange(numbregi)
     lcurbdtrregi = [[] for i in indxregi]
     indxtimeregi = [[] for i in indxregi]
@@ -1777,6 +1791,8 @@ def bdtr_tser( \
                     timeknot = np.linspace(minmtime, maxmtime, numbknot)
                     timeknot = timeknot[1:-1]
                     
+                    indxknotregi = np.digitize(timeregi[indxtimeregioutt[i]], timeknot) - 1
+
                     if numbknot >= 4:
                         if typeverb > 1:
                             print('Region %d. %d knots used.' % (i, timeknot.size))
@@ -2604,7 +2620,7 @@ def srch_pbox(arry, \
             print(thrssdee)
             j += 1
         
-            if sdee < thrssdee:
+            if sdee < thrssdee or indxperimpow == listsdee.size - 1:
                 break
         
         # make the BLS features arrays
@@ -2643,6 +2659,9 @@ def retr_lcurtess( \
               # Boolean flag to only consider TPF data (2-min or 20-sec)
               booltpxfonly=False, \
 
+              # name of the data product of lygos indicating which analysis has been used for photometry
+              nameanlslygo = 'aper', \
+
               ## Boolean flag to use 20-sec TPF when available
               boolfasttpxf=True, \
               
@@ -2654,6 +2673,9 @@ def retr_lcurtess( \
               
               # input dictionary to lygos
               dictlygoinpt=dict(), \
+            
+              #Boolean flag to normalize the light curve by the median
+              boolnorm=None, \
 
               ## Boolean flag to apply quality mask
               boolmaskqual=True, \
@@ -2661,14 +2683,13 @@ def retr_lcurtess( \
               # TPF light curve extraction pipeline (FFIs are always extracted by lygos)
               ## 'lygos': lygos
               ## 'SPOC': SPOC
-              typelcurtpxftess='SPOC', \
-              #typelcurtpxftess='lygos', \
+              typelcurtpxftess='lygos', \
               
               ## type of SPOC light curve: 'PDC', 'SAP'
               typedataspoc='PDC', \
               
               # type of verbosity
-              typeverb=0, \
+              typeverb=1, \
              ):
     '''
     Pipeline to retrieve TESS light curve of a target.
@@ -2676,6 +2697,8 @@ def retr_lcurtess( \
     
     #strgmast, rasctarg, decltarg = setp_coorstrgmast(rasctarg, decltarg, strgmast)
     
+    print('Running the pipeline to retrieve the TESS light curve of the target...')
+
     if not (strgmast is not None and ticitarg is None and rasctarg is None and decltarg is None or \
             strgmast is None and ticitarg is not None and rasctarg is None and decltarg is None or \
             strgmast is None and ticitarg is None and rasctarg is not None and decltarg is not None):
@@ -2688,6 +2711,12 @@ def retr_lcurtess( \
                     print('decltarg')
                     print(decltarg)
                     raise Exception('')
+    
+    if boolnorm is not None and 'boolnorm' in dictlygoinpt:
+        raise Exception('')
+    
+    if boolnorm is None:
+        boolnorm = True
     
     ticitsec = None
     if strgmast is not None or ticitarg is not None:
@@ -2708,21 +2737,34 @@ def retr_lcurtess( \
         else:
             ticitsec = ticitarg
     
+    if ticitsec is None:
+        print('No TIC ID could be associated with the search.')
+    else:
+        print('TIC associated with the search is %d' % ticitsec)
+
     if not booltpxfonly:
         if rasctarg is not None:
             strgmasttemp = '%g %g' % (rasctarg, decltarg)
 
         # get the list of sectors for which TESS FFI data are available
         listtsecffim, temp, temp = retr_listtsec(strgmasttemp)
+        
+        print('List of available sectors with FFI data:')
+        print(listtsecffim)
+    else:
+        print('Will only search for TPF light curves.')
+    print('typelcurtpxftess')
+    print(typelcurtpxftess)
     
     # get the list of sectors for which TESS SPOC data are available
-    if typelcurtpxftess == 'lygos' or ticitsec is None:
+    if boolffimonly or typelcurtpxftess == 'lygos' or ticitsec is None:
         listtsecspoc = np.array([], dtype=int)
         listpathspoc = np.array([])
     else:
         print('Retrieving the list of available TESS sectors for which there is SPOC light curve data...')
         listtsecspoc, listpathspoc = retr_tsecticibase(ticitsec)
-    
+        print('List of available sectors with SPOC light curve data:')
+        print(listtsecspoc)
     numbtsecspoc = listtsecspoc.size
     indxtsecspoc = np.arange(numbtsecspoc)
 
@@ -2732,8 +2774,12 @@ def retr_lcurtess( \
     else:
         listtsecmerg = listtsecspoc
 
+    print('List of available sectors:')
+    print(listtsecmerg)
+    
     # filter the list of sectors using the desired list of sectors, if any
     if listtsecsele is not None:
+        print('Filtering the list of sectors based on the user selection (listtsecsele)...')
         listtsec = []
         for tsec in listtsecsele:
             if tsec in listtsecmerg:
@@ -2742,9 +2788,8 @@ def retr_lcurtess( \
     else:
         listtsec = listtsecmerg
     
-    if typeverb > 0:
-        print('listtsec')
-        print(listtsec)
+    print('Final list of sectors:')
+    print(listtsec)
     
     numbtsec = len(listtsec)
     indxtsec = np.arange(numbtsec)
@@ -2752,7 +2797,7 @@ def retr_lcurtess( \
     listtcam = np.empty(numbtsec, dtype=int)
     listtccd = np.empty(numbtsec, dtype=int)
     
-    # determine whether sectors have 2-minute cadence data
+    # determine for each sector whether a TFP is available
     booltpxf = retr_booltpxf(listtsec, listtsecspoc)
     
     if typeverb > 0:
@@ -2761,7 +2806,7 @@ def retr_lcurtess( \
     
     if typelcurtpxftess == 'lygos':
         boollygo = np.ones(numbtsec, dtype=bool)
-        booltpxflygo = True
+        booltpxflygo = not boolffimonly
         listtseclygo = listtsec
     if typelcurtpxftess == 'SPOC':
         boollygo = ~booltpxf
@@ -2769,12 +2814,19 @@ def retr_lcurtess( \
         listtseclygo = listtsec[boollygo]
     listtseclygo = listtsec[boollygo]
     
+    print('boolffimonly')
+    print(boolffimonly)
+    print('booltpxflygo')
+    print(booltpxflygo)
+
     if typeverb > 0:
         print('booltpxflygo')
         print(booltpxflygo)
         print('listtseclygo')
         print(listtseclygo)
     
+    dictlygooutp = None
+
     listarrylcur = [[] for o in indxtsec]
     if len(listtseclygo) > 0:
         
@@ -2787,6 +2839,8 @@ def retr_lcurtess( \
         dictlygoinpt['booltpxflygo'] = booltpxflygo
         if not 'boolmaskqual' in dictlygoinpt:
             dictlygoinpt['boolmaskqual'] = boolmaskqual
+        if not 'boolnorm' in dictlygoinpt:
+            dictlygoinpt['boolnorm'] = boolnorm
         
         if typeverb > 0:
             print('Will run lygos on the target...')
@@ -2794,15 +2848,17 @@ def retr_lcurtess( \
                                        **dictlygoinpt, \
                                       )
         
+        namearry = 'listarry' + nameanlslygo
+
         for o, tseclygo in enumerate(listtsec):
             indx = np.where(dictlygooutp['listtsec'] == tseclygo)[0]
             if indx.size > 0:
-                if len(dictlygooutp['listarry'][indx[0]]) > 0:
-                    indxtimegood = np.where(np.isfinite(dictlygooutp['listarry'][indx[0]][:, 1]) & np.isfinite(dictlygooutp['listarry'][indx[0]][:, 2]))[0]
-                    listarrylcur[o] = dictlygooutp['listarry'][indx[0]][indxtimegood, :]
+                if len(dictlygooutp[namearry][indx[0]]) > 0:
+                    indxtimegood = np.where(np.isfinite(dictlygooutp[namearry][indx[0]][:, 1]) & np.isfinite(dictlygooutp[namearry][indx[0]][:, 2]))[0]
+                    listarrylcur[o] = dictlygooutp[namearry][indx[0]][indxtimegood, :]
                     listtcam[o] = dictlygooutp['listtcam'][indx[0]]
                     listtccd[o] = dictlygooutp['listtccd'][indx[0]]
-    
+                    
     listarrylcursapp = None
     listarrylcurpdcc = None
     arrylcursapp = None
@@ -2870,21 +2926,22 @@ def retr_lcurtess( \
                 print('Reading the PDC light curves...')
         listarrylcursapp = [[] for o in indxtsec] 
         listarrylcurpdcc = [[] for o in indxtsec] 
+        print('indxtsec')
+        summgene(indxtsec)
         for o in indxtsec:
             if not boollygo[o]:
                 
                 indx = np.where(listtsec[o] == listtsecspoc)[0][0]
                 path = listpathspoc[indx]
-                #path = listpathdownspoclcur[indx]
-                listarrylcursapp[indx], indxtimequalgood, indxtimenanngood, listtsec[o], listtcam[o], listtccd[o] = \
-                                                       read_tesskplr_file(path, typeinst='tess', strgtype='SAP_FLUX', boolmaskqual=boolmaskqual)
-                listarrylcurpdcc[indx], indxtimequalgood, indxtimenanngood, listtsec[o], listtcam[o], listtccd[o] = \
-                                                       read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqual=boolmaskqual)
+                listarrylcursapp[o], listtsec[o], listtcam[o], listtccd[o] = \
+                                                       read_tesskplr_file(path, typeinst='tess', strgtypelcur='SAP_FLUX', boolmaskqual=boolmaskqual, boolnorm=boolnorm)
+                listarrylcurpdcc[o], listtsec[o], listtcam[o], listtccd[o] = \
+                                                       read_tesskplr_file(path, typeinst='tess', strgtypelcur='PDCSAP_FLUX', boolmaskqual=boolmaskqual, boolnorm=boolnorm)
             
                 if typedataspoc == 'SAP':
-                    arrylcur = listarrylcursapp[indx]
+                    arrylcur = listarrylcursapp[o]
                 else:
-                    arrylcur = listarrylcurpdcc[indx]
+                    arrylcur = listarrylcurpdcc[o]
                 listarrylcur[o] = arrylcur
             
         if typeverb > 0:
@@ -2944,6 +3001,8 @@ def retr_lcurtess( \
             raise Exception('')
         
         if not np.isfinite(listarrylcur[o][:, 1]).all():
+            print('')
+            print('Light curve relative flux is not all finite.')
             print('listtsec')
             print(listtsec)
             print('tsec')
@@ -2955,7 +3014,7 @@ def retr_lcurtess( \
             summgene(indxbadd)
             raise Exception('')
 
-    return arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc, listtsec, listtcam, listtccd, listpathspoc
+    return arrylcur, arrylcursapp, arrylcurpdcc, listarrylcur, listarrylcursapp, listarrylcurpdcc, listtsec, listtcam, listtccd, listpathspoc, dictlygooutp
    
 
 def retr_subp(dictpopl, dictnumbsamp, dictindxsamp, namepoplinit, namepoplfinl, indx):
@@ -3417,16 +3476,16 @@ def plot_lcur(pathimag, strgextn, dictmodl=None, timedata=None, lcurdata=None, \
         for attr in dictmodl:
             if boolbrekmodl:
                 diftimemodl = dictmodl[attr]['time'][1:] - dictmodl[attr]['time'][:-1]
-                indxtimebrek = np.where(diftimemodl > 2 * np.amin(diftimemodl))[0] + 1
-                indxtimebrek = np.concatenate([np.array([0]), indxtimebrek, np.array([dictmodl[attr]['time'].size - 1])])
-                numbtimebrek = indxtimebrek.size
-                numbtimechun = numbtimebrek - 1
+                indxtimebrekregi = np.where(diftimemodl > 2 * np.amin(diftimemodl))[0] + 1
+                indxtimebrekregi = np.concatenate([np.array([0]), indxtimebrekregi, np.array([dictmodl[attr]['time'].size - 1])])
+                numbtimebrekregi = indxtimebrekregi.size
+                numbtimechun = numbtimebrekregi - 1
 
                 xdat = []
                 ydat = []
                 for n in range(numbtimechun):
-                    xdat.append(dictmodl[attr]['time'][indxtimebrek[n]:indxtimebrek[n+1]])
-                    ydat.append(dictmodl[attr]['lcur'][indxtimebrek[n]:indxtimebrek[n+1]])
+                    xdat.append(dictmodl[attr]['time'][indxtimebrekregi[n]:indxtimebrekregi[n+1]])
+                    ydat.append(dictmodl[attr]['lcur'][indxtimebrekregi[n]:indxtimebrekregi[n+1]])
                     
             else:
                 xdat = [dictmodl[attr]['time']]
@@ -3576,7 +3635,7 @@ def rebn_tser(arry, numbbins=None, delt=None, binsxdat=None):
     return arryrebn
 
     
-def read_tesskplr_fold(pathfold, pathwrit, boolmaskqual=True, typeinst='tess', strgtype='PDCSAP_FLUX'):
+def read_tesskplr_fold(pathfold, pathwrit, boolmaskqual=True, typeinst='tess', strgtypelcur='PDCSAP_FLUX', boolnorm=None):
     '''
     Reads all TESS or Kepler light curves in a folder and returns a data cube with time, flux and flux error.
     '''
@@ -3584,7 +3643,7 @@ def read_tesskplr_fold(pathfold, pathwrit, boolmaskqual=True, typeinst='tess', s
     listpath = fnmatch.filter(os.listdir(pathfold), '%s*' % typeinst)
     listarry = []
     for path in listpath:
-        arry = read_tesskplr_file(pathfold + path + '/' + path + '_lc.fits', typeinst=typeinst, strgtype=strgtype, boolmaskqual=boolmaskqual)
+        arry = read_tesskplr_file(pathfold + path + '/' + path + '_lc.fits', typeinst=typeinst, strgtypelcur=strgtypelcur, boolmaskqual=boolmaskqual, boolnorm=boolnorm)
         listarry.append(arry)
     
     # merge sectors
@@ -3601,34 +3660,47 @@ def read_tesskplr_fold(pathfold, pathwrit, boolmaskqual=True, typeinst='tess', s
     return arry 
 
 
-def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqual=True, boolmasknann=True):
+def read_tesskplr_file(path, typeinst='tess', strgtypelcur='PDCSAP_FLUX', boolmaskqual=True, boolmasknann=True, boolnorm=None):
     '''
-    Reads a TESS or Kepler light curve file and returns a data cube with time, flux and flux error.
+    Read a TESS or Kepler light curve file and returns a data cube with time, flux and flux error.
     '''
     
+    if boolnorm is None:
+        boolnorm = True
+
+    print('Reading from %s...' % path)
     listhdun = fits.open(path)
     
-    boollcur = path.endswith('_lc.fits')
-
     tsec = listhdun[0].header['SECTOR']
     tcam = listhdun[0].header['CAMERA']
     tccd = listhdun[0].header['CCD']
-        
+    
+    # indices of times where the quality flag is not raised (i.e., good quality)
+    indxtimequalgood = np.where((listhdun[1].data['QUALITY'] == 0) & np.isfinite(listhdun[1].data['TIME']))[0]
+    time = listhdun[1].data['TIME']
+
+    # Boolean flag indicating whether the target file is a light curve or target pixel file
+    boollcur = 'lc.fits' in path
+
     if boollcur:
+        strgtype = strgtypelcur
+
         time = listhdun[1].data['TIME'] + 2457000
         if typeinst == 'TESS':
             time += 2457000
         if typeinst == 'kplr':
             time += 2454833
+    
         flux = listhdun[1].data[strgtype]
         stdv = listhdun[1].data[strgtype+'_ERR']
-    
-        indxtimequalgood = np.where(listhdun[1].data['QUALITY'] == 0)[0]
+        #print(listhdun[1].data.names)
+        
         if boolmaskqual:
             # filtering for good quality
             time = time[indxtimequalgood]
-            flux = flux[indxtimequalgood]
-            stdv = stdv[indxtimequalgood]
+            flux = flux[indxtimequalgood, ...]
+            if boollcur:
+                stdv = stdv[indxtimequalgood]
     
         numbtime = time.size
         arry = np.empty((numbtime, 3))
@@ -3636,18 +3708,20 @@ def read_tesskplr_file(path, typeinst='tess', strgtype='PDCSAP_FLUX', boolmaskqu
         arry[:, 1] = flux
         arry[:, 2] = stdv
         
-        indxtimenanngood = np.where(~np.any(np.isnan(arry), axis=1))[0]
-        if boolmasknann:
-            arry = arry[indxtimenanngood, :]
+        #indxtimenanngood = np.where(~np.any(np.isnan(arry), axis=1))[0]
+        #if boolmasknann:
+        #    arry = arry[indxtimenanngood, :]
     
         #print('HACKING, SKIPPING NORMALIZATION FOR SPOC DATA')
         # normalize
-        arry[:, 2] /= np.median(arry[:, 1])
-        arry[:, 1] /= np.median(arry[:, 1])
-    
-        return arry, indxtimequalgood, indxtimenanngood, tsec, tcam, tccd
+        if boolnorm:
+            factnorm = np.median(arry[:, 1])
+            arry[:, 1] /= np.median(arry[:, 1])
+            arry[:, 2] /= np.median(arry[:, 1])
+        
+        return arry, tsec, tcam, tccd
     else:
-        return listhdun, tsec, tcam, tccd
+        return listhdun, indxtimequalgood, tsec, tcam, tccd
 
 
 #def retr_fracrtsa(fracrprs, fracsars):
@@ -4373,8 +4447,8 @@ def retr_massfromradi( \
             dictpopl['totl'] = retr_dictexar()
             ## planets with good measured radii and masses
             #indx = []
-            #for n  in range(dictpopl['totl']['strgrefrmassplan'].size):
-            #    if not ('Calculated Value' in dictpopl['totl']['strgrefrmassplan'][n] or \
+            #for n  in range(dictpopl['totl'][strgstrgrefrmasselem].size):
+            #    if not ('Calculated Value' in dictpopl['totl'][strgstrgrefrmasselem][n] or \
             #            'Calculated Value' in dictpopl['totl']['strgrefrradicomp'][n]):
             #        indx.append(n)
             #indxmeas = np.array(indx)
@@ -4460,8 +4534,17 @@ def retr_dictexar( \
                   strgexar=None, \
                   # verbosity level
                   typeverb=1, \
+                  strgelem='plan', \
                  ):
     
+    strgradielem = 'radi' + strgelem
+    strgstdvradi = 'stdv' + strgradielem
+    strgmasselem = 'mass' + strgelem
+    strgstdvmass = 'stdv' + strgmasselem
+    
+    strgstrgrefrradielem = 'strgrefrradi' + strgelem
+    strgstrgrefrmasselem = 'strgrefrmass' + strgelem
+
     # get NASA Exoplanet Archive data
     path = os.environ['EPHESUS_DATA_PATH'] + '/data/PSCompPars_2021.10.02_11.57.17.csv'
     if typeverb > 0:
@@ -4523,18 +4606,18 @@ def retr_dictexar( \
         dictexar['booltran'] = dictexar['booltran'].astype(bool)
 
         # radius reference
-        dictexar['strgrefrradicomp'] = objtexar['pl_rade_reflink'][indx].values
-        for a in range(dictexar['strgrefrradicomp'].size):
-            if isinstance(dictexar['strgrefrradicomp'][a], float) and not np.isfinite(dictexar['strgrefrradicomp'][a]):
-                dictexar['strgrefrradicomp'][a] = ''
+        dictexar[strgstrgrefrradielem] = objtexar['pl_rade_reflink'][indx].values
+        for a in range(dictexar[strgstrgrefrradielem].size):
+            if isinstance(dictexar[strgstrgrefrradielem][a], float) and not np.isfinite(dictexar[strgstrgrefrradielem][a]):
+                dictexar[strgstrgrefrradielem][a] = ''
         
         # mass reference
-        dictexar['strgrefrmassplan'] = objtexar['pl_bmasse_reflink'][indx].values
-        for a in range(dictexar['strgrefrmassplan'].size):
-            if isinstance(dictexar['strgrefrmassplan'][a], float) and not np.isfinite(dictexar['strgrefrmassplan'][a]):
-                dictexar['strgrefrmassplan'][a] = ''
+        dictexar[strgstrgrefrmasselem] = objtexar['pl_bmasse_reflink'][indx].values
+        for a in range(dictexar[strgstrgrefrmasselem].size):
+            if isinstance(dictexar[strgstrgrefrmasselem][a], float) and not np.isfinite(dictexar[strgstrgrefrmasselem][a]):
+                dictexar[strgstrgrefrmasselem][a] = ''
 
-        for strg in ['radistar', 'massstar', 'tmptstar', 'loggstar', 'radicomp', 'masscomp', 'tmptplan', 'tagestar', \
+        for strg in ['radistar', 'massstar', 'tmptstar', 'loggstar', strgradielem, strgmasselem, 'tmptplan', 'tagestar', \
                      'vmagsyst', 'jmagsyst', 'hmagsyst', 'kmagsyst', 'tmagsyst', 'metastar', 'distsyst', 'lumistar']:
             strgvarbexar = None
             if strg.endswith('syst'):
@@ -4559,7 +4642,7 @@ def retr_dictexar( \
                     strgvarbexar += 'teff'
                 if strg[:-4] == 'lumi':
                     strgvarbexar += 'lum'
-            if strg.endswith('plan') or strg.endswith('comp'):
+            if strg.endswith('plan') or strg.endswith(strgelem):
                 strgvarbexar = 'pl_'
                 if strg[:-4].endswith('mag'):
                     strgvarbexar += '%smag' % strg[0]
@@ -4576,8 +4659,8 @@ def retr_dictexar( \
             dictexar[strg] = objtexar[strgvarbexar][indx].values
             dictexar['stdv%s' % strg] = (objtexar['%serr1' % strgvarbexar][indx].values - objtexar['%serr2' % strgvarbexar][indx].values) / 2.
        
-        dictexar['vesc'] = retr_vesc(dictexar['masscomp'], dictexar['radicomp'])
-        dictexar['masstotl'] = dictexar['massstar'] + dictexar['masscomp'] / dictfact['msme']
+        dictexar['vesc'] = retr_vesc(dictexar[strgmasselem], dictexar[strgradielem])
+        dictexar['masstotl'] = dictexar['massstar'] + dictexar[strgmasselem] / dictfact['msme']
         
         dictexar['densplan'] = objtexar['pl_dens'][indx].values # [g/cm3]
         dictexar['vsiistar'] = objtexar['st_vsin'][indx].values # [km/s]
@@ -4614,7 +4697,7 @@ def retr_dictexar( \
         # ecliptic latitude
         dictexar['laecstar'] = np.array([objticrs.barycentricmeanecliptic.lat.degree])[0, :]
 
-        dictexar['rrat'] = dictexar['radicomp'] / dictexar['radistar'] / dictfact['rsre']
+        dictexar['rrat'] = dictexar[strgradielem] / dictexar['radistar'] / dictfact['rsre']
         
 
         # calculate TSM and ESM
