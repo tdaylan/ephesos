@@ -31,8 +31,8 @@ import scipy.interpolate
 import astroquery
 import astroquery.mast
 
-import matplotlib
-matplotlib.use('agg')
+import matplotlib as mpl
+mpl.use('agg')
 import matplotlib.pyplot as plt
 
 # own modules
@@ -846,7 +846,7 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1, strgelem='plan'
                     dicttoii[strg] = np.concatenate((dicttoii[strg], dictexar[strg][indxexartici]))
 
         # calculate TSM and ESM
-        calc_tsmmesmm(dicttoii, strgelem)
+        calc_tsmmesmm(dicttoii, strgelem=strgelem)
     
         # turn zero TSM ACWG or ESM ACWG into NaN
         indx = np.where(dicttoii['tsmmacwg'] == 0)[0]
@@ -4701,7 +4701,7 @@ def retr_dictexar( \
         
 
         # calculate TSM and ESM
-        calc_tsmmesmm(dictexar)
+        calc_tsmmesmm(dictexar, strgelem=strgelem)
         
     return dictexar
 
@@ -4755,14 +4755,15 @@ def retr_duratranfull(
     rdiacomp = rsmacomp * (1. - 2. / (1. + rratcomp))
 
     fact = rdiacomp**2 - cosicomp**2
-    if fact < 0:
-        duratranfull = np.full_like(pericomp, np.nan)
-    else:
-        # sine of inclination
-        sinicomp = np.sqrt(1. - cosicomp**2)
-        
-        #duratranfull = 24. * peri / np.pi * np.arcsin(rs2a / sinicomp * np.sqrt((1. - rrat)**2 - imfa**2)) # [hours]
-        duratranfull = 24. * pericomp / np.pi * np.arcsin(np.sqrt(fact) / sinicomp) # [hours]
+    
+    duratranfull = np.full_like(pericomp, np.nan)
+    indxtran = np.where(fact > 0)
+    
+    # sine of inclination
+    sinicomp = np.sqrt(1. - cosicomp[indxtran]**2)
+    
+    #duratranfull = 24. * peri / np.pi * np.arcsin(rs2a / sinicomp * np.sqrt((1. - rrat)**2 - imfa**2)) # [hours]
+    duratranfull[indxtran] = 24. * pericomp[indxtran] / np.pi * np.arcsin(np.sqrt(fact[indxtran]) / sinicomp) # [hours]
 
     return duratranfull 
 
@@ -4780,13 +4781,15 @@ def retr_duratrantotl( \
     '''    
     
     fact = rsmacomp**2 - cosicomp**2
-    if fact < 0:
-        duratrantotl = np.full_like(pericomp, np.nan)
-    else:
-        # sine of inclination
-        sinicomp = np.sqrt(1. - cosicomp**2)
     
-        duratrantotl = 24. * pericomp / np.pi * np.arcsin(np.sqrt(fact) / sinicomp) # [hours]
+    indxtran = np.where(fact > 0)
+    
+    duratrantotl = np.full_like(pericomp, np.nan)
+        
+    # sine of inclination
+    sinicomp = np.sqrt(1. - cosicomp**2)
+    
+    duratrantotl = 24. * pericomp / np.pi * np.arcsin(np.sqrt(fact) / sinicomp) # [hours]
     
     return duratrantotl
 
