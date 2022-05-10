@@ -1123,6 +1123,22 @@ def proc_axiscorr(time, lcur, axis, listindxtimeposimaxm, indxtime=None, colr='k
     axis.set_ylabel('Relative flux')
     
 
+def retr_lcurmodl_flarsing(meantime, timeflar, amplflar, scalrise, scalfall):
+    
+    numbtime = meantime.size
+    if numbtime == 0:
+        raise Exception('')
+    indxtime = np.arange(numbtime)
+    indxtimerise = np.where(meantime < timeflar)[0]
+    indxtimefall = np.setdiff1d(indxtime, indxtimerise)
+    lcur = np.empty_like(meantime)
+    lcur[indxtimerise] = np.exp((meantime[indxtimerise] - timeflar) / scalrise)
+    lcur[indxtimefall] = np.exp(-(meantime[indxtimefall] - timeflar) / scalfall)
+    lcur *= amplflar / np.amax(lcur) 
+    
+    return lcur
+
+
 def srch_flar(time, lcur, typeverb=1, strgextn='', numbkern=3, minmscalfalltmpt=None, maxmscalfalltmpt=None, \
                                                                     pathimag=None, boolplot=True, boolanim=False, thrs=None):
 
