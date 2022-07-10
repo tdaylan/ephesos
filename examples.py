@@ -250,7 +250,54 @@ def make_rflx( \
                                              boolwritover=boolwritover, \
                                              titl=titl, \
                                             )
+
+    # generate light curve
+    dictoutp = ephesus.retr_rflxtranmodl(time, \
+                                         radistar=dictpoplstar['radistar'][k], \
+                                         massstar=dictpoplstar['massstar'][k], \
+                                         
+                                         pericomp=dictpoplcomp['pericomp'][indxcompstar[k]], \
+                                         epocmtracomp=dictpoplcomp['epocmtracomp'][indxcompstar[k]], \
+                                         inclcomp=dictpoplcomp['inclcomp'][indxcompstar[k]], \
+                                         radicomp=dictpoplcomp['radicomp'][indxcompstar[k]], \
+                                         masscomp=dictpoplcomp['masscomp'][indxcompstar[k]], \
+                                         
+                                         perimoon=perimoon, \
+                                         epocmtramoon=epocmtramoon, \
+                                         radimoon=radimoon, \
+                                         
+                                         typeplanbrgt=typeplanbrgt, \
+
+                                         typecoor=typecoor, \
+
+                                         boolintp=boolintp, \
+                                         
+                                         pathfoldanim=pathimag, \
+                                         boolwritover=boolwritover, \
+                                         strgextn=strgextn, \
+                                         titlvisu=titl, \
+                                        )
     
+    print('Making a light curve plot...')
+    
+    dictmodl[strgextn]['time'] = time
+    dictmodl[strgextn]['lcur'] = 1e6 * (dictoutp['rflx'] - 1)
+    
+    lablyaxi = 'Relative flux - 1 [ppm]'
+    pathplot = ephesus.plot_lcur(pathimag, \
+                                 dictmodl=dictmodl, \
+                                 
+                                 boolwritover=boolwritover, \
+                                 strgextn=strgthissyst, \
+                                 lablyaxi=lablyaxi, \
+                                 titl=titl, \
+                                )
+    
+    
+
+    
+
+
 
 def test_pbox_psys():
     

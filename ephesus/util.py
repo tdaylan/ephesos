@@ -2960,10 +2960,11 @@ def retr_dictpoplstarcomp( \
     
     if typesyst == 'psys' or typesyst == 'psysmoon':
         
-        masstemp = np.copy(dictpoplstar[namepoplstartotl]['massstar'])
-        masstemp[np.where(~np.isfinite(masstemp))] = 1.
-
-        dictpoplstar[namepoplstartotl]['numbcompstarmean'] = 0.5 * masstemp**(-1.)
+        #masstemp = np.copy(dictpoplstar[namepoplstartotl]['massstar'])
+        #masstemp[np.where(~np.isfinite(masstemp))] = 1.
+        
+        # mean number of companions per star
+        dictpoplstar[namepoplstartotl]['numbcompstarmean'] = 0.5 * dictpoplstar[namepoplstartotl]['massstar']**(-1.)
         
         # number of companions per star
         dictpoplstar[namepoplstartotl]['numbcompstar'] = np.random.poisson(dictpoplstar[namepoplstartotl]['numbcompstarmean'])
@@ -3114,38 +3115,44 @@ def retr_dictpoplstarcomp( \
                                                              np.round((dictpoplcomp[namepoplcomptotl]['epocmtracomp'][k] - timeepoc) / dictpoplcomp[namepoplcomptotl]['pericomp'][k])
     
     
-        if typesyst == 'psysmoon':
-            # exomoons to companion
+    if typesyst == 'psysmoon':
+        # Hill radius of the companion
+        dictpoplcomp[namepoplcomptotl]['radihill'] = retr_radihill(dictpoplcomp[namepoplcomptotl]['smaxcomp'], dictpoplcomp[namepoplcomptotl]['masscomp'] / dictfact['msme'], \
+                                                                                                                            dictpoplcomp[namepoplcomptotl]['massstar'])
+    
+        # maximum semi-major axis of the moons 
+        maxmsmaxmoon = 0.5 * dictpoplcomp[namepoplcomptotl]['radihill']
+            
+        for k in tqdm(range(numbstar)):
             
             if dictpoplstar[namepoplstartotl]['numbcompstar'][k] == 0:
                 continue
             
             numbcomp = dictpoplstar[namepoplstartotl]['numbcompstar'][k]
-            numbmoon = np.empty(numbcomp, dtype=int)
-            radimoon = [[] for j in indxcomp]
-            massmoon = [[] for j in indxcomp]
-            densmoon = [[] for j in indxcomp]
-            perimoon = [[] for j in indxcomp]
-            epocmtramoon = [[] for j in indxcomp]
-            smaxmoon = [[] for j in indxcomp]
-            indxmoon = [[] for j in indxcomp]
-
-            # Hill radius of the companion
-            radihill = retr_radihill(smaxcomp, masscomp / dictfact['msme'], massstar)
-            # maximum semi-major axis of the moons 
-            maxmsmaxmoon = 0.5 * radihill
             
-            for j in indxcomp:
-                # number of moons
-                arry = np.arange(1, 10)
-                prob = arry**(-2.)
-                prob /= np.sum(prob)
-                numbmoon[j] = np.random.choice(arry, p=prob)
+            # number of exomoons to the companion
+            numbmoon = np.empty(numbcomp, dtype=int)
+            radimoon = [[] for j in indxcompstar[k]]
+            massmoon = [[] for j in indxcompstar[k]]
+            densmoon = [[] for j in indxcompstar[k]]
+            perimoon = [[] for j in indxcompstar[k]]
+            epocmtramoon = [[] for j in indxcompstar[k]]
+            smaxmoon = [[] for j in indxcompstar[k]]
+            indxmoon = [[] for j in indxcompstar[k]]
+            
+            for j in indxcompstar[k]:
+                # mean number of moons per companion
+                dictpoplcomp[namepoplcomptotl]['numbmooncompmean'][j] = 0.5 * dictpoplcomp[namepoplcomptotl]['masscomp'][j]**(-1.)
+                
+                # number of moons per companion
+                dictpoplcomp[namepoplcomptotl]['numbmooncomp'][j] = np.random.poisson(dictpoplcomp[namepoplcomptotl]['numbmooncompmean'][j])
+                
                 indxmoon[j] = np.arange(numbmoon[j])
                 smaxmoon[j] = np.empty(numbmoon[j])
                 # properties of the moons
                 ## radii [R_E]
-                radimoon[j] = radicomp[j] * tdpy.icdf_powr(np.random.rand(numbmoon[j]), 0.05, 0.3, 2.)
+                radimoon[j]
+                dictpoplcomp[namepoplcomptotl]['radimoon'][j] = dictpoplcomp[namepoplcomptotl]['radicomp'][j] * tdpy.icdf_powr(np.random.rand(dictpoplcomp[namepoplcomptotl]['numbmooncomp'][j]), 0.05, 0.3, 2.)
                 ## mass [M_E]
                 massmoon[j] = retr_massfromradi(radimoon[j])
                 ## densities [d_E]
@@ -3415,7 +3422,7 @@ def plot_lcur( \
               # Boolean flag to break the line of the model when separation is very large
               boolbrekmodl=True, \
               
-              # Boolean flag to ignore any existing plot and overwrite
+              # Boolean flag to ignore any existing files and overwrite
               boolwritover=False, \
               
               # label for the vertical axis, including the unit
@@ -3483,6 +3490,19 @@ def plot_lcur( \
                 
             if boolbrekmodl:
                 diftimemodl = dictmodl[attr]['time'][1:] - dictmodl[attr]['time'][:-1]
+                
+                print('')
+                print('')
+                print('')
+                print('dictmodl[attr][time]')
+                for timetemp in dictmodl[attr]['time']:
+                    print(timetemp)
+                print('diftimemodl')
+                summgene(diftimemodl)
+                print('')
+                print('')
+                print('')
+
                 indxtimebrekregi = np.where(diftimemodl > 2 * np.amin(diftimemodl))[0] + 1
                 indxtimebrekregi = np.concatenate([np.array([0]), indxtimebrekregi, np.array([dictmodl[attr]['time'].size - 1])])
                 numbtimebrekregi = indxtimebrekregi.size
