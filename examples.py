@@ -7,6 +7,42 @@ from tdpy.util import summgene
 import tdpy
 import pergamon
 
+def retr_strgtitl(dictstrgtitl):
+    
+    strgtitl = '$R_* = %.1f R _\odot' % dictstrgtitl['radistar']
+    
+    listnamecomp = []
+    for name in dictstrgtitl.keys():
+        if name.endswith('comp') and dictstrgtitl[name] is not None:
+            listnamecomp.append(name)
+            numbcomp = len(dictstrgtitl[name])
+
+    for name in dictstrgtitl.keys():
+        
+        if name in listnamecomp:
+            for j, valu in enumerate(dictstrgtitl[name]):
+                if name == 'radicomp':
+                    strgtitl += ', R_{c%d} = ' % j
+                if name == 'pericomp':
+                    strgtitl += ', P_{c%d} = ' % j
+            
+                strgtitl += '%.3g' % (valu)
+                if j != numbcomp - 1:
+                    strgtitl += ', '
+            
+            if name == 'radicomp':
+                strgtitl += ' R_{\oplus}'
+            if name == 'pericomp':
+                strgtitl += '$ days$'
+    
+    if strgtitl[-1] == '$':
+        strgtitl = strgtitl[:-1]
+    else:
+        strgtitl += '$'
+
+    return strgtitl
+
+
 def make_rflx( \
              ):
     '''
@@ -23,11 +59,10 @@ def make_rflx( \
      
     # type of systems to be illustrated
     listtypesyst = [ \
-                    #'psys', \
+                    'cosc', \
+                    'psys', \
                     'psyspcur', \
                     'psysmoon', \
-                    'psystranmoon', \
-                    'cosc', \
                     ]
     
     # Boolean flag to overwrite visuals
@@ -49,6 +84,9 @@ def make_rflx( \
     
     for typesyst in listtypesyst:
         
+        print('typesyst')
+        print(typesyst)
+
         pathimagpopl = pathimag + typesyst + '/'
         pathdatapopl = pathdata + typesyst + '/'
         
@@ -64,6 +102,7 @@ def make_rflx( \
                                                                                                                                              maxmpericomp=2., \
                                                                                                                                              numbsyst=numbsyst, \
                                                                                                                                             )
+          
         print('Visualizing the simulated population...')
 
         listdictlablcolrpopl = []
@@ -73,7 +112,7 @@ def make_rflx( \
         strgpoplstartotl = 'star' + typepoplsyst + 'totl'
         strgpoplcomptotl = 'compstar' + typepoplsyst + 'totl'
         strgpoplcomptran = 'compstar' + typepoplsyst + 'tran'
-        
+          
         del dictpoplcomp[strgpoplcomptotl]['idenstar']
         del dictpoplcomp[strgpoplcomptran]['idenstar']
         
@@ -83,19 +122,30 @@ def make_rflx( \
             typeplanbrgt = 'dark'
         
         listdictlablcolrpopl.append(dict())
-        listtitlcomp = []
+        liststrgtitlcomp = []
         listboolcompexcl = []
         if typesyst == 'cosc':
-            listtitlcomp.append('Compact Objects with a stellar companion')
+            liststrgtitlcomp.append('Compact Objects with a stellar companion')
             namesamp = 'COSC'
         if typesyst == 'psys' or typesyst == 'psyspcur':
-            listtitlcomp.append('Planets')
+            liststrgtitlcomp.append('Planets')
             namesamp = 'planet'
+        if typesyst == 'psysmoon':
+            liststrgtitlcomp.append('Exomoons')
+            namesamp = 'exomoon'
         
         listdictlablcolrpopl[-1][strgpoplcomptotl] = ['All', 'black']
-        listdictlablcolrpopl[-1][strgpoplcomptran] = ['Transiting', 'blue']
+        if typesyst == 'psys' or typesyst == 'psyspcur' or typesyst == 'cosc':
+            listdictlablcolrpopl[-1][strgpoplcomptran] = ['Transiting', 'blue']
         listboolcompexcl.append(False)
 
+        print('dictpoplstar[strgpoplstartotl][distsyst]')
+        summgene(dictpoplstar[strgpoplstartotl]['distsyst'])
+        print('dictpoplcomp[strgpoplcomptotl][distsyst]')
+        summgene(dictpoplcomp[strgpoplcomptotl]['distsyst'])
+        print('dictpoplcomp[strgpoplcomptran][distsyst]')
+        summgene(dictpoplcomp[strgpoplcomptran]['distsyst'])
+        
         typeanls = '%s' % (typesyst)
         pergamon.init( \
                       typeanls + 'tuto', \
@@ -103,7 +153,7 @@ def make_rflx( \
                       
                       listdictlablcolrpopl=listdictlablcolrpopl, \
                       listboolcompexcl=listboolcompexcl, \
-                      listtitlcomp=listtitlcomp, \
+                      listtitlcomp=liststrgtitlcomp, \
                       namesamp=namesamp, \
 
                       pathimag=pathimagpopl, \
@@ -116,7 +166,7 @@ def make_rflx( \
         
         # dictionary of features for companions
         dictpoplcomp = dictpoplcomp[strgpoplcomptotl]
-
+        
         # number of systems
         numbsyst = dictpoplstar['radistar'].size
         
@@ -147,29 +197,49 @@ def make_rflx( \
             if not np.any(dictpoplcomp['booltran'][indxcompstar[k]]):
                 continue
             
+            # radii of the companions
+            if typesyst == 'cosc':
+                radicomp = None
+            else:
+                radicomp = dictpoplcomp['radicomp'][indxcompstar[k]]
+            
+            # masses of the companions
+            if typesyst == 'psys' or typesyst == 'psysmoon':
+                masscomp = None
+            else:
+                masscomp = dictpoplcomp['masscomp'][indxcompstar[k]]
+            
+            # title for the plots
+            dictstrgtitl = dict()
+            dictstrgtitl['radistar'] = dictpoplstar['radistar'][k]
+            dictstrgtitl['pericomp'] = dictpoplcomp['pericomp'][indxcompstar[k]]
+            dictstrgtitl['radicomp'] = radicomp
+            strgtitl = retr_strgtitl(dictstrgtitl)
+                
+            # string for the configuration
+            strgthissyst = '%s_%04d' % (typesyst, k)
+            
             for a in range(numbiterintp):
                 
-                #if a < 2:
-                #    continue
+                if a > 0:
+                    continue
 
-                # string for the configuration
-                strgthissyst = '%s_%04d' % (typesyst, k)
-                
                 if a == 0:
-                    strgextn = strgthissyst
+                    strgextn = strgthissyst + '_intpplan'
                 if a == 1:
                     strgextn = strgthissyst + '_intpstar'
                 if a == 2:
-                    strgextn = strgthissyst + '_intpplan'
+                    strgextn = strgthissyst
                 
                 # dictionary for the configuration
                 dictmodl[strgextn] = dict()
                 
                 if a == 0:
-                    boolintp = False
-                    typecoor = 'star'
-                    dictmodl[strgextn]['lsty'] = '-'
-                    dictmodl[strgextn]['labl'] = 'Full Evaluation'
+                    boolintp = True
+                    strgextn = strgthissyst + '_intpplan'
+                    typecoor = 'plan'
+                    dictmodl[strgextn]['lsty'] = '-.'
+                    dictmodl[strgextn]['labl'] = 'Interpolation, Planet grid'
                 if a == 1:
                     boolintp = True
                     strgextn = strgthissyst + '_intpstar'
@@ -177,40 +247,29 @@ def make_rflx( \
                     dictmodl[strgextn]['lsty'] = '--'
                     dictmodl[strgextn]['labl'] = 'Interpolation, Star grid'
                 if a == 2:
-                    boolintp = True
-                    strgextn = strgthissyst + '_intpplan'
-                    typecoor = 'plan'
-                    dictmodl[strgextn]['lsty'] = '-.'
-                    dictmodl[strgextn]['labl'] = 'Interpolation, Planet grid'
+                    boolintp = False
+                    typecoor = 'star'
+                    dictmodl[strgextn]['lsty'] = '-'
+                    dictmodl[strgextn]['labl'] = 'Full Evaluation'
                 
-                # title for the plots
-                titl = '$R_* = %.3g R_\odot, R_{p} = ' % (dictpoplstar['radistar'][k])
-                for u, radi in enumerate(dictpoplcomp['radicomp'][indxcompstar[k]]):
-                    titl += '%.3g' % (radi)
-                    if u != len(dictpoplcomp['radicomp'][indxcompstar[k]]) - 1:
-                        titl += ', '
-                titl += ' R_{\oplus}, P = $'
-                for u, radi in enumerate(dictpoplcomp['pericomp'][indxcompstar[k]]):
-                    titl += '%.3g' % (radi)
-                    if u != len(dictpoplcomp['pericomp'][indxcompstar[k]]) - 1:
-                        titl += ', '
-                titl += ' days'
-
                 # generate light curve
                 dictoutp = ephesus.retr_rflxtranmodl(time, \
                                                      radistar=dictpoplstar['radistar'][k], \
                                                      massstar=dictpoplstar['massstar'][k], \
                                                      
+                                                     rsmacomp=dictpoplcomp['rsmacomp'][indxcompstar[k]], \
                                                      pericomp=dictpoplcomp['pericomp'][indxcompstar[k]], \
                                                      epocmtracomp=dictpoplcomp['epocmtracomp'][indxcompstar[k]], \
                                                      inclcomp=dictpoplcomp['inclcomp'][indxcompstar[k]], \
-                                                     radicomp=dictpoplcomp['radicomp'][indxcompstar[k]], \
-                                                     masscomp=dictpoplcomp['masscomp'][indxcompstar[k]], \
+                                                     radicomp=radicomp, \
+                                                     masscomp=masscomp, \
                                                      
                                                      perimoon=perimoon, \
                                                      epocmtramoon=epocmtramoon, \
                                                      radimoon=radimoon, \
                                                      
+                                                     typesyst=typesyst, \
+
                                                      typeplanbrgt=typeplanbrgt, \
 
                                                      typecoor=typecoor, \
@@ -220,13 +279,13 @@ def make_rflx( \
                                                      pathfoldanim=pathimag, \
                                                      boolwritover=boolwritover, \
                                                      strgextn=strgextn, \
-                                                     titlvisu=titl, \
+                                                     titlvisu=strgtitl, \
                                                     )
                 
                 print('Making a light curve plot...')
                 
                 dictmodl[strgextn]['time'] = time
-                dictmodl[strgextn]['lcur'] = 1e6 * (dictoutp['rflx'] - 1)
+                dictmodl[strgextn]['lcur'] = dictoutp['rflx']
             
             lablyaxi = 'Relative flux - 1 [ppm]'
             pathplot = ephesus.plot_lcur(pathimag, \
@@ -235,7 +294,7 @@ def make_rflx( \
                                          boolwritover=boolwritover, \
                                          strgextn=strgthissyst, \
                                          lablyaxi=lablyaxi, \
-                                         titl=titl, \
+                                         strgtitl=strgtitl, \
                                         )
             
             if typesyst == 'psysmoontran':
@@ -248,50 +307,92 @@ def make_rflx( \
                                              dictmodl=dictmodl, \
                                              strgextn='cmpt', \
                                              boolwritover=boolwritover, \
-                                             titl=titl, \
+                                             strgtitl=strgtitl, \
                                             )
-
-    # generate light curve
-    dictoutp = ephesus.retr_rflxtranmodl(time, \
-                                         radistar=dictpoplstar['radistar'][k], \
-                                         massstar=dictpoplstar['massstar'][k], \
-                                         
-                                         pericomp=dictpoplcomp['pericomp'][indxcompstar[k]], \
-                                         epocmtracomp=dictpoplcomp['epocmtracomp'][indxcompstar[k]], \
-                                         inclcomp=dictpoplcomp['inclcomp'][indxcompstar[k]], \
-                                         radicomp=dictpoplcomp['radicomp'][indxcompstar[k]], \
-                                         masscomp=dictpoplcomp['masscomp'][indxcompstar[k]], \
-                                         
-                                         perimoon=perimoon, \
-                                         epocmtramoon=epocmtramoon, \
-                                         radimoon=radimoon, \
-                                         
-                                         typeplanbrgt=typeplanbrgt, \
-
-                                         typecoor=typecoor, \
-
-                                         boolintp=boolintp, \
-                                         
-                                         pathfoldanim=pathimag, \
-                                         boolwritover=boolwritover, \
-                                         strgextn=strgextn, \
-                                         titlvisu=titl, \
-                                        )
     
-    print('Making a light curve plot...')
+    raise Exception('')
+
+    dictlistvalu = dict()
     
-    dictmodl[strgextn]['time'] = time
-    dictmodl[strgextn]['lcur'] = 1e6 * (dictoutp['rflx'] - 1)
+    typesyst = 'psys'
+    radistar = 1.
+    massstar = None
+    epocmtracomp = np.array([0.5])
+    dictlistvalu['pericomp'] = np.array([1., 3., 5.])
+    dictlistvalu['rratcomp'] = np.array([0.003, 0.01, 0.05, 0.1, 0.3])
+    dictlistvalu['radicomp'] = dictlistvalu['rratcomp'] / radistar
+    dictlistvalu['cosicomp'] = np.array([0., 0.05, 0.1])
+    dictlistvalu['rsmacomp'] = np.array([0.001, 0.1, 0.2])
+    dictlistvalu['tolerrat'] = np.array([0.001, 0.01, 0.1])
+    dictlistvalu['typeplanbrgt'] = ['term', 'dark']
     
-    lablyaxi = 'Relative flux - 1 [ppm]'
-    pathplot = ephesus.plot_lcur(pathimag, \
-                                 dictmodl=dictmodl, \
-                                 
-                                 boolwritover=boolwritover, \
-                                 strgextn=strgthissyst, \
-                                 lablyaxi=lablyaxi, \
-                                 titl=titl, \
-                                )
+    listname = dictlistvalu.keys()
+    dicttemp = dict()
+    for name in listname:
+        
+        dictmodl = dict()
+        for nametemp in listname:
+            if nametemp == name:
+                continue
+            dicttemp[nametemp] = np.array([dictlistvalu[nametemp][int(len(dictlistvalu[nametemp]) / 2.)]])
+        for k in range(len(dictlistvalu[name])):
+            
+            dicttemp[name] = np.array([dictlistvalu[name][k]])
+            
+            # title for the plots
+            dictstrgtitl = dict()
+            dictstrgtitl['radistar'] = radistar
+            for name in ['radicomp', 'pericomp']:
+                dictstrgtitl[name] = dicttemp[name]
+            strgtitl = retr_strgtitl(dictstrgtitl)
+                
+            # generate light curve
+            dictoutp = ephesus.retr_rflxtranmodl(time, \
+                                                 radistar=radistar, \
+                                                 massstar=massstar, \
+                                         
+                                                 epocmtracomp=epocmtracomp, \
+                                                 pericomp=dicttemp['pericomp'], \
+                                                 rratcomp=dicttemp['rratcomp'], \
+                                                 cosicomp=dicttemp['cosicomp'], \
+                                                 rsmacomp=dicttemp['rsmacomp'], \
+                                                 tolerrat=dicttemp['tolerrat'], \
+                                                 
+                                                 typeplanbrgt=dicttemp['typeplanbrgt'], \
+                                                 
+                                                 #perimoon=perimoon, \
+                                                 #epocmtramoon=epocmtramoon, \
+                                                 #radimoon=radimoon, \
+
+                                                 typecoor=typecoor, \
+                                                 typesyst=typesyst, \
+                                                 boolintp=boolintp, \
+                                                 
+                                                 #pathfoldanim=pathimag, \
+                                                 boolwritover=boolwritover, \
+                                                 strgextn=strgextn, \
+                                                 titlvisu=strgtitl, \
+                                                )
+            
+            strgextn = name + '_%02d' % k
+            
+            # dictionary for the configuration
+            dictmodl[strgextn] = dict()
+            dictmodl[strgextn]['time'] = time
+            dictmodl[strgextn]['lcur'] = 1e6 * (dictoutp['rflx'] - 1)
+        
+        print('Making a light curve plot...')
+        
+        strgextn = 'psys_cmps_%s' % name
+        lablyaxi = 'Relative flux - 1 [ppm]'
+        pathplot = ephesus.plot_lcur(pathimag, \
+                                     dictmodl=dictmodl, \
+                                     
+                                     boolwritover=boolwritover, \
+                                     strgextn=strgextn, \
+                                     lablyaxi=lablyaxi, \
+                                     strgtitl=strgtitl, \
+                                    )
     
     
 
