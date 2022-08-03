@@ -13,5 +13,5 @@ Using the Box Least Squares (BLS) algorithm, `ephesus.srch_pbox()` searches for 
 
 
 ### Light Curve Generator
-Integrating over the sky-projected brightness distribution of stars and planets, `ephesus.retr_rflxtranmodl()` generates the relative flux light curve of a system of stars, compact objects, and planets.
+Integrating over the sky-projected brightness distribution of stars and planets, `ephesus.retr_rflxtranmodl()` generates the relative flux light curve of a system of stars, compact objects, and planets. You can see an example model evaluation ![in this plot](https://github.com/tdaylan/ephesus/visuals/lcur.png).
 

@@ -1750,7 +1750,10 @@ def bdtr_tser( \
               epocmask=None, perimask=None, duramask=None, \
               
               # Boolean flag to break the time-series into regions
-              boolbrekregi=False, \
+              boolbrekregi=True, \
+            
+              # times to break the time-series into regions
+              timeedge=None, \
 
               # minimum gap to break the time-series into regions
               timebrekregi=None, \
@@ -1801,10 +1804,14 @@ def bdtr_tser( \
         print('Detrending the light curve with at a time scale of %.g days...' % timescal)
         if epocmask is not None:
             print('Using a specific ephemeris to mask out transits while detrending...')
-        
+    
+    if timeedge is not None and len(timeedge) > 2 and not boolbrekregi:
+        raise Exception('')
+
     if boolbrekregi:
         # determine the times at which the light curve will be broken into pieces
-        timeedge = retr_timeedge(time, lcur, timebrekregi, booladdddiscbdtr, timescal)
+        if timeedge is None:
+            timeedge = retr_timeedge(time, lcur, timebrekregi, booladdddiscbdtr, timescal)
         numbedge = len(timeedge)
         numbregi = numbedge - 1
     else:
@@ -1865,8 +1872,12 @@ def bdtr_tser( \
         if typebdtr == 'gpro':
             # fit a Gaussian Process (GP) model to the data as baseline
             ## construct the kernel object
-            objtkern = celerite.terms.Matern32Term(log_sigma=np.log(np.std(lcurregi[indxtimeregioutt[i]])), log_rho=np.log(timescalbdtrspln))
-            
+            objtkern = celerite.terms.Matern32Term(log_sigma=np.log(np.std(4. * lcurregi[indxtimeregioutt[i]])), log_rho=np.log(timescalbdtrspln))
+            print('sigma for GP')
+            print(np.std(lcurregi[indxtimeregioutt[i]]))
+            print('rho for GP [days]')
+            print(timescalbdtrspln)
+
             ## construct the GP model object
             objtgpro = celerite.GP(objtkern, mean=np.mean(lcurregi[indxtimeregioutt[i]]))
             
@@ -1961,7 +1972,7 @@ def retr_brgtlmdk(cosg, coeflmdk, typelmdk='quad'):
     if typelmdk == 'linr':
         brgtlmdk = 1. - coeflmdk[0] * (1. - cosg)
     
-    if typelmdk == 'quad':
+    if typelmdk == 'quad' or typelmdk == 'quadkipp':
         brgtlmdk = 1. - coeflmdk[0] * (1. - cosg) - coeflmdk[1] * (1. - cosg)**2
     
     if typelmdk == 'nlin':
@@ -1969,7 +1980,7 @@ def retr_brgtlmdk(cosg, coeflmdk, typelmdk='quad'):
     
     if typelmdk == 'none':
         brgtlmdk = np.ones_like(cosg)
-
+    
     return brgtlmdk
 
 
@@ -2862,6 +2873,9 @@ def retr_dictpoplstarcomp( \
                           # maximum ratio of semi-major axis to radius of the host star
                           maxmsmaxradistar=1e4, \
                           
+                          # minimum mass of the companions
+                          minmmasscomp=None, \
+                          
                           # minimum orbital period, only taken into account when typesamporbtcomp == 'peri'
                           minmpericomp=0.1, \
                           
@@ -3015,20 +3029,25 @@ def retr_dictpoplstarcomp( \
     print(namepoplstaroccu)
     retr_subp(dictpoplstar, dictstarnumbsamp, dictstarindxsamp, namepoplstartotl, namepoplstaroccu, indx)
     
+    if minmmasscomp is None:
+        if boolsystcosc:
+            minmmasscomp = 5. # [Solar mass]
+        elif typesyst == 'psys' or typesyst == 'psyspcur' or typesyst == 'psysmoon':
+            if typesyst == 'psys' or typesyst == 'psysmoon':
+                # ~ Mars mass
+                minmmasscomp = 0.1 # [Earth mass]
+            if typesyst == 'psyspcur':
+                # ~ Jupiter mass
+                minmmasscomp = 300. # [Earth mass]
+        elif typesyst == 'sbin':
+            minmmasscomp = 0.5 # [Earth mass]
+    
     if boolsystcosc:
-        minmmasscomp = 5. # [Solar mass]
         maxmmasscomp = 200. # [Solar mass]
     elif typesyst == 'psys' or typesyst == 'psyspcur' or typesyst == 'psysmoon':
-        if typesyst == 'psys' or typesyst == 'psysmoon':
-            # ~ Mars mass
-            minmmasscomp = 0.1 # [Earth mass]
-        if typesyst == 'psyspcur':
-            # ~ Jupiter mass
-            minmmasscomp = 300. # [Earth mass]
         # Deuterium burning mass
         maxmmasscomp = 4400. # [Earth mass]
     elif typesyst == 'sbin':
-        minmmasscomp = 0.5 # [Earth mass]
         maxmmasscomp = 1000. # [Earth mass]
     else:
         print('typesyst')
@@ -3174,13 +3193,27 @@ def retr_dictpoplstarcomp( \
                                                                    dictpoplcomp[namepoplcomptran]['rsmacomp'], \
                                                                    dictpoplcomp[namepoplcomptran]['cosicomp'])
     dictpoplcomp[namepoplcomptran]['dcyc'] = dictpoplcomp[namepoplcomptran]['duratrantotl'] / dictpoplcomp[namepoplcomptran]['pericomp'] / 24.
+    
     if typesyst == 'psys':
+        # radius ratio
         dictpoplcomp[namepoplcomptran]['rrat'] = dictpoplcomp[namepoplcomptran]['radicomp'] / dictpoplcomp[namepoplcomptran]['radistar'] / dictfact['rsre']
+        # transit depth
         dictpoplcomp[namepoplcomptran]['dept'] = 1e3 * dictpoplcomp[namepoplcomptran]['rrat']**2 # [ppt]
     if boolsystcosc:
+        # amplitude of self-lensing
         dictpoplcomp[namepoplcomptran]['amplslen'] = retr_amplslen(dictpoplcomp[namepoplcomptran]['pericomp'], dictpoplcomp[namepoplcomptran]['radistar'], \
                                                                             dictpoplcomp[namepoplcomptran]['masscomp'], dictpoplcomp[namepoplcomptran]['massstar'])
     
+    # define for all samples those features that are valid only for transiting systems
+    listtemp = ['duratrantotl', 'dcyc']
+    if typesyst == 'psys':
+        listtemp += ['rrat', 'dept']
+    if boolsystcosc:
+        listtemp += ['amplslen']
+    for strg in listtemp:
+        dictpoplcomp[namepoplcomptotl][strg] = np.full_like(dictpoplcomp[namepoplcomptotl]['pericomp'], np.nan)
+        dictpoplcomp[namepoplcomptotl][strg][indx] = dictpoplcomp[namepoplcomptran][strg]
+
     dictcompnumbsamp[namepoplcomptotl] = dictpoplcomp[namepoplcomptotl]['radistar'].size
     
     indxmooncompstar = [[[] for j in indxcompstar[k]] for k in indxsyst]
@@ -3198,6 +3231,16 @@ def retr_dictpoplstarcomp( \
         # number of moons per companion
         dictpoplcomp[namepoplcomptotl]['numbmooncomp'] = np.random.poisson(dictpoplcomp[namepoplcomptotl]['numbmooncompmean'])
         
+        print('dictpoplcomp[namepoplcomptotl][masscomp]')
+        summgene(dictpoplcomp[namepoplcomptotl]['masscomp'])
+
+        print('dictpoplcomp[namepoplcomptotl][numbmooncompmean]')
+        summgene(dictpoplcomp[namepoplcomptotl]['numbmooncompmean'])
+
+        print('dictpoplcomp[namepoplcomptotl][numbmooncomp]')
+        summgene(dictpoplcomp[namepoplcomptotl]['numbmooncomp'])
+        raise Exception('')
+
         cntr = 0
         for k in range(len(dictpoplstar[namepoplstartotl]['radistar'])):
             for j in range(len(indxcompstar[k])):
@@ -3277,6 +3320,7 @@ def retr_dictpoplstarcomp( \
                                                                                                 dictpoplcomp[namepoplcomptotl]['masscompmoon'][indxcompstar[k][j]] / dictfact['msme'])
                 
                 # load component features into moon features
+                ## temp the code crashed here once
                 for name in dictpoplcomp[namepoplcomptotl].keys():
                     dictpoplmoon[namepoplmoontotl][name][indxmooncompstar[k][j]] = dictpoplcomp[namepoplcomptotl][name][indxcompstar[k][j]]
                 
@@ -3521,12 +3565,21 @@ def plot_lcur( \
               # Boolean flag to ignore any existing files and overwrite
               boolwritover=False, \
               
+              # label for the horizontal axis, including the unit
+              lablxaxi=None, \
+              
               # label for the vertical axis, including the unit
               lablyaxi=None, \
               
               # size of the figure
               sizefigr=None, \
               
+              # list of x-values to draw vertical dashed lines at
+              listxdatvert=None, \
+
+              # colors of the vertical dashed lines at
+              listcolrvert=None, \
+
               timeoffs=0., \
               
               limtxaxi=None, \
@@ -3549,6 +3602,9 @@ def plot_lcur( \
     if strgextn == '':
         raise Exception('')
     
+    if strgextn[0] == '_':
+        strgextn = strgextn[1:]
+
     path = pathimag + 'lcur_%s.%s' % (strgextn, typefileplot)
     
     # skip plotting
@@ -3618,11 +3674,14 @@ def plot_lcur( \
                 
                 axis.plot(xdat[n] - timeoffs, ydat[n], color=color, lw=1, label=label, ls=ls, alpha=alpha)
             k += 1
-
-    if timeoffs == 0:
-        axis.set_xlabel('Time [days]')
-    else:
-        axis.set_xlabel('Time [BJD-%d]' % timeoffs)
+    
+    if lablxaxi is None:
+        if timeoffs == 0:
+            lablxaxi = 'Time [days]'
+        else:
+            lablxaxi = 'Time [BJD-%d]' % timeoffs
+    
+    axis.set_xlabel(lablxaxi)
     
     if limtxaxi is not None:
         if not np.isfinite(limtxaxi).all():
@@ -3631,7 +3690,15 @@ def plot_lcur( \
             raise Exception('')
 
         axis.set_xlim(limtxaxi)
-
+    
+    if listxdatvert is not None:
+        for k, xdatvert in enumerate(listxdatvert):
+            if listcolrvert is None:
+                colr = 'gray'
+            else:
+                colr = listcolrvert[k]
+            axis.axvline(xdatvert, ls='--', color=colr, alpha=0.4)
+    
     if limtyaxi is not None:
         axis.set_ylim(limtyaxi)
 
@@ -3646,7 +3713,7 @@ def plot_lcur( \
 
     plt.subplots_adjust(bottom=0.2)
     print('Writing to %s...' % path)
-    plt.savefig(path)
+    plt.savefig(path, dpi=300)
     plt.close()
     
     return path
@@ -3661,7 +3728,10 @@ def plot_pcur(pathimag, arrylcur=None, arrypcur=None, arrypcurbind=None, phascen
         arrypcur = fold_tser(arrylcur, epoc, peri)
     if arrypcurbind is None and boolbind:
         arrypcurbind = rebn_tser(arrypcur, numbbins)
-        
+    
+    if strgextn[0] == '_':
+        strgextn = strgextn[1:]
+
     # phase on the horizontal axis
     figr, axis = plt.subplots(1, 1, figsize=(8, 4))
     
@@ -3884,7 +3954,7 @@ def retr_boolnocccomp(gdat, j, t, boolinve=False):
         yposgridcomp = gdat.yposgridplan[j]
     
     if gdat.typecoor == 'star':
-        xposgridcomp = gdat.xposgridstar - gdat.xposcomp[j][t]
+        xposgridcomp = gdat.xposgridstar - gdat.xposcomp[j]
         yposgridcomp = gdat.yposgridstar - gdat.yposcomp[j]
     
     if gdat.typesyst == 'psys' or gdat.typesyst == 'psyspcur' or \
@@ -3994,8 +4064,6 @@ def anim_fluxtotl(gdat, t, j=None):
             
             if gdat.typesyst == 'cosc':
                 brtglens = retr_brgtlens(gdat, t)
-                print('brtglens')
-                summgene(brtglens)
                 brgttemp = brtglens
 
         if gdat.typecoor == 'star':
@@ -4019,7 +4087,7 @@ def anim_fluxtotl(gdat, t, j=None):
 
 def retr_brgtlens(gdat, t):
     
-    gdat.xposgridstarplan = gdat.xposgridstar - gdat.xposstar[0][t]
+    gdat.xposgridstarplan = gdat.xposgridstar - gdat.xposstar[0]
     gdat.yposgridstarplan = gdat.yposgridstar - gdat.yposstar[0]
     
     gdat.xposgridstarnorm = gdat.xposgridstarplan / gdat.radieins[0]
@@ -4036,16 +4104,21 @@ def retr_brgtlens(gdat, t):
     magnfrst = (gdat.distgridstarnorm**2 + 2.) / (2. * gdat.distgridstarnorm * np.sqrt(gdat.distgridstarnorm**2 + 4.)) + 0.5
     magnseco = (gdat.distgridstarnorm**2 + 2.) / (2. * gdat.distgridstarnorm * np.sqrt(gdat.distgridstarnorm**2 + 4.)) - 0.5
     
-    print('xposfrst.flatten()')
-    summgene(xposfrst.flatten())
-    print('yposfrst.flatten()')
-    summgene(yposfrst.flatten())
-    print('magnfrst.flatten()')
-    summgene(magnfrst.flatten())
-    print('gdat.binsxposgridplan[0]')
-    summgene(gdat.binsxposgridplan[0])
-    print('gdat.binsyposgridplan[0]')
-    summgene(gdat.binsyposgridplan[0])
+    #print('xposfrst.flatten()')
+    #print(xposfrst)
+    #summgene(xposfrst.flatten())
+    #print('yposfrst.flatten()')
+    #print(yposfrst)
+    #summgene(yposfrst.flatten())
+    #print('magnfrst.flatten()')
+    #print(magnfrst)
+    #summgene(magnfrst.flatten())
+    #print('gdat.binsxposgridplan[0]')
+    #summgene(gdat.binsxposgridplan[0])
+    #print('gdat.binsyposgridplan[0]')
+    #summgene(gdat.binsyposgridplan[0])
+    #raise Exception('')
+    
     flux, _, _, _ = scipy.stats.binned_statistic_2d(xposfrst.flatten(), yposfrst.flatten(), magnfrst.flatten(), statistic='sum', bins=[gdat.binsxposgridplan[0], gdat.binsyposgridplan[0]])
 
     #magn = np.abs(1. / (1. - (gdat.radieins[0] / gdat.distgridplan[0][np.where(boolgridplanstar)])**4.))
@@ -4065,8 +4138,8 @@ def retr_rflxtranmodl( \
                       # minimum radius ratio tolerated
                       tolerrat=None, \
 
-                      # a factor to multiply the number of time samples collected for interpolation
-                      facttimereso=None, \
+                      # maximum interval between phase samples
+                      diffphas=None, \
 
                       # the spatial resolution of the grid over which the planet's brightness and occultation are evaluated
                       resoplan=None, \
@@ -4092,7 +4165,7 @@ def retr_rflxtranmodl( \
                       typesyst='psys', \
                       
                       # type of limb-darkening
-                      typelmdk='quad', \
+                      typelmdk='quadkipp', \
                       # limb-darkening coefficient(s)
                       coeflmdk=None, \
                       # radius of the host star in Solar radius
@@ -4149,6 +4222,9 @@ def retr_rflxtranmodl( \
                       # Boolean flag to diagnose
                       booldiag=True, \
                       
+                      # Boolean flag to diagnose by raising an exception when the model output is all 1s
+                      booldiagtran=False, \
+                      
                       ## file type of the plot
                       typefileplot='pdf', \
 
@@ -4170,41 +4246,61 @@ def retr_rflxtranmodl( \
         if '__' not in attr and attr != 'gdat':
             setattr(gdat, attr, valu)
 
+    def calc_posifromphas(gdat, j, phastemp):
+    
+        xpos = gdat.smaxcomp[j] * np.sin(2. * np.pi * phastemp)
+        ypos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp) * gdat.cosicomp[j]
+        
+        if gdat.typecoor == 'star':
+            gdat.xposcomp[j] = xpos
+            gdat.yposcomp[j] = ypos
+            
+            if perimoon is not None:
+                for jj in indxmoon[j]:
+                    gdat.xposmoon[j][jj] = gdat.xposcomp[j] + \
+                                                    smaxmoon[j][jj] * np.cos(2. * np.pi * (time - epocmtramoon[j][jj]) / perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
+                    gdat.yposmoon[j][jj] = gdat.yposcomp[j] + \
+                                                    smaxmoon[j][jj] * np.sin(2. * np.pi * (time - epocmtramoon[j][jj]) / perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
+    
+        if gdat.typecoor == 'plan':
+            gdat.xposstar[j] = -xpos
+            gdat.yposstar[j] = -ypos
+
     if typeverb > 0:
         print('Estimating the light curve via retr_rflxtranmodl()...')
         
-    if isinstance(pericomp, list):
-        pericomp = np.array(pericomp)
+    if isinstance(gdat.pericomp, list):
+        gdat.pericomp = np.array(gdat.pericomp)
 
-    if isinstance(epocmtracomp, list):
-        epocmtracomp = np.array(epocmtracomp)
+    if isinstance(gdat.epocmtracomp, list):
+        gdat.epocmtracomp = np.array(gdat.epocmtracomp)
 
-    if isinstance(radicomp, list):
-        radicomp = np.array(radicomp)
+    if isinstance(gdat.radicomp, list):
+        gdat.radicomp = np.array(gdat.radicomp)
 
-    if isinstance(rsmacomp, list):
-        rsmacomp = np.array(rsmacomp)
+    if isinstance(gdat.rsmacomp, list):
+        gdat.rsmacomp = np.array(gdat.rsmacomp)
 
     if isinstance(gdat.rratcomp, list):
         gdat.rratcomp = np.array(gdat.rratcomp)
 
-    if isinstance(masscomp, list):
-        masscomp = np.array(masscomp)
+    if isinstance(gdat.masscomp, list):
+        gdat.masscomp = np.array(gdat.masscomp)
 
-    if isinstance(inclcomp, list):
-        inclcomp = np.array(inclcomp)
+    if isinstance(gdat.inclcomp, list):
+        gdat.inclcomp = np.array(gdat.inclcomp)
 
-    if isinstance(cosicomp, list):
-        cosicomp = np.array(cosicomp)
+    if isinstance(gdat.cosicomp, list):
+        gdat.cosicomp = np.array(gdat.cosicomp)
 
-    if isinstance(eccecomp, list):
-        eccecomp = np.array(eccecomp)
+    if isinstance(gdat.eccecomp, list):
+        gdat.eccecomp = np.array(gdat.eccecomp)
 
-    if isinstance(sinwcomp, list):
-        sinwcomp = np.array(sinwcomp)
+    if isinstance(gdat.sinwcomp, list):
+        gdat.sinwcomp = np.array(gdat.sinwcomp)
     
     # determine the input type
-    if rsmacomp is not None:
+    if gdat.rsmacomp is not None:
         typeinpt = 'rsmacomp'
     else:
         typeinpt = 'masstotlradistar'
@@ -4212,41 +4308,49 @@ def retr_rflxtranmodl( \
     if typeverb > 1:
         print('typeinpt')
         print(typeinpt)
-
+    
     if gdat.tolerrat is None:
         gdat.tolerrat = 3e-3
     
-    if gdat.facttimereso is None:
-        gdat.facttimereso = 1.
-   
     if gdat.resoplan is None:
-        gdat.resoplan = 0.05
-
+        gdat.resoplan = 0.1
+    
     # check inputs
     if booldiag:
         
-        if gdat.typesyst != 'cosc' and not ((gdat.radistar is not None and radicomp is not None) or gdat.rratcomp is not None):
+        if diffphas is not None and not isinstance(diffphas, float):
+            print('diffphas')
+            print(diffphas)
+            raise Exception('')
+
+        if tolerrat is not None and not isinstance(tolerrat, float):
+            raise Exception('')
+
+        if resoplan is not None and not isinstance(resoplan, float):
+            raise Exception('')
+
+        if gdat.typesyst != 'cosc' and not ((gdat.radistar is not None and gdat.radicomp is not None) or gdat.rratcomp is not None):
             print('gdat.radistar')
             print(gdat.radistar)
-            print('radicomp')
-            print(radicomp)
+            print('gdat.radicomp')
+            print(gdat.radicomp)
             print('gdat.rratcomp')
             print(gdat.rratcomp)
             raise Exception('')
         
-        if not ((masscomp is not None and massstar is not None) or rsmacomp is not None):
+        if not ((gdat.masscomp is not None and massstar is not None) or gdat.rsmacomp is not None):
             print('typesyst')
             print(typesyst)
-            print('masscomp')
-            print(masscomp)
+            print('gdat.masscomp')
+            print(gdat.masscomp)
             print('massstar')
             print(massstar)
-            print('rsmacomp')
-            print(rsmacomp)
+            print('gdat.rsmacomp')
+            print(gdat.rsmacomp)
             raise Exception('')
 
         # inclination
-        if inclcomp is not None and cosicomp is not None:
+        if gdat.inclcomp is not None and gdat.cosicomp is not None:
             raise Exception('')
         
         # eccentricity
@@ -4258,46 +4362,62 @@ def retr_rflxtranmodl( \
                 print(gdat.radistar)
                 raise Exception('')
         if typeinpt == 'rsmacomp':
-            if not np.isfinite(rsmacomp) or rsmacomp is None:
-                print('rsmacomp')
-                print(rsmacomp)
+            if not np.isfinite(gdat.rsmacomp).all() or gdat.rsmacomp is None:
+                print('gdat.rsmacomp')
+                print(gdat.rsmacomp)
                 raise Exception('')
         if gdat.typesyst == 'cosc':
             if massstar is None:
                 raise Exception('')
         
-            if masscomp is None:
+            if gdat.masscomp is None:
                 raise Exception('')
     
     # Boolean flag to return separate light curves for the companion and moon
     boolcompmoon = radimoon is not None
+            
+    def retr_coeflmdkkipp(u1, u2):
+        
+        q1 = (u1 + u2)**2
+        q2 = u1 / 2. / (u1 + u2)
+        
+        return q1, q2
 
-    if boolcompmoon and boolintp:
-        raise Exception('')
+
+    def retr_coeflmdkfromkipp(q1, q2):
+        
+        u1 = 2 * np.sqrt(q1) * q2
+        u2 = np.sqrt(q1) * (1. - 2. * q2)
+
+        return u1, u2
+
 
     if gdat.coeflmdk is None:
         # limb-darkening coefficient 
         if gdat.typelmdk == 'linr':
             # linear
             gdat.coeflmdk = 0.6
-        if gdat.typelmdk == 'quad':
+        if gdat.typelmdk == 'quad' or gdat.typelmdk == 'quadkipp':
             # quadratic
             gdat.coeflmdk=[0.4, 0.25]
         if gdat.typelmdk == 'nlin':
             # nonlinear
             gdat.coeflmdk=[0.2, 0.2, 0.2]
+    elif gdat.typelmdk == 'quadkipp':
+        # convert the Kipping basis to quadratic
+        gdat.coeflmdk = retr_coeflmdkfromkipp(gdat.coeflmdk[0], gdat.coeflmdk[1])
     
-    if inclcomp is not None:
-        cosicomp = np.cos(inclcomp * np.pi / 180.)
+    if gdat.inclcomp is not None:
+        gdat.cosicomp = np.cos(gdat.inclcomp * np.pi / 180.)
     
     if gdat.typesyst == 'cosc':
-        if radicomp is not None:
+        if gdat.radicomp is not None:
             if typeverb > 0:
                 print('Radius provided for the compact object...')
         else:
-            radicomp = np.array([0.])
+            gdat.radicomp = np.array([0.])
 
-    numbcomp = pericomp.size
+    numbcomp = gdat.pericomp.size
     if perimoon is not None:
         indxcomp = np.arange(numbcomp)
         numbmoon = np.empty(numbcomp, dtype=int)
@@ -4310,10 +4430,10 @@ def retr_rflxtranmodl( \
 
     if typeverb > 0:
         if typeverb > 1:
-            print('pericomp')
-            print(pericomp)
-            print('epocmtracomp')
-            print(epocmtracomp)
+            print('gdat.pericomp')
+            print(gdat.pericomp)
+            print('gdat.epocmtracomp')
+            print(gdat.epocmtracomp)
     
     if booldiag:
         if time.ndim != 1:
@@ -4324,90 +4444,88 @@ def retr_rflxtranmodl( \
     numbtime = time.size
     indxtime = np.arange(numbtime)
 
-    dictfact = retr_factconv()
+    gdat.dictfact = retr_factconv()
     
     if gdat.pathfoldanim is not None and gdat.strgextn != '':
         gdat.strgextn = '_' + gdat.strgextn
     
     if gdat.rratcomp is not None:
-        radicomp = gdat.rratcomp
+        gdat.radicomp = gdat.rratcomp
+        if gdat.radistar is not None:
+            raise Exception('')
     else:
-        gdat.rratcomp = radicomp / gdat.radistar / dictfact['rsre']
+        gdat.rratcomp = gdat.radicomp / gdat.radistar / gdat.dictfact['rsre']
         if typeverb > 1:
             print('gdat.radistar')
             print(gdat.radistar)
     
+    if typeverb > 0:
+        print('gdat.coeflmdk')
+        print(gdat.coeflmdk)
+    
     if typeinpt == 'rsmacomp':
         
         gdat.radistar = 1.
-        radicomp = gdat.rratcomp * dictfact['rsre']
         if typeverb > 0:
             print('gdat.radistar [RS]')
             print(gdat.radistar)
-            print('rsmacomp')
-            print(rsmacomp)
-            print('radicomp [RE]')
-            print(radicomp)
-        smaxcomp = 1. / (gdat.radistar + radicomp / dictfact['rsre']) / rsmacomp / dictfact['aurs']
-    
+            print('gdat.rsmacomp')
+            print(gdat.rsmacomp)
+            print('gdat.cosicomp')
+            print(gdat.cosicomp)
+        gdat.smaxcomp = (1. + gdat.rratcomp) / gdat.rsmacomp
     if typeinpt == 'masstotlradistar':
         
         if gdat.typesyst == 'psys' or gdat.typesyst == 'psyspcur':
-            masscompsolr = masscomp / dictfact['msme']
+            gdat.masscompsolr = gdat.masscomp / gdat.dictfact['msme']
         elif gdat.typesyst == 'cosc' or gdat.typesyst == 'sbin':
-            masscompsolr = masscomp
+            gdat.masscompsolr = gdat.masscomp
         else:
             print('gdat.typesyst')
             print(gdat.typesyst)
             raise Exception('')
 
         ## total mass of the system
-        masstotl = massstar + np.sum(masscompsolr)
+        masstotl = massstar + np.sum(gdat.masscompsolr)
         
         ## semi-major axis
-        smaxcomp = retr_smaxkepl(pericomp, masstotl)
+        gdat.smaxcomp = retr_smaxkepl(gdat.pericomp, masstotl)
         
         print('Estimating rsmacomp...')
-        rsmacomp = (gdat.radistar + radicomp / dictfact['rsre']) / smaxcomp / dictfact['aurs']
+        gdat.rsmacomp = (gdat.radistar + gdat.radicomp / gdat.dictfact['rsre']) / gdat.smaxcomp / gdat.dictfact['aurs']
         
         if perimoon is not None:
             smaxmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
             for j in indxcomp:
-                smaxmoon[j] = retr_smaxkepl(perimoon[j], masscompsolr[j])
+                smaxmoon[j] = retr_smaxkepl(perimoon[j], gdat.masscompsolr[j])
                 
                 for jj in indxmoon[j]:
-                    if smaxmoon[j] <= radicomp[j] / dictfact['rsre'] / dictfact['aurs']:
+                    if smaxmoon[j] <= gdat.radicomp[j] / gdat.dictfact['rsre'] / gdat.dictfact['aurs']:
                         print('smaxmoon[j] [AU]')
                         print(smaxmoon[j])
-                        print('masscomp[j] [MES]')
-                        print(masscomp[j])
-                        print('masscompsolr[j]')
-                        print(masscompsolr[j])
+                        print('gdat.masscomp[j] [MES]')
+                        print(gdat.masscomp[j])
+                        print('gdat.masscompsolr[j]')
+                        print(gdat.masscompsolr[j])
                         print('perimoon[j]')
                         print(perimoon[j])
-                        print('radicomp[j]')
-                        print(radicomp[j])
+                        print('gdat.radicomp[j]')
+                        print(gdat.radicomp[j])
                         raise Exception('')
     
-    numbcomp = pericomp.size
+    numbcomp = gdat.pericomp.size
     indxcomp = np.arange(numbcomp)
     
-    if eccecomp is None:
-        eccecomp = np.zeros(numbcomp)
-    if sinwcomp is None:
-        sinwcomp = np.zeros(numbcomp)
+    if gdat.eccecomp is None:
+        gdat.eccecomp = np.zeros(numbcomp)
+    if gdat.sinwcomp is None:
+        gdat.sinwcomp = np.zeros(numbcomp)
     
     if typeverb > 1:
         print('time')
         summgene(time)
-        print('radicomp [RE]')
-        print(radicomp)
-        print('cosicomp')
-        print(cosicomp)
-        print('rsmacomp')
-        print(rsmacomp)
-        print('smaxcomp [AU]')
-        print(smaxcomp)
+        print('gdat.smaxcomp [R_star]')
+        print(gdat.smaxcomp)
         
         print('indxcomp')
         print(indxcomp)
@@ -4426,6 +4544,13 @@ def retr_rflxtranmodl( \
         else:
             boolintp = True
 
+    if boolintp:
+        if diffphas is None:
+            diffphas = 0.0003
+        
+    if boolcompmoon and boolintp:
+        raise Exception('')
+
     if typeverb > 0:
         print('typesyst')
         print(typesyst)
@@ -4434,13 +4559,12 @@ def retr_rflxtranmodl( \
         print('typecoor')
         print(typecoor)
 
-    
-    duratrantotl = retr_duratrantotl(pericomp, rsmacomp, cosicomp) / 24.
+    duratrantotl = retr_duratrantotl(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp) / 24.
     
     dictoutp['duratrantotl'] = duratrantotl
         
     if gdat.typesyst == 'cosc':
-        amplslen = retr_amplslen(pericomp, radistar, masscomp, massstar)
+        amplslen = retr_amplslen(gdat.pericomp, radistar, gdat.masscomp, massstar)
         dictoutp['amplslen'] = amplslen
 
     if boolintp:
@@ -4460,29 +4584,12 @@ def retr_rflxtranmodl( \
                 if gdat.typesyst == 'sbin' and (gdat.rratcomp == 0).any():
                     raise Exception('')
 
-            duratranfull = retr_duratranfull(pericomp, rsmacomp, cosicomp, gdat.rratcomp) / 24.
+            duratranfull = retr_duratranfull(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, gdat.rratcomp) / 24.
+            dictoutp['duratranfull'] = duratranfull
         
         numbtimecomp = [[] for j in indxcomp]
         indxtimecomp = [[] for j in indxcomp]
-        numbtimecompingr = [[] for j in indxcomp]
-        numbtimecompfull = [[] for j in indxcomp]
-        if gdat.typesyst == 'cosc':
-            numbtimecomp[0] = int(gdat.facttimereso * 75)
-            numbtimecompfull[0] = int(gdat.facttimereso * 75)
-        else:
-            for j in indxcomp:
-                numbtimecompingr[j] = int(gdat.facttimereso * 25)
-                if np.isfinite(duratranfull[j]):
-                    numbtimecompfull[j] = int(numbtimecompingr[j] * (duratrantotl[j] - duratranfull[j]) / duratrantotl[j])
-                else:
-                    numbtimecompfull[j] = 0
-                numbtimecomp[j] = numbtimecompfull[j] + 2 * numbtimecompingr[j]
         
-        for j in indxcomp:
-            indxtimecomp[j] = np.arange(numbtimecomp[j])
-        
-        maxphastrantotl = duratrantotl / pericomp / 2.
-    
     phas = [[] for j in indxcomp]
     for j in indxcomp:
         
@@ -4490,7 +4597,7 @@ def retr_rflxtranmodl( \
             print('j')
             print(j)
         
-        phas[j] = ((time - epocmtracomp[j]) / pericomp[j] + 0.5) % 1. - 0.5
+        phas[j] = ((time - gdat.epocmtracomp[j]) / gdat.pericomp[j] + 0.5) % 1. - 0.5
         
         if booldiag:
             if np.isscalar(phas[j]):
@@ -4500,92 +4607,24 @@ def retr_rflxtranmodl( \
             print('phas[j]')
             summgene(phas[j])
 
-        if boolintp:
-            if not np.isfinite(duratrantotl[j]) or duratrantotl[j] == 0.:
-                continue
-
-            if gdat.typesyst == 'cosc':
-                timecompinen = -0.5 * duratrantotl[j]
-                timecompegst = 0.5 * duratrantotl[j]
-            else:
-                timecompinst = -duratrantotl[j] / 2.
-                timecompegen = duratrantotl[j] / 2.
-                if np.isfinite(duratranfull[j]):
-                    timecompinen = timecompinst + 0.5 * (duratrantotl[j] - duratranfull[j])
-                    timecompegst = timecompegen - 0.5 * (duratrantotl[j] - duratranfull[j])
-                else:
-                    timecompinen = 0.
-                    timecompegst = 0.
-            listtimetemp = []
-            if gdat.typesyst == 'cosc':
-                listtimetemp.append(np.linspace(timecompinen, timecompegst, numbtimecompfull[j]))
-            else:
-                listtimetemp += [np.linspace(timecompinst, timecompinen, numbtimecompingr[j])]
-                if numbtimecompfull[j] > 0:
-                    listtimetemp.append(np.linspace(timecompinen, timecompegst, numbtimecompfull[j] + 1)[1:])
-                listtimetemp.append(np.linspace(timecompegst, timecompegen, numbtimecompingr[j] + 1)[1:])
-            timecomp[j] = np.concatenate(listtimetemp)
-            
-            phascomp[j] = (timecomp[j] / pericomp[j] + 0.5) % 1. - 0.5
-            
-            if booldiag:
-                if (timecomp[j][1:] - timecomp[j][:-1] <= 0).any() or not np.isfinite(timecomp[j]).all():
-                    print('')
-                    print('')
-                    print('')
-                    print('gdat.typesyst')
-                    print(gdat.typesyst)
-                    print('pericomp')
-                    print(pericomp)
-                    print('rsmacomp')
-                    print(rsmacomp)
-                    print('cosicomp')
-                    print(cosicomp)
-                    print('duratrantotl[j]')
-                    print(duratrantotl[j])
-                    print('duratranfull[j]')
-                    print(duratranfull[j])
-                    print('numbtimecompfull[j]')
-                    print(numbtimecompfull[j])
-                    print('timecompinst')
-                    print(timecompinst)
-                    print('timecompinen')
-                    print(timecompinen)
-                    print('timecompegst')
-                    print(timecompegst)
-                    print('timecompegen')
-                    print(timecompegen)
-                    print('np.isfinite(timecomp[j]).all()')
-                    print(np.isfinite(timecomp[j]).all())
-                    print('listtimetemp')
-                    print(listtimetemp)
-                    print('timecomp[j]')
-                    print(timecomp[j])
-                    raise Exception('')
-                if not np.isfinite(phascomp[j]).all():
-                    print('timecomp[j]')
-                    summgene(timecomp[j])
-                    print('duratrantotl')
-                    print(duratrantotl)
-                    raise Exception('')
-        
-                if np.isscalar(phascomp[j]):
-                    raise Exception('')
-        
     # grids
     if gdat.typesyst != 'cosc' and not (gdat.rratcomp > gdat.tolerrat).all():
+        print('gdat.tolerrat')
+        print(gdat.tolerrat)
+        print('gdat.rratcomp')
+        print(gdat.rratcomp)
         print('WARNING! At least one of the occulter radii is smaller than the grid resolution. The output will be unreliable.')
     
     if gdat.typesyst == 'cosc':
-        diffgrid = 0.01
+        diffgrid = 0.05
         gdat.wdthslen = np.array([0.1])
-        gdat.radieins = 0.04273 * np.sqrt(masscomp * smaxcomp) / radistar
+        gdat.radieins = 0.04273 * np.sqrt(gdat.masscomp * gdat.smaxcomp) / radistar
 
         if gdat.booldiag:
             if numbcomp > 1:
                 raise Exception('')
 
-    elif not (gdat.rratcomp > gdat.tolerrat).any():
+    elif (gdat.rratcomp <= gdat.tolerrat).all():
         diffgrid = 0.01
     else:
         diffgrid = gdat.resoplan * np.amin(gdat.rratcomp[gdat.rratcomp > gdat.tolerrat])
@@ -4604,7 +4643,7 @@ def retr_rflxtranmodl( \
             else:
                 arryplan = np.arange(-gdat.rratcomp[j] - 2. * diffgrid, gdat.rratcomp[j] + 3. * diffgrid, diffgrid)
             gdat.xposgridplan[j], gdat.yposgridplan[j] = np.meshgrid(arryplan, arryplan)
-    
+            
             if gdat.typesyst == 'cosc':
                 # distance to the points in the planet grid
                 gdat.distgridplan[j] = np.sqrt(gdat.xposgridplan[j]**2 + gdat.yposgridplan[j]**2)
@@ -4619,7 +4658,7 @@ def retr_rflxtranmodl( \
     ## star
     arrystar = np.arange(-1. - 2. * diffgrid, 1. + 3. * diffgrid, diffgrid)
     gdat.xposgridstar, gdat.yposgridstar = np.meshgrid(arrystar, arrystar)
-    
+
     # distance to the points in the star grid
     gdat.distgridstar = np.sqrt(gdat.xposgridstar**2 + gdat.yposgridstar**2)
     
@@ -4642,14 +4681,14 @@ def retr_rflxtranmodl( \
     gdat.brgtstarnocc = np.sum(gdat.brgtgridstar)
     
     if boolintp:
-        fluxtotlcomp = [np.full(numbtimecomp[j], gdat.brgtstarnocc) for j in indxcomp]
+        fluxtotlcomp = [[] for j in indxcomp]
     
     if gdat.typecoor == 'star':
         gdat.xposcomp = [[] for j in indxcomp]
         gdat.yposcomp = [[] for j in indxcomp]
         if perimoon is not None:
-            xposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
-            yposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
+            gdat.xposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
+            gdat.yposmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
         
     if gdat.typecoor == 'plan':
         gdat.xposstar = [[] for j in indxcomp]
@@ -4657,36 +4696,16 @@ def retr_rflxtranmodl( \
         
     for j in indxcomp:
         
-        if boolintp and not np.isfinite(duratrantotl[j]) or duratrantotl[j] == 0.:
-            continue
-        
-        if boolintp:
-            phastemp = phascomp[j]
-        else:
+        if not boolintp:
             phastemp = phas[j]
+            calc_posifromphas(gdat, j, phastemp)
         
-        if booldiag:
-            if phastemp.size == 1:
-                print('boolintp')
-                print(boolintp)
-                raise Exception('')
-
-        xpos = smaxcomp[j] * np.sin(2. * np.pi * phastemp) / gdat.radistar * dictfact['aurs']
-        ypos = cosicomp[j] * smaxcomp[j] / gdat.radistar * dictfact['aurs']
+            if booldiag:
+                if phastemp.size == 1:
+                    print('boolintp')
+                    print(boolintp)
+                    raise Exception('')
         
-        if gdat.typecoor == 'star':
-            gdat.xposcomp[j] = xpos
-            gdat.yposcomp[j] = ypos
-            
-            if perimoon is not None:
-                for jj in indxmoon[j]:
-                    xposmoon[j][jj] = gdat.xposcomp[j] + smaxmoon[j][jj] * np.cos(2. * np.pi * (time - epocmtramoon[j][jj]) / perimoon[j][jj]) / gdat.radistar * dictfact['aurs']
-                    yposmoon[j][jj] = gdat.yposcomp[j] + smaxmoon[j][jj] * np.sin(2. * np.pi * (time - epocmtramoon[j][jj]) / perimoon[j][jj]) / gdat.radistar * dictfact['aurs']
-                
-        if gdat.typecoor == 'plan':
-            gdat.xposstar[j] = -xpos
-            gdat.yposstar[j] = -ypos
-    
     if boolcompmoon:
         numbitermoon = 2
     else:
@@ -4696,9 +4715,6 @@ def retr_rflxtranmodl( \
     
     for a in range(numbitermoon):
         
-        #print('a')
-        #print(a)
-
         if a == 0:
             gdat.strgcompmoon = ''
         else:
@@ -4718,27 +4734,31 @@ def retr_rflxtranmodl( \
                  
                 if gdat.typesyst != 'cosc' and gdat.rratcomp[j] < gdat.tolerrat:
                     continue
+                
+                t = 0
+                phasthis = -0.25
+                while phasthis < 0.25:
                     
-                for t in indxtimecomp[j]:
+                    calc_posifromphas(gdat, j, phasthis)
 
                     if gdat.typecoor == 'plan':
                         
-                        if gdat.typesyst != 'cosc' and (np.sqrt(gdat.xposstar[j][t]**2 + gdat.yposstar[j]**2) < 1. + gdat.rratcomp[j]):
-                            booleval = True
-                        elif gdat.typesyst == 'cosc' and (np.sqrt(gdat.xposstar[j][t]**2 + gdat.yposstar[j]**2) < 1. + gdat.wdthslen[j]):
-                            booleval = True
+                        if gdat.typesyst != 'cosc' and (np.sqrt(gdat.xposstar[j]**2 + gdat.yposstar[j]**2) < 1. + 1.1 * gdat.rratcomp[j]):
+                            boolevaltranprim = True
+                        elif gdat.typesyst == 'cosc' and (np.sqrt(gdat.xposstar[j]**2 + gdat.yposstar[j]**2) < 1. + gdat.wdthslen[j]):
+                            boolevaltranprim = True
                         else:
-                            booleval = False
+                            boolevaltranprim = False
 
                     if gdat.typecoor == 'star':
-                        if gdat.typesyst != 'cosc' and (np.sqrt(gdat.xposcomp[j][t]**2 + gdat.yposcomp[j]**2) < 1. + gdat.rratcomp[j]):
-                            booleval = True
-                        elif gdat.typesyst == 'cosc' and (np.sqrt(gdat.xposcomp[j][t]**2 + gdat.yposcomp[j]**2) < 1. + gdat.wdthslen[j]):
-                            booleval = True
+                        if gdat.typesyst != 'cosc' and (np.sqrt(gdat.xposcomp[j]**2 + gdat.yposcomp[j]**2) < 1. + 1.1 * gdat.rratcomp[j]):
+                            boolevaltranprim = True
+                        elif gdat.typesyst == 'cosc' and (np.sqrt(gdat.xposcomp[j]**2 + gdat.yposcomp[j]**2) < 1. + gdat.wdthslen[j]):
+                            boolevaltranprim = True
                         else:
-                            booleval = False
+                            boolevaltranprim = False
     
-                    if booleval:
+                    if boolevaltranprim:
                         
                         if gdat.typecoor == 'plan':
                             
@@ -4747,11 +4767,13 @@ def retr_rflxtranmodl( \
                                 gdat.boolgridoccu = retr_boolnocccomp(gdat, j, t, boolinve=True)
                             
                             # distance from the points in the planet grid to the star
-                            gdat.diststargridplan = np.sqrt((gdat.xposgridplan[j] - gdat.xposstar[j][t])**2 + (gdat.yposgridplan[j] - gdat.yposstar[j])**2)
+                            #gdat.diststargridplan = np.sqrt((gdat.xposgridplan[j] - gdat.xposstar[j][t])**2 + (gdat.yposgridplan[j] - gdat.yposstar[j])**2)
+                            gdat.diststargridplan = np.sqrt((gdat.xposgridplan[j] - gdat.xposstar[j])**2 + (gdat.yposgridplan[j] - gdat.yposstar[j])**2)
                         
                             # Booleans indicating whether planet grid points are within the star
                             gdat.boolgridplanstar = gdat.diststargridplan < 1.
                             
+
                             if gdat.typesyst != 'cosc':
                                 # Booleans indicating whether planet grid points are within the star and occulted
                                 booloccu = gdat.boolgridplanstar & gdat.boolgridoccu
@@ -4759,8 +4781,8 @@ def retr_rflxtranmodl( \
                                 # stellar flux occulted
                                 deltflux = -retr_fluxstartrantotl(gdat, t, booloccu)
                             
-                                fluxtotlcomp[j][t] += deltflux
-                        
+                                fluxtotlcomp[j].append(gdat.brgtstarnocc + deltflux)
+                            
                             else:
                                 # stellar flux in the planet grid
                                 fluxstartrantotl = retr_fluxstartrantotl(gdat, t, gdat.boolgridplanstar)
@@ -4775,14 +4797,7 @@ def retr_rflxtranmodl( \
                                 
                                 brtglens = retr_brgtlens(gdat, t)
                                 
-                                np.set_printoptions(precision=1, linewidth=180)
-
-                                print('brtglens')
-                                print(brtglens)
-                                print('')
-                                print('')
-                                print('')
-                                fluxtotlcomp[j][t] += np.sum(brtglens) - fluxstartrantotl
+                                fluxtotlcomp[j].append(gdat.brgtstarnocc + np.sum(brtglens) - fluxstartrantotl)
 
                         if gdat.typecoor == 'star':
                             # Booleans indicating whether planet grid points are NOT occulted
@@ -4790,23 +4805,26 @@ def retr_rflxtranmodl( \
                             
                             gdat.boolgridstarbrgt = gdat.boolgridstarstar & boolnocccomp
         
-                            fluxtotlcomp[j][t] = retr_fluxstartrantotl(gdat, t, gdat.boolgridstarbrgt)
+                            fluxtotlcomp[j].append(retr_fluxstartrantotl(gdat, t, gdat.boolgridstarbrgt))
                             
                         anim_fluxtotl(gdat, t, j=j)
     
                         if booldiag:
-                            if abs(fluxtotlcomp[j][t]) > 1e20:
+                            if abs(fluxtotlcomp[j][-1]) > 1e20:
                                 print('jt')
                                 print(j, t)
                                 print('fluxtotlcomp[j]')
                                 summgene(fluxtotlcomp[j])
                                 raise Exception('')
 
+                        phascomp[j].append(phasthis)
+                    phasthis += diffphas
+                    t += 1
         else:
             
             for t in tqdm(range(numbtime)):
                 cntrtemp = 0
-                booleval = False
+                boolevaltranprim = False
                 
                 for j in indxcomp:
                 
@@ -4817,13 +4835,13 @@ def retr_rflxtranmodl( \
                         continue
             
                     if gdat.typesyst != 'cosc' and (np.sqrt(gdat.xposcomp[j][t]**2 + gdat.yposcomp[j]**2) < 1. + gdat.rratcomp[j]):
-                        booleval = True
+                        boolevaltranprim = True
                         cntrtemp += 1
 
                     if cntrtemp == 1:
                         gdat.boolgridstarbrgt = np.copy(gdat.boolgridstarstar)
                                     
-                    if booleval:
+                    if boolevaltranprim:
                         boolnocccomp = retr_boolnocccomp(gdat, j, t)
                         gdat.boolgridstarbrgt = gdat.boolgridstarbrgt & boolnocccomp
     
@@ -4832,23 +4850,23 @@ def retr_rflxtranmodl( \
 
                         for jj in indxmoon[j]:
                             
-                            if np.sqrt(xposmoon[j][jj][t]**2 + yposmoon[j][jj][t]**2) < 1. + rratmoon[j][jj]:
+                            if np.sqrt(gdat.xposmoon[j][jj][t]**2 + gdat.yposmoon[j][jj][t]**2) < 1. + rratmoon[j][jj]:
                                 
-                                booleval = True
+                                boolevaltranprim = True
                                 cntrtemp += 1
 
                                 if cntrtemp == 1:
                                     gdat.boolgridstarbrgt = np.copy(gdat.boolgridstarstar)
                                     
-                                xposgridmoon = gdat.xposgridstar - xposmoon[j][jj][t]
-                                yposgridmoon = gdat.yposgridstar - yposmoon[j][jj][t]
+                                xposgridmoon = gdat.xposgridstar - gdat.xposmoon[j][jj][t]
+                                yposgridmoon = gdat.yposgridstar - gdat.yposmoon[j][jj][t]
                                 
                                 distmoon = np.sqrt(xposgridmoon**2 + yposgridmoon**2)
                                 boolnoccmoon = distmoon > rratmoon[j][jj]
                                 
                                 gdat.boolgridstarbrgt = gdat.boolgridstarbrgt & boolnoccmoon
             
-                if booleval:
+                if boolevaltranprim:
                     fluxtotl[t] = retr_fluxstartrantotl(gdat, t, gdat.boolgridstarbrgt)
                     anim_fluxtotl(gdat, t)
                         
@@ -4857,53 +4875,87 @@ def retr_rflxtranmodl( \
             # make the animation
             gdat.cmndmakeanim += ' %s' % gdat.pathgiff
             print('Writing to %s...' % gdat.pathgiff)
-            print(gdat.cmndmakeanim)
             os.system(gdat.cmndmakeanim)
             
             # delete images
             os.system(gdat.cmnddeleimag)
 
     if boolintp:
+        
+        for j in indxcomp:
+        
+            fluxtotlcomp[j] = np.array(fluxtotlcomp[j])
+            phascomp[j] = np.array(phascomp[j])
+            numbtimecomp[j] = fluxtotlcomp[j].size
+            indxtimecomp[j] = np.arange(numbtimecomp[j])
+        
+            if booldiag:
+                if booldiagtran:
+                    if (fluxtotlcomp[j] == 1.).all():
+                        raise Exception('')
+
         for j in indxcomp:
             
             if not np.isfinite(duratrantotl[j]) or duratrantotl[j] == 0.:
                 continue
             
-            indxphasintr = np.where(abs(phas[j]) < maxphastrantotl[j])[0]
-            
-            #try:
-            diff = gdat.brgtstarnocc - scipy.interpolate.interp1d(phascomp[j], fluxtotlcomp[j])(phas[j][indxphasintr])
-            #except:
-            #    print('')
-            #    print('')
-            #    print('')
-            #    print('gdat.typesyst')
-            #    print(gdat.typesyst)
-            #    print('phas[j]')
-            #    summgene(phas[j])
-            #    print('phas[j][indxphasintr]')
-            #    summgene(phas[j][indxphasintr])
-            #    print('phascomp[j]')
-            #    summgene(phascomp[j])
-            #    print('fluxtotlcomp[j]')
-            #    summgene(fluxtotlcomp[j])
-            #    raise Exception('')
+            if phascomp[j].size > 1:
+                
+                indxphasintr = np.where((phas[j] > np.amin(phascomp[j])) & (phas[j] < np.amax(phascomp[j])))[0]
+                if indxphasintr.size > 0:
+                    diff = gdat.brgtstarnocc - scipy.interpolate.interp1d(phascomp[j], fluxtotlcomp[j])(phas[j][indxphasintr])
+                    fluxtotl[indxphasintr] -= diff
+                #try:
+                #    diff = gdat.brgtstarnocc - scipy.interpolate.interp1d(phascomp[j], fluxtotlcomp[j])(phas[j][indxphasintr])
+                #except:
+                #    print('')
+                #    print('')
+                #    print('')
+                #    print('gdat.typesyst')
+                #    print(gdat.typesyst)
+                #    print('phas[j]')
+                #    summgene(phas[j])
+                #    print('phas[j][indxphasintr]')
+                #    summgene(phas[j][indxphasintr])
+                #    print('phascomp[j]')
+                #    summgene(phascomp[j])
+                #    print('fluxtotlcomp[j]')
+                #    summgene(fluxtotlcomp[j])
+                #    raise Exception('')
 
-            fluxtotl[indxphasintr] -= diff
-        
-    rflxtranmodl = fluxtotl / np.amax(fluxtotl)
-    print('rflxtranmodl')
-    summgene(rflxtranmodl)
+            else:
+                fluxtotl = np.full_like(phas[j], gdat.brgtstarnocc)
+    maxmfluxtotl = np.amax(fluxtotl)
+   
+    if booldiag:
+        if gdat.typesyst != 'cosc' and  maxmfluxtotl > gdat.brgtstarnocc:
+            print('gdat.coeflmdk')
+            print(gdat.coeflmdk)
+            print('fluxtotl')
+            summgene(fluxtotl)
+            raise Exception('')
+    
+    rflxtranmodl = fluxtotl / maxmfluxtotl
+    
     dictoutp['rflx'] = rflxtranmodl
     
-    if masscomp is not None and massstar is not None and radistar is not None:
+    if booldiag:
+        if booldiagtran:
+            if (rflxtranmodl == 1.).all():
+                if boolintp:
+                    for j in indxcomp:
+                        print('phascomp[j]')
+                        summgene(phascomp[j])
+                        print('fluxtotlcomp[j]')
+                        summgene(fluxtotlcomp[j])
+                raise Exception('')
+
+    if gdat.masscomp is not None and massstar is not None and radistar is not None:
         densstar = 1.4 * massstar / radistar**3
-        deptbeam = 1e-3 * retr_deptbeam(pericomp, massstar, masscomp)
-        deptelli = 1e-3 * retr_deptelli(pericomp, densstar, massstar, masscomp)
+        deptbeam = 1e-3 * retr_deptbeam(gdat.pericomp, massstar, gdat.masscomp)
+        deptelli = 1e-3 * retr_deptelli(gdat.pericomp, densstar, massstar, gdat.masscomp)
         dictoutp['rflxbeam'] = [[] for j in indxcomp]
         dictoutp['rflxelli'] = [[] for j in indxcomp]
-        print('dictoutp[rflx]')
-        summgene(dictoutp['rflx'])
 
         for j in indxcomp:
             
@@ -4911,13 +4963,9 @@ def retr_rflxtranmodl( \
             
             dictoutp['rflxbeam'][j] = 1. + deptbeam * np.sin(phas[j])
             dictoutp['rflxelli'][j] = 1. + deptelli * np.sin(2. * phas[j])
-        
+            
             dictoutp['rflx'] += dictoutp['rflxelli'][j] - 2.
             dictoutp['rflx'] += dictoutp['rflxbeam'][j]
-
-            print('dictoutp[rflx]')
-            summgene(dictoutp['rflx'])
-
 
     if boolcompmoon:
         rflxtranmodlcomp /= np.amax(rflxtranmodlcomp)
@@ -4948,23 +4996,23 @@ def retr_rflxtranmodl( \
         #summgene(rflxtranmodlcomp)
         print('fluxtotl')
         summgene(fluxtotl)
-        print('pericomp')
-        print(pericomp)
-        print('masscomp')
-        print(masscomp)
+        print('gdat.pericomp')
+        print(gdat.pericomp)
+        print('gdat.masscomp')
+        print(gdat.masscomp)
         print('massstar')
         print(massstar)
         if typeinpt == 'masstotlradistar':
             print('masstotl')
             print(masstotl)
-        print('smaxcomp')
-        print(smaxcomp)
+        print('gdat.smaxcomp')
+        print(gdat.smaxcomp)
         print('gdat.rratcomp')
         print(gdat.rratcomp)
-        print('cosicomp')
-        print(cosicomp)
-        print('rsmacomp')
-        print(rsmacomp)
+        print('gdat.cosicomp')
+        print(gdat.cosicomp)
+        print('gdat.rsmacomp')
+        print(gdat.rsmacomp)
         print('duratrantotl')
         print(duratrantotl)
         raise Exception('')
@@ -4975,6 +5023,21 @@ def retr_rflxtranmodl( \
 
     return dictoutp
 
+
+def retr_toiifstr():
+    '''
+    Return the TOI IDs that have been alerted by the FaintStar project
+    '''
+    
+    dicttoii = retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1, strgelem='plan')
+    listtoiifstr = []
+    for k in range(len(dicttoii['strgcomm'])):
+        if isinstance(dicttoii['strgcomm'][k], str) and 'found in faint-star QLP search' in dicttoii['strgcomm'][k]:
+            listtoiifstr.append(dicttoii['nametoii'][k][4:])
+    listtoiifstr = np.array(listtoiifstr)
+
+    return listtoiifstr
+    
 
 def retr_radifrommass( \
                       # list of planet masses in units of Earth mass
@@ -5295,8 +5358,11 @@ def retr_dictexar( \
         # ecliptic latitude
         dictexar['laecstar'] = np.array([objticrs.barycentricmeanecliptic.lat.degree])[0, :]
 
+        # radius ratio
         dictexar['rrat'] = dictexar[strgradielem] / dictexar['radistar'] / dictfact['rsre']
         
+        # sum of the companion and stellar radii divided by the semi-major axis
+        dictexar['rsma'] = (dictexar[strgradielem] / dictfact['rsre'] + dictexar['radistar']) / (dictexar['smaxcomp'] * dictfact['aurs'])
 
         # calculate TSM and ESM
         calc_tsmmesmm(dictexar, strgelem=strgelem)
@@ -5355,13 +5421,13 @@ def retr_duratranfull(
     fact = rdiacomp**2 - cosicomp**2
     
     duratranfull = np.full_like(pericomp, np.nan)
-    indxtran = np.where(fact > 0)
+    indxtran = np.where(fact > 0)[0]
     
-    # sine of inclination
-    sinicomp = np.sqrt(1. - cosicomp[indxtran]**2)
+    if indxtran.size > 0:
+        # sine of inclination
+        sinicomp = np.sqrt(1. - cosicomp[indxtran]**2)
     
-    #duratranfull = 24. * peri / np.pi * np.arcsin(rs2a / sinicomp * np.sqrt((1. - rrat)**2 - imfa**2)) # [hours]
-    duratranfull[indxtran] = 24. * pericomp[indxtran] / np.pi * np.arcsin(np.sqrt(fact[indxtran]) / sinicomp) # [hours]
+        duratranfull[indxtran] = 24. * pericomp[indxtran] / np.pi * np.arcsin(np.sqrt(fact[indxtran]) / sinicomp) # [hours]
 
     return duratranfull 
 
@@ -5380,14 +5446,14 @@ def retr_duratrantotl( \
     
     fact = rsmacomp**2 - cosicomp**2
     
-    indxtran = np.where(fact > 0)
-    
     duratrantotl = np.full_like(pericomp, np.nan)
+    indx = np.where(fact >= 0.)[0]
         
-    # sine of inclination
-    sinicomp = np.sqrt(1. - cosicomp**2)
+    if indx.size > 0:
+        # sine of inclination
+        sinicomp = np.sqrt(1. - cosicomp[indx]**2)
     
-    duratrantotl = 24. * pericomp / np.pi * np.arcsin(np.sqrt(fact) / sinicomp) # [hours]
+        duratrantotl[indx] = 24. * pericomp[indx] / np.pi * np.arcsin(np.sqrt(fact[indx]) / sinicomp) # [hours]
     
     return duratrantotl
 
