@@ -8,10 +8,9 @@ Ephesus is a library for exoplanet science. It provides functions for processing
 Ephesus library contains a suite of functions useful in time-domain and/or exoplanet research.
 
 ### Peridic box finder
-
 Using the Box Least Squares (BLS) algorithm, `ephesus.srch_pbox()` searches for periodic boxes in time-series data.
 
 
 ### Light Curve Generator
-Integrating over the sky-projected brightness distribution of stars and planets, `ephesus.retr_rflxtranmodl()` generates the relative flux light curve of a system of stars, compact objects, and planets. You can see an example model evaluation ![in this plot](https://github.com/tdaylan/ephesus/blob/master/visuals/lcur.png).
+Integrating over the sky-projected brightness distribution of bodies in a system, `ephesus.retr_rflxtranmodl()` generates the relative flux light curve of a system of stars, compact objects, and planets. You can see an example model evaluation below, where a hot Jupiter transits a Sun-like star. ![in this plot](https://github.com/tdaylan/ephesus/blob/master/visuals/lcur.png)
 
