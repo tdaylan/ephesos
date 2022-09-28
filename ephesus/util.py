@@ -798,7 +798,7 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1, strgelem='plan'
         dicttoii['stdvlumistar'] = dicttoii['lumistar'] * np.sqrt((2 * dicttoii['stdvradistar'] / dicttoii['radistar'])**2 + \
                                                                         (4 * dicttoii['stdvtmptstar'] / dicttoii['tmptstar'])**2)
 
-        # mass from radii
+        # predicted mass from radii
         path = pathlygo + 'exofop_toi_mass_saved.csv'
         if not os.path.exists(path):
             dicttemp = dict()
@@ -841,6 +841,11 @@ def retr_dicttoii(toiitarg=None, boolreplexar=False, typeverb=1, strgelem='plan'
                     dicttemp[name] = dicttemp[name][indxcomp]
 
         dicttoii[strgmasselem] = dicttemp['mass' + strgelem]
+        
+        perielem = dicttoii['peri'+strgelem]
+        masselem = dicttoii['mass'+strgelem]
+
+        dicttoii['rvelsemapred'] = retr_rvelsema(perielem, dicttoii['massstar'], masselem, 90., 0.)
         
         dicttoii['stdvmass' + strgelem] = dicttemp['stdvmass' + strgelem]
         
@@ -4312,8 +4317,8 @@ def retr_rvelsema( \
     
     dictfact = tdpy.retr_factconv()
     
-    rvelsema = 203. * peri**(-1. / 3.) * masscomp * np.sin(incl / 180. * np.pi) / \
-                                                    (masscomp + massstar * dictfact['msme'])**(2. / 3.) / np.sqrt(1. - ecce**2) # [m/s]
+    rvelsema = 203. * pericomp**(-1. / 3.) * masscomp * np.sin(inclcomp / 180. * np.pi) / \
+                                                    (masscomp + massstar * dictfact['msme'])**(2. / 3.) / np.sqrt(1. - eccecomp**2) # [m/s]
 
     return rvelsema
 
