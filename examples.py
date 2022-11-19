@@ -105,11 +105,11 @@ def make_rflx( \
      
     # type of systems to be illustrated
     listtypesyst = [ \
-                    #'psys', \
+                    'psys', \
                     #'turkey', \
-                    'cosc', \
                     #'psysmoon', \
                     #'psyspcur', \
+                    #'cosc', \
                     ]
     
     # Boolean flag to overwrite visuals
@@ -167,6 +167,8 @@ def make_rflx( \
         return strgtitl
 
 
+    dictfact = tdpy.retr_factconv()
+
     dictsimu = dict()
 
     dictlistvalu = dict()
@@ -186,7 +188,11 @@ def make_rflx( \
         
         listnamevarbcomp = ['pericomp', 'epocmtracomp', 'cosicomp', 'rsmacomp'] 
         listnamevarbstar = ['radistar', 'coeflmdklinr', 'coeflmdkquad']
-        listnamevarbsimu = ['tolerrat', 'diffphas', 'typecoor']
+        
+        # model resolution
+        listnamevarbsimu = ['tolerrat', 'diffphas']
+        #listnamevarbsimu += ['typecoor']
+        
         if typesyst == 'cosc':
             listnamevarbcomp += ['masscomp']
             listnamevarbstar += ['massstar']
@@ -199,14 +205,16 @@ def make_rflx( \
         listnamevarbtotl = listnamevarbsyst + listnamevarbsimu
         
         dictdefa = dict()
-        for strgvarb in ['cosicomp', 'radicomp']:
-            dictdefa[strgvarb] = dict()
+        dictdefa['cosicomp'] = dict()
         dictdefa['cosicomp']['labl'] = ['$\cos i$', '']
         dictdefa['cosicomp']['scal'] = 'self'
-        dictdefa['radicomp']['labl'] = ['$R_p$', '$R_\oplus$']
-        dictdefa['radicomp']['scal'] = 'self'
+        if typesyst != 'cosc':
+            dictdefa['radicomp'] = dict()
+            dictdefa['radicomp']['labl'] = ['$R_p$', '$R_\oplus$']
+            dictdefa['radicomp']['scal'] = 'self'
 
-        listlablpara, listscalpara, listlablroot, listlablunit, listlabltotl = tdpy.retr_listlablscalpara(listnamevarbtotl, dictdefa=dictdefa, typelang=typelang)
+        listlablpara, listscalpara, listlablroot, listlablunit, listlabltotl = tdpy.retr_listlablscalpara(listnamevarbtotl, \
+                                                                                            dictdefa=dictdefa, typelang=typelang, boolmath=True)
         
         # turn lists of labels into dictionaries
         for k, strgvarb in enumerate(listnamevarbtotl):
@@ -225,24 +233,32 @@ def make_rflx( \
         
         dictvaludefa['epocmtracomp'] = 0.
         dictvaludefa['pericomp'] = 3.
-        dictvaludefa['cosicomp'] = 0.01
+        dictvaludefa['cosicomp'] = 0.
         dictvaludefa['rsmacomp'] = 0.1
         if typesyst == 'cosc':
             dictvaludefa['masscomp'] = 1e-1 # [M_S]
         else:
-            dictvaludefa['resoplan'] = 0.1
+            dictvaludefa['resoplan'] = 0.01
             dictvaludefa['radicomp'] = 10. # [R_E]
             #dictvaludefa['typebrgtcomp'] = np.array(['dark'])
-        dictvaludefa['tolerrat'] = 0.01
-        dictvaludefa['diffphas'] = 0.0005
-        if typesyst == 'psysmoon' or typesyst == 'turkey':
+        dictvaludefa['tolerrat'] = 0.005
+        dictvaludefa['diffphas'] = 1e-4
+        if typesyst == 'psysmoon':
             dictvaludefa['typecoor'] = 'star'
         else:
-            dictvaludefa['typecoor'] = 'plan'
+            dictvaludefa['typecoor'] = 'comp'
         
-        for name in listnamevarbtotl + ['visu', 'radicompsmal', 'radicomplarg']:
-            if name == 'epocmtracomp' or name == 'radicomp':
-                continue
+        # list of names for runs
+        listnamevarbuber = []
+        for name in listnamevarbtotl:
+            if name != 'epocmtracomp' and name != 'radicomp':
+                listnamevarbuber.append(name)
+        listnamevarbuber += ['visu']
+        if typesyst != 'cosc':
+            if typesyst != 'turkey':
+                listnamevarbuber += ['radicompsmal', 'radicomplarg']
+
+        for name in listnamevarbuber:
             dictlistvalu[name] = dict()
             dictlistvalu[name]['defa'] = dict()
             dictlistvalu[name]['vari'] = dict()
@@ -262,38 +278,42 @@ def make_rflx( \
                 dictlistvalu['radicompsmal']['vari']['radicomp'] = np.array([0.5, 1., 1.5]) # [R_E]
                 dictlistvalu['radicomplarg']['vari']['radicomp'] = np.array([8., 10., 12.]) # [R_E]
                 
-        dictlistvalu['visu']['defa']['diffphas'] = 0.00003
+        #dictlistvalu['visu']['defa']['diffphas'] = 0.00003
         dictlistvalu['visu']['defa']['typecoor'] = 'star'
         if typesyst != 'cosc':
-            dictlistvalu['visu']['defa']['resoplan'] = 0.01
+            #dictlistvalu['visu']['defa']['resoplan'] = 0.01
             if typesyst == 'turkey':
                 dictlistvalu['visu']['vari']['radicomp'] = np.array([30.]) # [R_E]
             else:
                 dictlistvalu['visu']['vari']['radicomp'] = np.array([10.]) # [R_E]
         
-        if typesyst != 'cosc':
-            dictlistvalu['typecoor']['vari']['typecoor'] = ['star', 'plan']
+        #dictlistvalu['typecoor']['vari']['typecoor'] = ['star', 'comp']
         dictlistvalu['pericomp']['vari']['pericomp'] = np.array([1., 3., 5.])
         dictlistvalu['cosicomp']['vari']['cosicomp'] = np.array([0., 0.06, 0.09])
         dictlistvalu['rsmacomp']['vari']['rsmacomp'] = np.array([0.05, 0.1, 0.15])
         dictlistvalu['tolerrat']['vari']['tolerrat'] = np.array([0.001, 0.01, 0.1])
         if typesyst != 'cosc':
-            dictlistvalu['resoplan']['vari']['resoplan'] = np.array([0.05, 0.08, 0.2])
+            dictlistvalu['resoplan']['vari']['resoplan'] = np.array([0.01, 0.03, 0.08])
         dictlistvalu['diffphas']['vari']['diffphas'] = np.array([0.00001, 0.00003, 0.0001, 0.0003, 0.001])
         
         numbcomp = 1
-        boolintp = True
                 
         dicttemp = dict()
         for nameruns in dictlistvalu.keys():
             
             print('nameruns')
             print(nameruns)
-            namevari = list(dictlistvalu[nameruns]['vari'].keys())[0]
+            print('dictlistvalu[nameruns]')
+            print(dictlistvalu[nameruns])
+            print('dictlistvalu[nameruns][vari]')
+            print(dictlistvalu[nameruns]['vari'])
+            print('dictlistvalu[nameruns][vari].keys()')
+            print(dictlistvalu[nameruns]['vari'].keys())
+            nameparavari = list(dictlistvalu[nameruns]['vari'].keys())[0]
             
             # for all other parameters, set the central value
             for nametemp in listnamevarbtotl:
-                if nametemp == namevari:
+                if nametemp == nameparavari:
                     continue
                 
                 if nametemp in dictlistvalu[nameruns]['defa'].keys():
@@ -305,24 +325,26 @@ def make_rflx( \
                     dicttemp[nametemp] = np.array([valu])
                 else:
                     dicttemp[nametemp] = valu
-                
+            
             dictmodl = dict()
             
             if nameruns == 'visu':
+                
                 pathfoldanim = pathimag
+                
+                print('temp')
+                pathfoldanim = None
+
             else:
                 pathfoldanim = None
                 
-                print('temp')
-                pathfoldanim = pathimag
+            for k in range(len(dictlistvalu[nameruns]['vari'][nameparavari])):
                 
-            for k in range(len(dictlistvalu[nameruns]['vari'][namevari])):
-                
-                valu = dictlistvalu[nameruns]['vari'][namevari][k]
-                if namevari in listnamevarbcomp:
-                    dicttemp[namevari] = np.array([valu])
+                valu = dictlistvalu[nameruns]['vari'][nameparavari][k]
+                if nameparavari in listnamevarbcomp:
+                    dicttemp[nameparavari] = np.array([valu])
                 else:
-                    dicttemp[namevari] = valu
+                    dicttemp[nameparavari] = valu
                 
                 # title for the plots
                 dictstrgtitl = dict()
@@ -335,58 +357,55 @@ def make_rflx( \
                 for nametemp in dicttemp:
                     if nametemp != 'coeflmdklinr' and nametemp != 'coeflmdkquad':
                         dicttemptemp[nametemp] = dicttemp[nametemp]
+                
+                if typesyst != 'cosc':
+                    dicttemptemp['rratcomp'] = dicttemptemp['radicomp'] / dicttemptemp['radistar'] / dictfact['rsre']
+                    del dicttemptemp['radicomp']
+                    del dicttemptemp['radistar']
+
+                boolintp = True
+                #if dicttemptemp['typecoor'] == 'star':
+                #    boolintp = False
+                #else:
+                #    boolintp = True
 
                 strgextn = typesyst + '_' + nameruns + '%02d' % k
                 
+                dicttemptemp['typelmdk'] = 'quad'
+                dicttemptemp['typesyst'] = typesyst
+                dicttemptemp['typenorm'] = 'edgeleft'
+                dicttemptemp['pathfoldanim'] = pathfoldanim
+                dicttemptemp['typelang'] = typelang
+                dicttemptemp['typefileplot'] = typefileplot
+                dicttemptemp['booldiag'] = booldiag
+                dicttemptemp['typeverb'] = 1
+                dicttemptemp['boolintp'] = boolintp
+                dicttemptemp['boolwritover'] = boolwritover
+                dicttemptemp['strgextn'] = strgextn
+                dicttemptemp['titlvisu'] = strgtitl
+
                 print('dicttemptemp')
                 print(dicttemptemp)
-                print('pathfoldanim')
-                print(pathfoldanim)
-
+                
                 # generate light curve
-                dictoutp = ephesus.retr_rflxtranmodl(time, \
-                                                     **dicttemptemp, \
-
-                                                     typelmdk='quad', \
-                                                     
-                                                     typesyst=typesyst, \
-
-                                                     typenorm='edgeleft', \
-
-                                                     # plotting
-                                                     pathfoldanim=pathfoldanim, \
-                                                     typelang=typelang, \
-                                                     typefileplot=typefileplot, \
-                                                     
-                                                     booldiag=booldiag, \
-
-                                                     typeverb=1, \
-
-                                                     boolintp=boolintp, \
-                                                     
-                                                     boolwritover=boolwritover, \
-                                                     strgextn=strgextn, \
-                                                     titlvisu=strgtitl, \
-
-                                                    )
+                dictoutp = ephesus.retr_rflxtranmodl(time, **dicttemptemp)
                
-                print('')
-                dictfact = tdpy.retr_factconv()
-
                 # dictionary for the configuration
                 dictmodl[strgextn] = dict()
                 dictmodl[strgextn]['time'] = time * 24. # [hours]
-                if not isinstance(dictlistvalu[nameruns]['vari'][namevari][k], str):
-                    dictmodl[strgextn]['labl'] = '%s = %.3g %s' % (dictlabl['root'][namevari], dictlistvalu[nameruns]['vari'][namevari][k], dictlabl['unit'][namevari])
-                else:
-                    dictmodl[strgextn]['labl'] = '%s' % (dictlistvalu[nameruns]['vari'][namevari][k])
+                if dictlistvalu[nameruns]['vari'][nameparavari].size > 1:
+                    if not isinstance(dictlistvalu[nameruns]['vari'][nameparavari][k], str):
+                        dictmodl[strgextn]['labl'] = '%s = %.3g %s' % (dictlabl['root'][nameparavari], \
+                                            dictlistvalu[nameruns]['vari'][nameparavari][k], dictlabl['unit'][nameparavari])
+                    else:
+                        dictmodl[strgextn]['labl'] = '%s' % (dictlistvalu[nameruns]['vari'][nameparavari][k])
                 dictmodl[strgextn]['lcur'] = 1e6 * (dictoutp['rflx'] - 1)
                 
                 dictmodl[strgextn]['colr'] = listcolr[k]
 
             print('Making a light curve plot...')
             
-            if len(dictlistvalu[nameruns]['vari'][namevari]) == 1:
+            if len(dictlistvalu[nameruns]['vari'][nameparavari]) == 1:
                 listxdatvert = [-0.5 * 24. * dictoutp['duratrantotl'], 0.5 * 24. * dictoutp['duratrantotl']] 
                 if 'duratranfull' in dictoutp:
                     listxdatvert += [-0.5 * 24. * dictoutp['duratranfull'], 0.5 * 24. * dictoutp['duratranfull']]
@@ -397,7 +416,7 @@ def make_rflx( \
             # title for the plots
             dictstrgtitl = dict()
             for namevarbtotl in listnamevarbtotl:
-                if namevarbtotl != namevari:
+                if namevarbtotl != nameparavari or dictlistvalu[nameruns]['vari'][nameparavari].size == 1:
                     dictstrgtitl[namevarbtotl] = dicttemp[namevarbtotl]
             strgtitl = retr_strgtitl(dictstrgtitl)
                 
@@ -414,6 +433,7 @@ def make_rflx( \
                                          lablxaxi=lablxaxi, \
                                          lablyaxi=lablyaxi, \
                                          strgtitl=strgtitl, \
+                                         typesigncode='ephesus', \
                                         )
             print('')
             print('')
