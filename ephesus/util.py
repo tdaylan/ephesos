@@ -5939,6 +5939,187 @@ def retr_rflxtranmodl( \
     return dictoutp
 
 
+def plot_modllcur_phas(pathimag, ):
+
+    dictlabl = dict()
+    dictlabl['root'] = dict()
+    dictlabl['unit'] = dict()
+    dictlabl['totl'] = dict()
+    
+    listnamevarbcomp = ['pericomp', 'epocmtracomp', 'cosicomp', 'rsmacomp'] 
+    listnamevarbcomp += ['offsphascomp']
+    
+    listnamevarbstar = ['radistar', 'coeflmdklinr', 'coeflmdkquad']
+    
+    listnamevarbcomp += ['radicomp']
+    listnamevarbcomp += ['typebrgtcomp']
+    
+    listnamevarbsyst = listnamevarbstar + listnamevarbcomp
+    listnamevarbtotl = listnamevarbsyst + listnamevarbsimu
+    
+    listlablpara, listscalpara, listlablroot, listlablunit, listlabltotl = tdpy.retr_listlablscalpara(listnamevarbtotl, boolmath=True)
+    
+    # turn lists of labels into dictionaries
+    for k, strgvarb in enumerate(listnamevarbtotl):
+        dictlabl['root'][strgvarb] = listlablroot[k]
+        dictlabl['unit'][strgvarb] = listlablunit[k]
+        dictlabl['totl'][strgvarb] = listlabltotl[k]
+    
+    dictmodl = dict()
+    
+    pathfoldanim = pathimag
+    
+    # title for the plots
+    dictstrgtitl = dict()
+    for namevarbtotl in listnamevarbtotl:
+        dictstrgtitl[namevarbtotl] = dicttemp[namevarbtotl]
+    strgtitl = ephesus.retr_strgtitl(dictstrgtitl)
+    
+    dicttemp['coeflmdk'] = np.array([dicttemp['coeflmdklinr'], dicttemp['coeflmdkquad']])
+    
+    # dictionary for the configuration
+    dictmodl[strgextn] = dict()
+    dictmodl[strgextn]['time'] = time * 24. # [hours]
+    if dictlistvalubatc[namebatc]['vari'][nameparavari].size > 1:
+        if not isinstance(dictlistvalubatc[namebatc]['vari'][nameparavari][k], str):
+            dictmodl[strgextn]['labl'] = '%s = %.3g %s' % (dictlabl['root'][nameparavari], \
+                                dictlistvalubatc[namebatc]['vari'][nameparavari][k], dictlabl['unit'][nameparavari])
+        else:
+            dictmodl[strgextn]['labl'] = '%s' % (dictlistvalubatc[namebatc]['vari'][nameparavari][k])
+    dictmodl[strgextn]['lcur'] = 1e6 * (dictefes['rflx'] - 1)
+    
+    listcolr = ['g', 'b', 'firebrick', 'orange', 'olive']
+    dictmodl[strgextn]['colr'] = listcolr[k]
+
+
+    print('Making a light curve plot...')
+
+    duratrantotl = ephesus.retr_duratrantotl(dicttemp['pericomp'], dicttemp['rsmacomp'], dicttemp['cosicomp']) / 24. # [days]
+    
+    if len(dictlistvalubatc[namebatc]['vari'][nameparavari]) == 1:
+        listxdatvert = [-0.5 * 24. * dictefes['duratrantotl'], 0.5 * 24. * dictefes['duratrantotl']] 
+        if 'duratranfull' in dictefes:
+            listxdatvert += [-0.5 * 24. * dictefes['duratranfull'], 0.5 * 24. * dictefes['duratranfull']]
+        listxdatvert = np.array(listxdatvert)
+    else:
+        listxdatvert = None
+    
+    # title for the plots
+    dictstrgtitl = dict()
+    for namevarbtotl in listnamevarbtotl:
+        if namevarbtotl != nameparavari or dictlistvalubatc[namebatc]['vari'][nameparavari].size == 1:
+            dictstrgtitl[namevarbtotl] = dicttemp[namevarbtotl]
+    strgtitl = ephesus.retr_strgtitl(dictstrgtitl)
+    
+    lablxaxi = 'Time from mid-transit [hours]'
+    lablyaxi = 'Relative flux - 1 [ppm]'
+    
+    # all of the phase curve
+    strgextn = '%s_%s_%s' % (typesyst, typetarg)
+    pathplot = ephesus.plot_lcur(pathimag, \
+                                 dictmodl=dictmodl, \
+                                 typefileplot=typefileplot, \
+                                 boolwritover=boolwritover, \
+                                 listxdatvert=listxdatvert, \
+                                 strgextn=strgextn, \
+                                 lablxaxi=lablxaxi, \
+                                 lablyaxi=lablyaxi, \
+                                 strgtitl=strgtitl, \
+                                 typesigncode='ephesus', \
+                                )
+    
+    # vertical zoom onto the phase curve
+    strgextn = '%s_%s_%s_pcur' % (typetarg)
+    pathplot = ephesus.plot_lcur(pathimag, \
+                                 dictmodl=dictmodl, \
+                                 typefileplot=typefileplot, \
+                                 boolwritover=boolwritover, \
+                                 listxdatvert=listxdatvert, \
+                                 strgextn=strgextn, \
+                                 lablxaxi=lablxaxi, \
+                                 lablyaxi=lablyaxi, \
+                                 strgtitl=strgtitl, \
+                                 limtyaxi=[-500, None], \
+                                 typesigncode='ephesus', \
+                                )
+    
+    # horizontal zoom around the primary
+    strgextn = '%s_%s_%s_prim' % (typetarg)
+    #limtxaxi = np.array([-24. * 0.7 * dictefes['duratrantotl'], 24. * 0.7 * dictefes['duratrantotl']])
+    limtxaxi = np.array([-2, 2.])
+    pathplot = ephesus.plot_lcur(pathimag, \
+                                 dictmodl=dictmodl, \
+                                 typefileplot=typefileplot, \
+                                 boolwritover=boolwritover, \
+                                 listxdatvert=listxdatvert, \
+                                 strgextn=strgextn, \
+                                 lablxaxi=lablxaxi, \
+                                 lablyaxi=lablyaxi, \
+                                 strgtitl=strgtitl, \
+                                 limtxaxi=limtxaxi, \
+                                 typesigncode='ephesus', \
+                                )
+    
+    # horizontal zoom around the secondary
+    strgextn = '%s_%s_%s_seco' % (typetarg)
+    limtxaxi += 0.5 * dicttemptemp['pericomp'] * 24.
+    pathplot = ephesus.plot_lcur(pathimag, \
+                                 dictmodl=dictmodl, \
+                                 typefileplot=typefileplot, \
+                                 boolwritover=boolwritover, \
+                                 listxdatvert=listxdatvert, \
+                                 strgextn=strgextn, \
+                                 lablxaxi=lablxaxi, \
+                                 lablyaxi=lablyaxi, \
+                                 strgtitl=strgtitl, \
+                                 limtxaxi=limtxaxi, \
+                                 limtyaxi=[-500, None], \
+                                 typesigncode='ephesus', \
+                                )
+
+
+def retr_strgtitl(dictstrgtitl):
+    '''
+    Return the title of a plot with information about the system
+    '''
+    
+    strgtitl = ''
+    if 'radistar' in dictstrgtitl:
+        strgtitl += '$R_*$ = %.1f $R_\odot$' % dictstrgtitl['radistar']
+    if typesyst == 'cosc' and 'massstar' in dictstrgtitl:
+        if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
+            strgtitl += ', '
+        strgtitl += '$M_*$ = %.1f $M_\odot$' % dictstrgtitl['massstar']
+        
+    cntr = 0
+    for kk, name in enumerate(listnamevarbcomp):
+        
+        if name == 'epocmtracomp' or not name in dictstrgtitl:
+            continue
+        
+        if name == 'typebrgtcomp':
+            continue
+
+        for j, valu in enumerate(dictstrgtitl[name]):
+            
+            if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
+                strgtitl += ', '
+            
+            strgtitl += '%s = ' % dictlabl['root'][name]
+            
+            if name == 'typebrgtcomp':
+                strgtitl += '%s' % (valu)
+            else:
+                strgtitl += '%.3g' % (valu)
+            
+            if name in dictlabl['unit'] and dictlabl['unit'][name] != '':
+                strgtitl += ' %s' % dictlabl['unit'][name]
+    
+            cntr += 1
+
+    return strgtitl
+
+
 def retr_toiifstr():
     '''
     Return the TOI IDs that have been alerted by the FaintStar project
