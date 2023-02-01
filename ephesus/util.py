@@ -4170,11 +4170,11 @@ def make_framanim(gdat, t, phasthis, j=None):
             axis.set_aspect('equal')
             axis.axis('off')
             
-            if gdat.titlvisu is not None:
-                axis.set_title(gdat.titlvisu)
+            if gdat.strgtitl is not None:
+                axis.set_title(gdat.strgtitl)
             else:
-                titl = '$R_S = %.3g R_{\odot}$' % gdat.radistar
-                axis.set_title(titl)
+                strgtitl = '$R_S = %.3g R_{\odot}$' % gdat.radistar
+                axis.set_title(strgtitl)
             
             if j is not None:
                 timemtra = gdat.phascomp[j][-1] * gdat.pericomp[j] * 24.
@@ -4712,7 +4712,7 @@ def retr_rflxtranmodl( \
                       pathfoldanim=None, \
                       
                       # title of the animation
-                      titlvisu=None, \
+                      strgtitl=None, \
 
                       # string to be appended to the file name of the animation
                       strgextn='', \
