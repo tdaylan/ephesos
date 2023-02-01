@@ -1,8 +1,8 @@
 Ephesus
-===
+====
 
 Introduction
----
+----
 
 A large fraction of light sources in the sky is time-variable. Their variability contains valuable information about their nature.
 
@@ -13,9 +13,9 @@ Ephesus derives its name from the ancient city of Ephesus on the western coast o
 
 Usage
 ---
-'''
+.. code-block:: rst
+ephesus
 
-'''
 
 Modeling a transiting hot Jupiter
 ~~~
