@@ -12,11 +12,15 @@ Ephesus derives its name from the ancient city of Ephesus on the western coast o
 
 
 Usage
----
+----
 .. code-block:: rst
-ephesus
+    ephesus
 
 
 Modeling a transiting hot Jupiter
-~~~
+~~~~
+
+
+Modeling a black hole transiting a Sun-like star
+~~~~
 
