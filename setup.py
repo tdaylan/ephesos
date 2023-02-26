@@ -1,14 +1,14 @@
 from setuptools import setup, find_packages
 
 setup(
-    name = 'ephesus',
+    name = 'ephesos',
     packages = find_packages(),
     version = '1.13',
     description = 'Library of useful routines in exoplanet science',
     author = 'Tansu Daylan',
     author_email = 'tansu.daylan@gmail.com',
-    url = 'https://github.com/tdaylan/ephesus',
-    download_url = 'https://github.com/tdaylan/ephesus', 
+    url = 'https://github.com/tdaylan/ephesos',
+    download_url = 'https://github.com/tdaylan/ephesos', 
     license='MIT',
     classifiers=['Development Status :: 4 - Beta',
                  'Intended Audience :: Science/Research',
