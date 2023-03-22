@@ -2219,6 +2219,14 @@ def retr_strgtitl(dictstrgtitl, dictefes, listnamevarbcomp, dictlabl):
         
         if name == 'typebrgtcomp':
             continue
+        
+        if dictstrgtitl[name] is None:
+            print('')
+            print('')
+            print('')
+            print('name')
+            print(name)
+            raise Exception('dictstrgtitl[name] is None')
 
         for j, valu in enumerate(dictstrgtitl[name]):
             
