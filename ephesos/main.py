@@ -418,7 +418,7 @@ def proc_phas(gdat, j, t, phasthis):
         
         if gdat.typecoor == 'comp':
             
-            if gdat.maxmfactellp > 1:
+            if gdat.typebndr == 'view' and gdat.maxmfactellp > 1:
                 factelli = 1. + (gdat.maxmfactellp - 1.) * np.sin(2. * np.pi * phasthis)**2
             else:
                 factelli = 1.
@@ -434,7 +434,7 @@ def proc_phas(gdat, j, t, phasthis):
             prep_dist(gdat, j)
         
         # brightness of the primary
-        if gdat.maxmfactellp > 1:
+        if gdat.typebndr == 'view' and gdat.maxmfactellp > 1:
             gdat.brgtprim = calc_brgtprim(gdat, j, phasthis)
             fluxtotlcompthis = np.sum(gdat.brgtprim)
         else:
@@ -793,6 +793,11 @@ def eval_modl( \
               ## 'cart': bright background, colored planets
               typevisu='real', \
               
+              # type of the boundary of the grid
+              ## 'calc': optimized for fast calculation
+              ## 'view': large field-of-view unneccessary for calculation
+              typebndr='calc', \
+
               # type of light curve plot
               ## 'inst': inset
               ## 'lowr': lower panel
@@ -1490,8 +1495,10 @@ def eval_modl( \
                 else:
                     limtgridxpos = gdat.rratcomp[j] * 1.5
                     
-                    #limtgridypos = gdat.rratcomp[j]
-                    limtgridypos = (gdat.smaxcomp[j] + 1. * gdat.maxmfactellp) * 1.05
+                    if gdat.typebndr == 'view':
+                        limtgridypos = (gdat.smaxcomp[j] + 1. * gdat.maxmfactellp) * 1.05
+                    else:
+                        limtgridypos = gdat.rratcomp[j]
                     
                     print('gdat.rratcomp[j]')
                     print(gdat.rratcomp[j])
@@ -1929,15 +1936,16 @@ def eval_modl( \
                 print('')
                 print('gdat.typesyst')
                 print(gdat.typesyst)
-                print('gdat.brgtstarnocc')
-                print(gdat.brgtstarnocc)
                 print('gdat.typelmdk')
                 print(gdat.typelmdk)
                 print('gdat.coeflmdk')
                 print(gdat.coeflmdk)
                 print('gdat.fluxtotl')
                 summgene(gdat.fluxtotl)
-                raise Exception('')
+                print('gdat.brgtstarnocc')
+                print(gdat.brgtstarnocc)
+                #raise Exception('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6)')
+                print('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6)')
         
             if False and np.amax(rflxtranmodl) > 1e6:
                 print('gdat.fluxtotl')
