@@ -46,43 +46,46 @@ typefileplot = 'png'
 
 listcolr = ['g', 'b', 'firebrick', 'orange', 'olive']
 
-def retr_strgtitl(dictstrgtitl):
-    
-    strgtitl = ''
-    if 'radistar' in dictstrgtitl:
-        strgtitl += '$R_*$ = %.1f $R_\odot$' % dictstrgtitl['radistar']
-    if typesyst == 'cosc' and 'massstar' in dictstrgtitl:
-        if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
-            strgtitl += ', '
-        strgtitl += '$M_*$ = %.1f $M_\odot$' % dictstrgtitl['massstar']
-        
-    cntr = 0
-    for kk, name in enumerate(listnamevarbcomp):
-        
-        if name == 'epocmtracomp' or not name in dictstrgtitl:
-            continue
-        
-        if name == 'typebrgtcomp':
-            continue
 
-        for j, valu in enumerate(dictstrgtitl[name]):
-            
-            if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
-                strgtitl += ', '
-            
-            strgtitl += '%s = ' % dictlabl['root'][name]
-            
-            if name == 'typebrgtcomp':
-                strgtitl += '%s' % (valu)
-            else:
-                strgtitl += '%.3g' % (valu)
-            
-            if name in dictlabl['unit'] and dictlabl['unit'][name] != '':
-                strgtitl += ' %s' % dictlabl['unit'][name]
-    
-            cntr += 1
-
-    return strgtitl
+# to be deleted
+#def retr_strgtitl(dictefesinpt, dictefes, listnamevarbcomp, dictlabl):
+#def retr_strgtitl(dictefesinpt):
+#    
+#    strgtitl = ''
+#    if 'radistar' in dictefesinpt:
+#        strgtitl += '$R_*$ = %.1f $R_\odot$' % dictefesinpt['radistar']
+#    if typesyst == 'cosc' and 'massstar' in dictefesinpt:
+#        if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
+#            strgtitl += ', '
+#        strgtitl += '$M_*$ = %.1f $M_\odot$' % dictefesinpt['massstar']
+#        
+#    cntr = 0
+#    for kk, name in enumerate(listnamevarbcomp):
+#        
+#        if name == 'epocmtracomp' or not name in dictefesinpt:
+#            continue
+#        
+#        if name == 'typebrgtcomp':
+#            continue
+#
+#        for j, valu in enumerate(dictefesinpt[name]):
+#            
+#            if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
+#                strgtitl += ', '
+#            
+#            strgtitl += '%s = ' % dictlabl['root'][name]
+#            
+#            if name == 'typebrgtcomp':
+#                strgtitl += '%s' % (valu)
+#            else:
+#                strgtitl += '%.3g' % (valu)
+#            
+#            if name in dictlabl['unit'] and dictlabl['unit'][name] != '':
+#                strgtitl += ' %s' % dictlabl['unit'][name]
+#    
+#            cntr += 1
+#
+#    return strgtitl
 
 
 dictfact = tdpy.retr_factconv()
@@ -385,21 +388,17 @@ for typesyst in listtypesyst:
                 print(dicttemp)
                 
                 # title for the plots
-                dictstrgtitl = dict()
-                for namevarbtotl in listnamevarbtotl:
-                    dictstrgtitl[namevarbtotl] = dicttemp[namevarbtotl]
-                strgtitl = retr_strgtitl(dictstrgtitl)
+                dictefesinpt = dict()
                 
                 dicttemp['coeflmdk'] = np.array([dicttemp['coeflmdklinr'], dicttemp['coeflmdkquad']])
-                dicttemptemp = dict()
                 for nametemp in dicttemp:
                     if nametemp != 'coeflmdklinr' and nametemp != 'coeflmdkquad':
-                        dicttemptemp[nametemp] = dicttemp[nametemp]
+                        dictefesinpt[nametemp] = dicttemp[nametemp]
                 
                 if typesyst != 'cosc':
-                    dicttemptemp['rratcomp'] = dicttemptemp['radicomp'] / dicttemptemp['radistar'] / dictfact['rsre']
-                    del dicttemptemp['radicomp']
-                    del dicttemptemp['radistar']
+                    dictefesinpt['rratcomp'] = dictefesinpt['radicomp'] / dictefesinpt['radistar'] / dictfact['rsre']
+                    del dictefesinpt['radicomp']
+                    del dictefesinpt['radistar']
 
                 if typecoor == 'star':
                     boolintp = False
@@ -410,25 +409,27 @@ for typesyst in listtypesyst:
                 if namebatc != 'defa':
                     strgextn += '%02d' % k
 
-                dicttemptemp['typelmdk'] = 'quad'
-                #dicttemptemp['typesyst'] = typesyst
-                #dicttemptemp['typenorm'] = 'edgeleft'
-                dicttemptemp['pathvisu'] = pathvisupopl
-                dicttemptemp['typelang'] = typelang
-                dicttemptemp['typefileplot'] = typefileplot
-                dicttemptemp['booldiag'] = booldiag
-                dicttemptemp['typeverb'] = 1
-                dicttemptemp['boolintp'] = boolintp
-                dicttemptemp['boolwritover'] = boolwritover
-                dicttemptemp['strgextn'] = strgextn
-                dicttemptemp['strgtitl'] = strgtitl
-                dicttemptemp['typecoor'] = typecoor
+                dictefesinpt['typelmdk'] = 'quad'
+                #dictefesinpt['typesyst'] = typesyst
+                #dictefesinpt['typenorm'] = 'edgeleft'
+                dictefesinpt['pathvisu'] = pathvisupopl
+                dictefesinpt['typelang'] = typelang
+                dictefesinpt['typefileplot'] = typefileplot
+                dictefesinpt['booldiag'] = booldiag
+                dictefesinpt['typeverb'] = 1
+                dictefesinpt['boolintp'] = boolintp
+                dictefesinpt['boolwritover'] = boolwritover
+                dictefesinpt['strgextn'] = strgextn
+                dictefesinpt['typecoor'] = typecoor
+                
+                strgtitl = ephesos.retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl)
+                dictefesinpt['strgtitl'] = strgtitl
 
-                print('dicttemptemp')
-                print(dicttemptemp)
+                print('dictefesinpt')
+                print(dictefesinpt)
                 
                 # generate light curve
-                dictoutp = ephesos.eval_modl(time, typesyst, **dicttemptemp)
+                dictoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
                
                 # dictionary for the configuration
                 dictmodl[strgextn] = dict()
@@ -454,12 +455,11 @@ for typesyst in listtypesyst:
                 listxdatvert = None
 
             # title for the plots
-            dictstrgtitl = dict()
+            listnamevarbthis = []
             for namevarbtotl in listnamevarbtotl:
                 if namevarbtotl != nameparavari or dictlistvalubatc[namebatc]['vari'][nameparavari].size == 1:
-                    dictstrgtitl[namevarbtotl] = dicttemp[namevarbtotl]
-            strgtitl = retr_strgtitl(dictstrgtitl)
-                
+                    listnamevarbthis.append(namevarbtotl)
+            strgtitl = ephesos.retr_strgtitl(dictefesinpt)
             
             lablyaxi = 'Relative flux - 1 [ppm]'
             
@@ -511,7 +511,7 @@ for typesyst in listtypesyst:
                 
                 # horizontal zoom around the secondary
                 strgextn = '%s_%s_%s_seco' % (dicttdpy[typesyst], typetarg, namebatc)
-                limtxaxi += 0.5 * dicttemptemp['pericomp'] * 24.
+                limtxaxi += 0.5 * dictefesinpt['pericomp'] * 24.
                 pathplot = ephesos.plot_lcur(pathvisu, \
                                              dictmodl=dictmodl, \
                                              typefileplot=typefileplot, \

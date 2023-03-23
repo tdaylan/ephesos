@@ -115,17 +115,39 @@ dictefesinpt['typeverb'] = 1
 print('dictefesinpt')
 print(dictefesinpt)
 
-# generate light curve
-dictefesoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
 
-# dictionary for the configuration
-dictmodl[strgextn] = dict()
-dictmodl[strgextn]['time'] = time * 24. # [hours]
-if dictlistvalubatc[namebatc]['vari'][nameparavari].size > 1:
-    if not isinstance(dictlistvalubatc[namebatc]['vari'][nameparavari][k], str):
-        dictmodl[strgextn]['labl'] = '%s = %.3g %s' % (dictlabl['root'][nameparavari], \
-                            dictlistvalubatc[namebatc]['vari'][nameparavari][k], dictlabl['unit'][nameparavari])
-    else:
-        dictmodl[strgextn]['labl'] = '%s' % (dictlistvalubatc[namebatc]['vari'][nameparavari][k])
-dictmodl[strgextn]['lcur'] = 1e6 * (dictefesoutp['rflx'] - 1)
+## cadence of simulation
+cade = 30. / 24. / 60. / 60. # days
+### duration of simulation
+#if typesyst == 'psyspcur':
+#    durasimu = dicttemp['pericomp']
+#    if namebatc == 'longbase':
+#        durasimu *= 3.
+#else:
+#    durasimu = 6. / 24. # days
+
+minmtime = 0.
+maxmtime = 10.
+#duratrantotl = nicomedia.retr_duratrantotl(dicttemp['pericomp'], dicttemp['rsmacomp'], dicttemp['cosicomp']) / 24. # [days]
+#if typesyst == 'psyspcur':
+#    # minimum time
+#    minmtime = -0.25 * durasimu
+#    # maximum time
+#    maxmtime = 0.75 * durasimu
+#else:
+#    # minimum time
+#    minmtime = -0.5 * 1.5 * duratrantotl
+#    # maximum time
+#    maxmtime = 0.5 * 1.5 * duratrantotl
+# time axis
+time = np.arange(minmtime, maxmtime, cade)
+
+listnamevarb = ['peri', 'epocmtra', 'rsma', 'cosi']
+for k in range(numbsyst):
+    
+    for namevarb in listnamevarb:
+        dictefesinpt['%scomp' % namevarb] = dictpoplcomp['%scomp' % namevarb][indxcompstar[k]]
+    
+    # generate light curve
+    dictefesoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
 

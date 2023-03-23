@@ -1944,8 +1944,7 @@ def eval_modl( \
                 summgene(gdat.fluxtotl)
                 print('gdat.brgtstarnocc')
                 print(gdat.brgtstarnocc)
-                #raise Exception('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6)')
-                print('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6)')
+                raise Exception('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6)')
         
             if False and np.amax(rflxtranmodl) > 1e6:
                 print('gdat.fluxtotl')
@@ -2092,10 +2091,7 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     pathfoldanim = pathvisu
     
     # title for the plots
-    dictstrgtitl = dict()
-    for namevarbtotl in listnamevarbtotl:
-        dictstrgtitl[namevarbtotl] = dictefes[namevarbtotl]
-    strgtitl = retr_strgtitl(dictstrgtitl, dictefes, listnamevarbcomp, dictlabl)
+    strgtitl = retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl)
     
     #dicttemp['coeflmdk'] = np.array([dicttemp['coeflmdklinr'], dicttemp['coeflmdkquad']])
     
@@ -2126,7 +2122,6 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     listxdatvert = np.array(listxdatvert)
     
     # title for the plots
-    #dictstrgtitl = dict()
     #for namevarbtotl in listnamevarbtotl:
     #    if namevarbtotl != nameparavari or dictlistvalubatc[namebatc]['vari'][nameparavari].size == 1:
     #        dictstrgtitl[namevarbtotl] = dictefes[namevarbtotl]
@@ -2198,37 +2193,37 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
                                 )
 
 
-def retr_strgtitl(dictstrgtitl, dictefes, listnamevarbcomp, dictlabl):
+def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
     '''
     Return the title of a plot with information about the system
     '''
     
     strgtitl = ''
-    if 'radistar' in dictstrgtitl:
-        strgtitl += '$R_*$ = %.1f $R_\odot$' % dictstrgtitl['radistar']
-    if dictefes['typesyst'] == 'cosc' and 'massstar' in dictstrgtitl:
+    if 'radistar' in dictefesinpt:
+        strgtitl += '$R_*$ = %.1f $R_\odot$' % dictefesinpt['radistar']
+    if dictefesinpt['typesyst'] == 'cosc' and 'massstar' in dictefesinpt:
         if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
             strgtitl += ', '
-        strgtitl += '$M_*$ = %.1f $M_\odot$' % dictstrgtitl['massstar']
+        strgtitl += '$M_*$ = %.1f $M_\odot$' % dictefesinpt['massstar']
         
     cntr = 0
     for kk, name in enumerate(listnamevarbcomp):
         
-        if name == 'epocmtracomp' or not name in dictstrgtitl:
+        if name == 'epocmtracomp' or not name in dictefesinpt:
             continue
         
         if name == 'typebrgtcomp':
             continue
         
-        if dictstrgtitl[name] is None:
+        if dictefesinpt[name] is None:
             print('')
             print('')
             print('')
             print('name')
             print(name)
-            raise Exception('dictstrgtitl[name] is None')
+            raise Exception('dictefesinpt[name] is None')
 
-        for j, valu in enumerate(dictstrgtitl[name]):
+        for j, valu in enumerate(dictefesinpt[name]):
             
             if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
                 strgtitl += ', '
