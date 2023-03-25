@@ -441,6 +441,18 @@ def proc_phas(gdat, j, t, phasthis):
             gdat.brgtprim = gdat.brgtstarnocc
         fluxtotlcompthis = gdat.brgtprim
 
+        if gdat.booldiag:
+            if gdat.typesyst == 'psys':
+                if fluxtotlcompthis > gdat.brgtstarnocc:
+                    print('')
+                    print('')
+                    print('')
+                    print('fluxtotlcompthis')
+                    print(fluxtotlcompthis)
+                    print('gdat.brgtstarnocc')
+                    print(gdat.brgtstarnocc)
+                    raise Exception('gdat.typesyst == psys and fluxtotlcompthis > gdat.brgtstarnocc')
+
         # brightness of the companion
         if gdat.typebrgtcomp != 'dark':
             if gdat.typecoor == 'comp':
@@ -520,6 +532,18 @@ def proc_phas(gdat, j, t, phasthis):
                 #    print('')
                 #    print('')
         
+        if gdat.booldiag:
+            if gdat.typesyst == 'psys':
+                if fluxtotlcompthis > gdat.brgtstarnocc:
+                    print('')
+                    print('')
+                    print('')
+                    print('fluxtotlcompthis')
+                    print(fluxtotlcompthis)
+                    print('gdat.brgtstarnocc')
+                    print(gdat.brgtstarnocc)
+                    raise Exception('gdat.typesyst == psys and fluxtotlcompthis > gdat.brgtstarnocc')
+
         if gdat.boolsystpsys:
             
             if abs(phasthis) < 0.25:
@@ -597,20 +621,38 @@ def proc_phas(gdat, j, t, phasthis):
 
             if booldiag:
                 if fluxtotlfram / gdat.brgtstarnocc < 0.5 or fluxtotlfram <= 0.:
+                    print('')
+                    print('')
+                    print('')
                     print('gdat.brgtlens')
                     summgene(gdat.brgtlens)
                     print('fluxtotlfram')
                     print(fluxtotlfram)
                     print('gdat.brgtstarnocc')
                     print(gdat.brgtstarnocc)
-                    raise Exception('')
+                    raise Exception('fluxtotlfram / gdat.brgtstarnocc < 0.5 or fluxtotlfram <= 0.')
                 if fluxtotlfram == 0.:
+                    print('')
+                    print('')
+                    print('')
                     print('fluxtotlfram')
                     print(fluxtotlfram)
-                    raise Exception('')
+                    raise Exception('fluxtotlfram == 0.')
             
             fluxtotlcompthis += fluxtotlfram
-            
+        
+        if gdat.booldiag:
+            if gdat.typesyst == 'psys':
+                if fluxtotlcompthis > gdat.brgtstarnocc:
+                    print('')
+                    print('')
+                    print('')
+                    print('fluxtotlcompthis')
+                    print(fluxtotlcompthis)
+                    print('gdat.brgtstarnocc')
+                    print(gdat.brgtstarnocc)
+                    raise Exception('gdat.typesyst == psys and fluxtotlcompthis > gdat.brgtstarnocc')
+
         gdat.fluxtotlcomp[j].append(fluxtotlcompthis)
         
         gdat.phascomp[j].append(phasthis)
@@ -679,7 +721,7 @@ def eval_modl( \
               ### 'heated': companion irradiated by the primary with a sinusoidal in phase (e.g., a planet)
               ### 'sliced': orange slices
               ### 'isot': isothermal
-              typebrgtcomp='isot', \
+              typebrgtcomp='dark', \
               
               ## phase offset for the sinusoidal model
               offsphascomp=None, \
@@ -938,6 +980,17 @@ def eval_modl( \
         
         if np.isscalar(gdat.rratcomp):
             raise Exception('')
+        
+        
+        if gdat.typesyst.startswith('psys') and gdat.rratcomp is None:
+            print('')
+            print('')
+            print('')
+            print('gdat.typesyst')
+            print(gdat.typesyst)
+            print('gdat.rratcomp')
+            summgene(gdat.rratcomp)
+            raise Exception('rratcomp is None despite the system having planetary companions.')
         
         if (gdat.rratcomp > 1).any() or (gdat.rratcomp < 0).any():
             print('')
