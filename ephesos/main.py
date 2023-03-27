@@ -992,7 +992,7 @@ def eval_modl( \
             summgene(gdat.rratcomp)
             raise Exception('rratcomp is None despite the system having planetary companions.')
         
-        if (gdat.rratcomp > 1).any() or (gdat.rratcomp < 0).any():
+        if gdat.rratcomp is not None and (gdat.rratcomp < 0).any():
             print('')
             print('')
             print('')
@@ -1053,9 +1053,13 @@ def eval_modl( \
             raise Exception('')
         
         if gdat.rsmacomp is None or not np.isfinite(gdat.rsmacomp).all():
+            print('')
+            print('')
+            print('')
             print('gdat.rsmacomp')
             print(gdat.rsmacomp)
-            raise Exception('')
+            raise Exception('gdat.rsmacomp is None or not np.isfinite(gdat.rsmacomp).all()')
+        
         if gdat.typesyst == 'cosc':
             if gdat.massstar is None:
                 raise Exception('')
