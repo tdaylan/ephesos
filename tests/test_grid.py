@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import tdpy
 import ephesos
 import nicomedia
+import miletos
 
 '''
 Compute the relative flux light curves of systems of bodies drawn from a grid
@@ -103,6 +104,8 @@ for typesyst in listtypesyst:
     
     pathvisupopl = pathvisu + dicttdpy[typesyst] + '/'
     
+    os.system('mkdir -p %s' % pathvisupopl)
+
     listtypetarg = []
     if typesyst.startswith('psysdisk'):
         listtypetarg += ['ExoSaturn']
@@ -421,6 +424,7 @@ for typesyst in listtypesyst:
                 dictefesinpt['boolwritover'] = boolwritover
                 dictefesinpt['strgextn'] = strgextn
                 dictefesinpt['typecoor'] = typecoor
+                dictefesinpt['typesyst'] = typesyst
                 
                 strgtitl = ephesos.retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl)
                 dictefesinpt['strgtitl'] = strgtitl
@@ -429,7 +433,7 @@ for typesyst in listtypesyst:
                 print(dictefesinpt)
                 
                 # generate light curve
-                dictoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
+                dictoutp = ephesos.eval_modl(time, **dictefesinpt)
                
                 # dictionary for the configuration
                 dictmodl[strgextn] = dict()
@@ -459,12 +463,12 @@ for typesyst in listtypesyst:
             for namevarbtotl in listnamevarbtotl:
                 if namevarbtotl != nameparavari or dictlistvalubatc[namebatc]['vari'][nameparavari].size == 1:
                     listnamevarbthis.append(namevarbtotl)
-            strgtitl = ephesos.retr_strgtitl(dictefesinpt)
+            strgtitl = ephesos.retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl)
             
             lablyaxi = 'Relative flux - 1 [ppm]'
             
             strgextn = 'Simulated_%s_%s_%s' % (dicttdpy[typesyst], typetarg, namebatc)
-            pathplot = ephesos.plot_lcur(pathvisu, \
+            pathplot = miletos.plot_tser(pathvisu, \
                                          dictmodl=dictmodl, \
                                          typefileplot=typefileplot, \
                                          boolwritover=boolwritover, \
@@ -479,7 +483,7 @@ for typesyst in listtypesyst:
             if typesyst == 'psyspcur':
                 # vertical zoom onto the phase curve
                 strgextn = '%s_%s_%s_pcur' % (dicttdpy[typesyst], typetarg, namebatc)
-                pathplot = ephesos.plot_lcur(pathvisu, \
+                pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              typefileplot=typefileplot, \
                                              boolwritover=boolwritover, \
@@ -496,7 +500,7 @@ for typesyst in listtypesyst:
                 strgextn = '%s_%s_%s_prim' % (dicttdpy[typesyst], typetarg, namebatc)
                 #limtxaxi = np.array([-24. * 0.7 * dictoutp['duratrantotl'], 24. * 0.7 * dictoutp['duratrantotl']])
                 limtxaxi = np.array([-2, 2.])
-                pathplot = ephesos.plot_lcur(pathvisu, \
+                pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              typefileplot=typefileplot, \
                                              boolwritover=boolwritover, \
@@ -512,7 +516,7 @@ for typesyst in listtypesyst:
                 # horizontal zoom around the secondary
                 strgextn = '%s_%s_%s_seco' % (dicttdpy[typesyst], typetarg, namebatc)
                 limtxaxi += 0.5 * dictefesinpt['pericomp'] * 24.
-                pathplot = ephesos.plot_lcur(pathvisu, \
+                pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              typefileplot=typefileplot, \
                                              boolwritover=boolwritover, \

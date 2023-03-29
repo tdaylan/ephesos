@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import nicomedia
 import ephesos
 import pergamon
+from tdpy import summgene
 
 '''
 Compute the relative flux light curves of systems of bodies drawn from a population model
@@ -22,8 +23,8 @@ typesyst = 'psys'
 # path of the folder for visuals
 pathbase = os.environ['EPHESOS_DATA_PATH'] + '/'
 pathpopl = pathbase + 'Population/'
-pathvisupopl = pathbase + 'visuals/'
-pathdatapopl = pathbase + 'data/'
+pathvisupopl = pathpopl + 'visuals/'
+pathdatapopl = pathpopl + 'data/'
 
 # number of systems
 numbsyst = 30
@@ -36,6 +37,7 @@ dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompst
                                                                                                                                   epocmtracomp=0., \
                                                                                                                                   booltoyysunn=True, \
                                                                                                                                   typesamporbtcomp='peri', \
+                                                                                                                                  minmnumbcompstar=1, \
                                                                                                                                   #minmradicomp=10., \
                                                                                                                                   minmmasscomp=300., \
                                                                                                                                   minmpericomp=1., \
@@ -112,10 +114,6 @@ dictefesinpt['typeverb'] = 1
 #dictefesinpt['strgtitl'] = strgtitl
 #dictefesinpt['typecoor'] = typecoor
 
-print('dictefesinpt')
-print(dictefesinpt)
-
-
 ## cadence of simulation
 cade = 30. / 24. / 60. / 60. # days
 ### duration of simulation
@@ -149,13 +147,23 @@ if typesyst == 'psys':
 for k in range(numbsyst):
     
     if indxcompstar[k].size == 0:
-        raise Exception('')
+        print('')
+        print('')
+        print('')
+        raise Exception('indxcompstar[k].size == 0')
+    
+    if not np.isfinite(dictpoplcomp['rratcomp']).all():
+        print('')
+        print('')
+        print('')
+        print('dictpoplcomp[rratcomp]')
+        summgene(dictpoplcomp['rratcomp'])
+        raise Exception('not np.isfinite(dictpoplcomp[rratcomp]).all()')
 
     for namevarb in listnamevarb:
         dictefesinpt['%scomp' % namevarb] = dictpoplcomp['%scomp' % namevarb][indxcompstar[k]]
     
-    print('dictefesinpt')
-    print(dictefesinpt)
+    dictefesinpt['strgextn'] = '%s_%04d' % (typesyst, k)
 
     # generate light curve
     dictefesoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)

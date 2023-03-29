@@ -806,7 +806,7 @@ def eval_modl( \
               # title of the animation
               strgtitl=None, \
 
-              # string to be appended to the file name of the animation
+              # string to be appended to the file name of the visuals
               strgextn='', \
               
               # resolution controls
@@ -840,7 +840,7 @@ def eval_modl( \
               ## 'calc': optimized for fast calculation
               ## 'view': large field-of-view unneccessary for calculation
               typebndr='calc', \
-
+            
               # type of light curve plot
               ## 'inst': inset
               ## 'lowr': lower panel
@@ -2069,6 +2069,10 @@ def eval_modl( \
 
     if gdat.boolfast and gdat.rratcomp.ndim == 2 and gdat.boolrscllcur:
         dictefes['rflx'] = 1. - gdat.rratcompsave[None, 0, :] * (1. - dictefes['rflx'][:, None])
+    
+    # create dummy energy axis
+    if dictefes['rflx'].ndim == 1:
+        dictefes['rflx'] = dictefes['rflx'][:, None]
 
     if gdat.booldiag:
         if not np.isfinite(dictefes['rflx']).all() or (dictefes['rflx'] < 0).any():
@@ -2084,7 +2088,7 @@ def eval_modl( \
         for name in dictinpt:
             if name != 'gdat':
                 dictefes[name] = getattr(gdat, name)#dictinpt[name]
-        plot_tser_dictefes(gdat.pathvisu, dictefes, 'eval')
+        plot_tser_dictefes(gdat.pathvisu, dictefes, 'eval%s' % strgextn)
         
     dictefes['timetotl'] = timemodu.time() - timeinit
     dictefes['timeredu'] = dictefes['timetotl'] / numbtime
@@ -2135,7 +2139,7 @@ def eval_modl( \
     return dictefes
 
 
-def plot_tser_dictefes(pathvisu, dictefes, strgextn, typetarg='', typefileplot='png'):
+def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, typetarg='', typefileplot='png'):
 
     dictlabl = dict()
     dictlabl['root'] = dict()
@@ -2177,22 +2181,32 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     #dicttemp['coeflmdk'] = np.array([dicttemp['coeflmdklinr'], dicttemp['coeflmdkquad']])
     
     # dictionary for the configuration
-    dictmodl[strgextn] = dict()
-    dictmodl[strgextn]['time'] = dictefes['time'] # [BJD]
+    dictmodl['eval'] = dict()
+    dictmodl['eval']['time'] = dictefes['time'] # [BJD]
     
+    numbtime = dictefes['rflx'].shape[0]
+    numbener = dictefes['rflx'].shape[1]
+    arrytser = np.empty((numbtime, numbener, 3))
+    arrytser[:, 0, 0] = dictefes['time']
+    arrytser[:, :, 1] = dictefes['rflx']
+    numbcomp = dictefes['pericomp'].size
+    indxcomp = np.arange(numbcomp)
+    arrypcur = [[] for j in indxcomp]
+    for j in indxcomp:
+        arrypcur[j] = miletos.fold_tser(arrytser, dictefes['epocmtracomp'][j], dictefes['pericomp'][j])
 
-    #dictmodl[strgextn]['time'] = dictefes['time'] * 24. # [hours]
+    #dictmodl['eval']['time'] = dictefes['time'] * 24. # [hours]
     
     #if dictlistvalubatc[namebatc]['vari'][nameparavari].size > 1:
     #    if not isinstance(dictlistvalubatc[namebatc]['vari'][nameparavari][k], str):
-    #        dictmodl[strgextn]['labl'] = '%s = %.3g %s' % (dictlabl['root'][nameparavari], \
+    #        dictmodl['eval']['labl'] = '%s = %.3g %s' % (dictlabl['root'][nameparavari], \
     #                            dictlistvalubatc[namebatc]['vari'][nameparavari][k], dictlabl['unit'][nameparavari])
     #    else:
-    #        dictmodl[strgextn]['labl'] = '%s' % (dictlistvalubatc[namebatc]['vari'][nameparavari][k])
-    dictmodl[strgextn]['lcur'] = 1e6 * (dictefes['rflx'] - 1)
+    #        dictmodl['eval']['labl'] = '%s' % (dictlistvalubatc[namebatc]['vari'][nameparavari][k])
+    dictmodl['eval']['lcur'] = 1e6 * (dictefes['rflx'] - 1)
     
     #listcolr = ['g', 'b', 'firebrick', 'orange', 'olive']
-    #dictmodl[strgextn]['colr'] = listcolr[k]
+    #dictmodl['eval']['colr'] = listcolr[k]
 
 
     print('Making a light curve plot...')
@@ -2214,15 +2228,34 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     lablxaxi = 'Time [BJD]'
     lablyaxi = 'Relative flux - 1 [ppm]'
     
-    # all of the phase curve
-    strgextnbase = '%s' % (dictefes['typesyst'])
-    if typetarg != '':
-        strgextnbase += '_%s' % typetarg
+    if strgextninpt is None or strgextninpt == '':
+        strgextnbase = '%s' % (dictefes['typesyst'])
+        if typetarg != '':
+            strgextnbase += '_%s' % typetarg
+    else:
+        strgextnbase = strgextninpt
+    
+    # time-series
+    strgextn = strgextnbase
     pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
-                                 strgextn=strgextnbase, \
+                                 strgextn=strgextn, \
+                                 lablxaxi=lablxaxi, \
+                                 lablyaxi=lablyaxi, \
+                                 strgtitl=strgtitl, \
+                                 #typesigncode='ephesos', \
+                                )
+    
+    # phase curve
+    strgextn = '%s_pcur' % (strgextnbase)
+    pathplot = miletos.plot_tser(pathvisu, \
+                                 dictmodl=dictmodl, \
+                                 boolfold=True, \
+                                 typefileplot=typefileplot, \
+                                 #listxdatvert=listxdatvert, \
+                                 strgextn=strgextn, \
                                  lablxaxi=lablxaxi, \
                                  lablyaxi=lablyaxi, \
                                  strgtitl=strgtitl, \
@@ -2230,9 +2263,10 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
                                 )
     
     # vertical zoom onto the phase curve
-    strgextn = '%s_pcur' % (strgextnbase)
+    strgextn = '%s_pcurzoom' % (strgextnbase)
     pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
+                                 boolfold=True, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
                                  strgextn=strgextn, \
@@ -2249,6 +2283,7 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     limtxaxi = np.array([-2, 2.])
     pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
+                                 boolfold=True, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
                                  strgextn=strgextn, \
@@ -2264,6 +2299,7 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     limtxaxi += 0.5 * dictefes['pericomp'] * 24.
     pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
+                                 boolfold=True, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
                                  strgextn=strgextn, \
