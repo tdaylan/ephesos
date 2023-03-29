@@ -148,9 +148,15 @@ if typesyst == 'psys':
 
 for k in range(numbsyst):
     
+    if indxcompstar[k].size == 0:
+        raise Exception('')
+
     for namevarb in listnamevarb:
         dictefesinpt['%scomp' % namevarb] = dictpoplcomp['%scomp' % namevarb][indxcompstar[k]]
     
+    print('dictefesinpt')
+    print(dictefesinpt)
+
     # generate light curve
     dictefesoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
 

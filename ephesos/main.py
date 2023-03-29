@@ -31,6 +31,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 import nicomedia
+import chalcedon
 
 import tdpy
 from tdpy import summgene
@@ -1373,10 +1374,11 @@ def eval_modl( \
             gdat.diffphaspcur = 0.02
         
         if gdat.diffphasintr is None:
-            if np.isfinite(gdat.duratranfull):
+            if gdat.boolsystpsys and np.isfinite(gdat.duratranfull):
                 gdat.diffphasintr = 0.0005
             else:
                 gdat.diffphasintr = 0.0001
+        
         if typeverb > 1:
             if np.isfinite(gdat.duratranfull):
                 print('gdat.diffphasineg')
@@ -1411,6 +1413,18 @@ def eval_modl( \
             print(gdat.rratcomp)
             print('WARNING! At least one of the occulter radii is smaller than the grid resolution. The output will be unreliable.')
     
+        if gdat.boolsystpsys and len(gdat.rratcomp) == 0:
+            print('')
+            print('')
+            print('')
+            print('gdat.typesyst')
+            print(gdat.typesyst)
+            print('gdat.tolerrat')
+            print(gdat.tolerrat)
+            print('gdat.rratcomp')
+            print(gdat.rratcomp)
+            raise Exception('gdat.rratcomp is empty.')
+    
     if typecalc == 'simpboxx':
         
         for j in indxcomp:
@@ -1422,7 +1436,7 @@ def eval_modl( \
     
         if gdat.typesyst == 'cosc':
             
-            gdat.radieins = retr_radieinssbin(gdat.masscomp, gdat.smaxcompasun) / gdat.radistar
+            gdat.radieins = chalcedon.retr_radieinssbin(gdat.masscomp, gdat.smaxcompasun) / gdat.radistar
             gdat.wdthslen = np.minimum(2. * gdat.radieins, np.ones_like(gdat.masscomp))
             
             if gdat.typeverb > 1:
@@ -1458,11 +1472,6 @@ def eval_modl( \
             if gdat.resoplan is None:
                 gdat.resoplan = 0.1
             
-            print('gdat.tolerrat')
-            print(gdat.tolerrat)
-            print('gdat.rratcomp')
-            print(gdat.rratcomp)
-            print('')
             gdat.diffgrid = min(0.02, gdat.resoplan * np.amin(gdat.rratcomp[gdat.rratcomp > gdat.tolerrat]))
         
         if gdat.booldiag:
@@ -1575,11 +1584,6 @@ def eval_modl( \
                     else:
                         limtgridypos = gdat.rratcomp[j]
                     
-                    print('gdat.rratcomp[j]')
-                    print(gdat.rratcomp[j])
-                    print('gdat.smaxcomp[j]')
-                    print(gdat.smaxcomp[j])
-                
                 arrycompxpos = np.arange(-limtgridxpos - 2. * gdat.diffgrid, limtgridxpos + 3. * gdat.diffgrid, gdat.diffgrid)
                 arrycompypos = np.arange(-limtgridypos - 2. * gdat.diffgrid, limtgridypos + 3. * gdat.diffgrid, gdat.diffgrid)
                 gdat.numbsidegridcomp[j] = arrycompxpos.size
@@ -1766,7 +1770,7 @@ def eval_modl( \
             for j in indxcomp:
                 if np.isfinite(gdat.duratrantotl[j]):
                     gdat.phastrantotl = gdat.duratrantotl / gdat.pericomp[j]
-                    if np.isfinite(gdat.duratranfull[j]):
+                    if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         gdat.phastranfull = gdat.duratranfull[j] / gdat.pericomp[j]
                         # inlclude a fudge factor of 1.1
                         deltphasineg = 1.1 * (gdat.phastrantotl - gdat.phastranfull) / 2.
@@ -1778,22 +1782,22 @@ def eval_modl( \
                     
                     listphaseval[j] = [np.arange(-0.25, -phasingr - deltphasineghalf, gdat.diffphaspcur)]
                     
-                    if np.isfinite(gdat.duratranfull[j]):
+                    if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         listphaseval[j].append(np.arange(-phasingr - deltphasineghalf, -phasingr + deltphasineghalf, gdat.diffphasineg))
 
                     listphaseval[j].append(np.arange(-phasingr + deltphasineghalf, phasingr - deltphasineghalf, gdat.diffphasintr))
                                                    
-                    if np.isfinite(gdat.duratranfull[j]):
+                    if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         listphaseval[j].append(np.arange(phasingr - deltphasineghalf, phasingr + deltphasineghalf, gdat.diffphasineg))
                     
                     listphaseval[j].append(np.arange(phasingr + deltphasineghalf, 0.5 - phasingr - deltphasineghalf, gdat.diffphaspcur))
                     
-                    if np.isfinite(gdat.duratranfull[j]):
+                    if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         listphaseval[j].append(np.arange(0.5 - phasingr - deltphasineghalf, 0.5 - phasingr + deltphasineghalf, gdat.diffphasineg))
                                                    
                     listphaseval[j].append(np.arange(0.5 - phasingr + deltphasineghalf, 0.5 + phasingr - deltphasineghalf, gdat.diffphasintr))
                                                    
-                    if np.isfinite(gdat.duratranfull[j]):
+                    if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         listphaseval[j].append(np.arange(0.5 + phasingr - deltphasineghalf, 0.5 + phasingr + deltphasineghalf, gdat.diffphasineg))
                     
                     listphaseval[j].append(np.arange(0.5 + phasingr + deltphasineghalf, 0.75 + gdat.diffphaspcur, gdat.diffphaspcur))
@@ -2041,14 +2045,15 @@ def eval_modl( \
 
     if gdat.masscomp is not None and gdat.massstar is not None and gdat.radistar is not None:
         densstar = 1.4 * gdat.massstar / gdat.radistar**3
-        deptbeam = 1e-3 * retr_deptbeam(gdat.pericomp, gdat.massstar, gdat.masscomp)
-        deptelli = 1e-3 * retr_deptelli(gdat.pericomp, densstar, gdat.massstar, gdat.masscomp)
+        deptbeam = 1e-3 * nicomedia.retr_deptbeam(gdat.pericomp, gdat.massstar, gdat.masscomp)
+        deptelli = 1e-3 * nicomedia.retr_deptelli(gdat.pericomp, densstar, gdat.massstar, gdat.masscomp)
+        dictefes['rflxslen'] = [[] for j in indxcomp]
         dictefes['rflxbeam'] = [[] for j in indxcomp]
         dictefes['rflxelli'] = [[] for j in indxcomp]
 
         for j in indxcomp:
             
-            dictefes['rflxslen'] = np.copy(dictefes['rflx'])
+            dictefes['rflxslen'][j] = dictefes['rflx']
             
             dictefes['rflxbeam'][j] = 1. + deptbeam * np.sin(phas[j])
             dictefes['rflxelli'][j] = 1. + deptelli * np.sin(2. * phas[j])
@@ -2079,7 +2084,7 @@ def eval_modl( \
         for name in dictinpt:
             if name != 'gdat':
                 dictefes[name] = getattr(gdat, name)#dictinpt[name]
-        plot_modllcur_phas(gdat.pathvisu, dictefes, 'eval')
+        plot_tser_dictefes(gdat.pathvisu, dictefes, 'eval')
         
     dictefes['timetotl'] = timemodu.time() - timeinit
     dictefes['timeredu'] = dictefes['timetotl'] / numbtime
@@ -2130,7 +2135,7 @@ def eval_modl( \
     return dictefes
 
 
-def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='png'):
+def plot_tser_dictefes(pathvisu, dictefes, strgextn, typetarg='', typefileplot='png'):
 
     dictlabl = dict()
     dictlabl['root'] = dict()
@@ -2138,7 +2143,8 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     dictlabl['totl'] = dict()
     
     listnamevarbcomp = ['pericomp', 'epocmtracomp', 'cosicomp', 'rsmacomp'] 
-    listnamevarbcomp += ['offsphascomp']
+    if dictefes['typesyst'] == 'psyspcur':
+        listnamevarbcomp += ['offsphascomp']
     
     listnamevarbsimu = ['tolerrat']#, 'diffphas']
     listnamevarbstar = ['radistar']
@@ -2173,6 +2179,8 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     # dictionary for the configuration
     dictmodl[strgextn] = dict()
     dictmodl[strgextn]['time'] = dictefes['time'] # [BJD]
+    
+
     #dictmodl[strgextn]['time'] = dictefes['time'] * 24. # [hours]
     
     #if dictlistvalubatc[namebatc]['vari'][nameparavari].size > 1:
@@ -2210,7 +2218,7 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     strgextnbase = '%s' % (dictefes['typesyst'])
     if typetarg != '':
         strgextnbase += '_%s' % typetarg
-    pathplot = miletos.plot_lcur(pathvisu, \
+    pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
@@ -2223,7 +2231,7 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     
     # vertical zoom onto the phase curve
     strgextn = '%s_pcur' % (strgextnbase)
-    pathplot = miletos.plot_lcur(pathvisu, \
+    pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
@@ -2239,7 +2247,7 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     strgextn = '%s_prim' % (strgextnbase)
     #limtxaxi = np.array([-24. * 0.7 * dictefes['duratrantotl'], 24. * 0.7 * dictefes['duratrantotl']])
     limtxaxi = np.array([-2, 2.])
-    pathplot = miletos.plot_lcur(pathvisu, \
+    pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
@@ -2254,7 +2262,7 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     # horizontal zoom around the secondary
     strgextn = '%s_seco' % (strgextnbase)
     limtxaxi += 0.5 * dictefes['pericomp'] * 24.
-    pathplot = miletos.plot_lcur(pathvisu, \
+    pathplot = miletos.plot_tser(pathvisu, \
                                  dictmodl=dictmodl, \
                                  typefileplot=typefileplot, \
                                  #listxdatvert=listxdatvert, \
@@ -2294,6 +2302,8 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
             print('')
             print('')
             print('')
+            print('dictefesinpt[typesyst]')
+            print(dictefesinpt['typesyst'])
             print('name')
             print(name)
             raise Exception('dictefesinpt[name] is None')
