@@ -143,6 +143,9 @@ maxmtime = 10.
 time = np.arange(minmtime, maxmtime, cade)
 
 listnamevarb = ['peri', 'epocmtra', 'rsma', 'cosi']
+if typesyst == 'psys':
+    listnamevarb += ['rrat']
+
 for k in range(numbsyst):
     
     for namevarb in listnamevarb:

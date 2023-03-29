@@ -982,7 +982,7 @@ def eval_modl( \
             raise Exception('')
         
         
-        if gdat.typesyst.startswith('psys') and gdat.rratcomp is None:
+        if gdat.typesyst.startswith('psys') and (gdat.rratcomp is None or not np.isfinite(gdat.rratcomp).all()):
             print('')
             print('')
             print('')
@@ -990,7 +990,7 @@ def eval_modl( \
             print(gdat.typesyst)
             print('gdat.rratcomp')
             summgene(gdat.rratcomp)
-            raise Exception('rratcomp is None despite the system having planetary companions.')
+            raise Exception('rratcomp is None or at least one element in it is infinite despite the system having planetary companions.')
         
         if gdat.rratcomp is not None and (gdat.rratcomp < 0).any():
             print('')
@@ -1052,7 +1052,7 @@ def eval_modl( \
         if gdat.inclcomp is not None and gdat.cosicomp is not None:
             raise Exception('')
         
-        if gdat.rsmacomp is None or not np.isfinite(gdat.rsmacomp).all():
+        if gdat.typesyst != 'cosc' and (gdat.rsmacomp is None or not np.isfinite(gdat.rsmacomp).all()):
             print('')
             print('')
             print('')
@@ -1067,12 +1067,12 @@ def eval_modl( \
             if gdat.masscomp is None:
                 raise Exception('')
     
-    if gdat.boolfast and gdat.rratcomp.ndim == 2:
+    if gdat.boolfast and gdat.boolsystpsys and gdat.rratcomp.ndim == 2:
         print('np.std(gdat.rratcomp)')
         print(np.std(gdat.rratcomp))
         print('gdat.rratcomp')
         summgene(gdat.rratcomp)
-        if np.std(gdat.rratcomp) < 0.05 and gdat.boolsystpsys and numbcomp == 1:
+        if np.std(gdat.rratcomp) < 0.05 and numbcomp == 1:
             gdat.boolrscllcur = True
             print('Rescaling the white light curve instead of calculating the light curve in each wavelength channel...')
             gdat.rratcompsave = np.copy(gdat.rratcomp)
@@ -1188,7 +1188,8 @@ def eval_modl( \
         print('gdat.cosicomp')
         print(gdat.cosicomp)
     
-    gdat.smaxcomp = (1. + gdat.rratcomp) / gdat.rsmacomp
+    if gdat.rsmacomp is not None:
+        gdat.smaxcomp = (1. + gdat.rratcomp) / gdat.rsmacomp
     
     if gdat.typesyst == 'psyspcur':
     
@@ -1229,14 +1230,14 @@ def eval_modl( \
         gdat.masstotl = gdat.massstar + np.sum(gdat.masscompsolr) # [M_S]
         
         ## semi-major axis
-        gdat.smaxcompasun = retr_smaxkepl(gdat.pericomp, gdat.masstotl) # [AU]
+        gdat.smaxcompasun = nicomedia.retr_smaxkepl(gdat.pericomp, gdat.masstotl) # [AU]
         
         gdat.smaxcomp = gdat.smaxcompasun * gdat.dictfact['aurs'] / gdat.radistar # [R_*]
 
         if gdat.perimoon is not None:
             smaxmoon = [[[] for jj in indxmoon[j]] for j in indxcomp]
             for j in indxcomp:
-                smaxmoon[j] = retr_smaxkepl(gdat.perimoon[j], gdat.masscompsolr[j])
+                smaxmoon[j] = nicomedia.retr_smaxkepl(gdat.perimoon[j], gdat.masscompsolr[j])
                 
                 for jj in indxmoon[j]:
                     if smaxmoon[j] <= gdat.radicomp[j] / gdat.dictfact['rsre'] / gdat.dictfact['aurs']:
@@ -1289,6 +1290,18 @@ def eval_modl( \
                                                             gdat.typesyst == 'psysttvr' or gdat.typesyst == 'psyslasr' or \
                     gdat.typesyst == 'psysdiskedgehori' or gdat.typesyst == 'psysdiskedgevert' or gdat.typesyst == 'psysdiskface' or gdat.typesyst == 'sbin'
     
+    if gdat.rsmacomp is None:
+        gdat.rsmacomp = (gdat.rratcomp + gdat.radistar) / gdat.smaxcomp
+
+    if gdat.booldiag:
+        if gdat.rsmacomp is None:
+            print('')
+            print('')
+            print('')
+            print('gdat.smaxcomp')
+            print(gdat.smaxcomp)
+            raise Exception(' gdat.rsmacomp is Non')
+
     gdat.duratrantotl = nicomedia.retr_duratrantotl(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, booldiag=gdat.booldiag) / 24.
     
     dictefes['duratrantotl'] = gdat.duratrantotl
@@ -1301,7 +1314,7 @@ def eval_modl( \
             print(gdat.masscomp)
             print('gdat.massstar')
             print(gdat.massstar)
-        amplslen = retr_amplslen(gdat.pericomp, gdat.radistar, gdat.masscomp, gdat.massstar)
+        amplslen = chalcedon.retr_amplslen(gdat.pericomp, gdat.radistar, gdat.masscomp, gdat.massstar)
         dictefes['amplslen'] = amplslen
     
     if boolintp:
@@ -1438,13 +1451,18 @@ def eval_modl( \
                 if numbcomp > 1:
                     raise Exception('')
 
-        elif (gdat.rratcomp <= gdat.tolerrat).all():
+        elif (gdat.rratcomp <= gdat.tolerrat).any():
             gdat.diffgrid = 0.001
         else:
         
             if gdat.resoplan is None:
                 gdat.resoplan = 0.1
             
+            print('gdat.tolerrat')
+            print(gdat.tolerrat)
+            print('gdat.rratcomp')
+            print(gdat.rratcomp)
+            print('')
             gdat.diffgrid = min(0.02, gdat.resoplan * np.amin(gdat.rratcomp[gdat.rratcomp > gdat.tolerrat]))
         
         if gdat.booldiag:
@@ -2148,7 +2166,7 @@ def plot_modllcur_phas(pathvisu, dictefes, strgextn, typetarg='', typefileplot='
     pathfoldanim = pathvisu
     
     # title for the plots
-    strgtitl = retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl)
+    strgtitl = retr_strgtitl(dictefes, listnamevarbcomp, dictlabl)
     
     #dicttemp['coeflmdk'] = np.array([dicttemp['coeflmdklinr'], dicttemp['coeflmdkquad']])
     
