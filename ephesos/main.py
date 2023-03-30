@@ -487,6 +487,12 @@ def proc_phas(gdat, j, t, phasthis):
                     thet = -0.5 * np.pi + np.arccos(zposgridsphr / np.sqrt(xposgridsphr**2 + yposgridsphr**2 + zposgridsphr**2))
                     phii = 0.5 * np.pi - np.arctan2(yposgridsphr, xposgridsphr)
                 
+                    print('gdat.ratibrgtcomp')
+                    print(gdat.ratibrgtcomp)
+                    print('gdat.latigridsphr')
+                    print(gdat.latigridsphr)
+                    print('thet')
+                    print(thet)
                     brgtraww = gdat.ratibrgtcomp * np.cos(thet + gdat.latigridsphr[j][gdat.indxplannoccgridcomp[j]])
                 
                     # longitudes of the unocculted pixels of the revolved (and tidally-locked) planet
@@ -2088,7 +2094,7 @@ def eval_modl( \
         for name in dictinpt:
             if name != 'gdat':
                 dictefes[name] = getattr(gdat, name)#dictinpt[name]
-        plot_tser_dictefes(gdat.pathvisu, dictefes, 'eval%s' % strgextn)
+        plot_tser_dictefes(gdat.pathvisu, dictefes, '%s' % strgextn)
         
     dictefes['timetotl'] = timemodu.time() - timeinit
     dictefes['timeredu'] = dictefes['timetotl'] / numbtime
@@ -2195,21 +2201,15 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, typetarg='', typefilepl
     for j in indxcomp:
         arrypcur[j] = miletos.fold_tser(arrytser, dictefes['epocmtracomp'][j], dictefes['pericomp'][j])
 
-    #dictmodl['eval']['time'] = dictefes['time'] * 24. # [hours]
-    
     #if dictlistvalubatc[namebatc]['vari'][nameparavari].size > 1:
     #    if not isinstance(dictlistvalubatc[namebatc]['vari'][nameparavari][k], str):
     #        dictmodl['eval']['labl'] = '%s = %.3g %s' % (dictlabl['root'][nameparavari], \
     #                            dictlistvalubatc[namebatc]['vari'][nameparavari][k], dictlabl['unit'][nameparavari])
     #    else:
     #        dictmodl['eval']['labl'] = '%s' % (dictlistvalubatc[namebatc]['vari'][nameparavari][k])
-    dictmodl['eval']['lcur'] = 1e6 * (dictefes['rflx'] - 1)
     
     #listcolr = ['g', 'b', 'firebrick', 'orange', 'olive']
     #dictmodl['eval']['colr'] = listcolr[k]
-
-
-    print('Making a light curve plot...')
 
     duratrantotl = nicomedia.retr_duratrantotl(dictefes['pericomp'], dictefes['rsmacomp'], dictefes['cosicomp']) / 24. # [days]
     
@@ -2235,81 +2235,108 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, typetarg='', typefilepl
     else:
         strgextnbase = strgextninpt
     
-    # time-series
-    strgextn = strgextnbase
-    pathplot = miletos.plot_tser(pathvisu, \
-                                 dictmodl=dictmodl, \
-                                 typefileplot=typefileplot, \
-                                 #listxdatvert=listxdatvert, \
-                                 strgextn=strgextn, \
-                                 lablxaxi=lablxaxi, \
-                                 lablyaxi=lablyaxi, \
-                                 strgtitl=strgtitl, \
-                                 #typesigncode='ephesos', \
-                                )
+    numbener = dictefes['rflx'].shape[1]
+    indxener = np.arange(numbener)
+    for e in indxener:
+        
+        if numbener > 0:
+            strgener = '_e%03d' % e
+        else:
+            strgener = ''
     
-    # phase curve
-    strgextn = '%s_pcur' % (strgextnbase)
-    pathplot = miletos.plot_tser(pathvisu, \
-                                 dictmodl=dictmodl, \
-                                 boolfold=True, \
-                                 typefileplot=typefileplot, \
-                                 #listxdatvert=listxdatvert, \
-                                 strgextn=strgextn, \
-                                 lablxaxi=lablxaxi, \
-                                 lablyaxi=lablyaxi, \
-                                 strgtitl=strgtitl, \
-                                 #typesigncode='ephesos', \
-                                )
-    
-    # vertical zoom onto the phase curve
-    strgextn = '%s_pcurzoom' % (strgextnbase)
-    pathplot = miletos.plot_tser(pathvisu, \
-                                 dictmodl=dictmodl, \
-                                 boolfold=True, \
-                                 typefileplot=typefileplot, \
-                                 #listxdatvert=listxdatvert, \
-                                 strgextn=strgextn, \
-                                 lablxaxi=lablxaxi, \
-                                 lablyaxi=lablyaxi, \
-                                 strgtitl=strgtitl, \
-                                 limtyaxi=[-500, None], \
-                                 #typesigncode='ephesos', \
-                                )
-    
-    # horizontal zoom around the primary
-    strgextn = '%s_prim' % (strgextnbase)
-    #limtxaxi = np.array([-24. * 0.7 * dictefes['duratrantotl'], 24. * 0.7 * dictefes['duratrantotl']])
-    limtxaxi = np.array([-2, 2.])
-    pathplot = miletos.plot_tser(pathvisu, \
-                                 dictmodl=dictmodl, \
-                                 boolfold=True, \
-                                 typefileplot=typefileplot, \
-                                 #listxdatvert=listxdatvert, \
-                                 strgextn=strgextn, \
-                                 lablxaxi=lablxaxi, \
-                                 lablyaxi=lablyaxi, \
-                                 strgtitl=strgtitl, \
-                                 limtxaxi=limtxaxi, \
-                                 #typesigncode='ephesos', \
-                                )
-    
-    # horizontal zoom around the secondary
-    strgextn = '%s_seco' % (strgextnbase)
-    limtxaxi += 0.5 * dictefes['pericomp'] * 24.
-    pathplot = miletos.plot_tser(pathvisu, \
-                                 dictmodl=dictmodl, \
-                                 boolfold=True, \
-                                 typefileplot=typefileplot, \
-                                 #listxdatvert=listxdatvert, \
-                                 strgextn=strgextn, \
-                                 lablxaxi=lablxaxi, \
-                                 lablyaxi=lablyaxi, \
-                                 strgtitl=strgtitl, \
-                                 limtxaxi=limtxaxi, \
-                                 limtyaxi=[-500, None], \
-                                 #typesigncode='ephesos', \
-                                )
+        dictmodl['eval']['lcur'] = 1e6 * (dictefes['rflx'][:, e] - 1)
+
+        # time-series
+        strgextn = '%s%s' % (strgextnbase, strgener)
+        pathplot = miletos.plot_tser(pathvisu, \
+                                     dictmodl=dictmodl, \
+                                     typefileplot=typefileplot, \
+                                     #listxdatvert=listxdatvert, \
+                                     strgextn=strgextn, \
+                                     lablxaxi=lablxaxi, \
+                                     lablyaxi=lablyaxi, \
+                                     strgtitl=strgtitl, \
+                                     #typesigncode='ephesos', \
+                                    )
+        
+        for j in indxcomp:
+            strgextnbasecomp = '%s%s_com%d' % (strgextnbase, strgener, j)
+            
+            epoc = dictefes['epocmtracomp'][j]
+            peri = dictefes['pericomp'][j]
+            
+            # phase curve
+            strgextn = '%s_pcur' % (strgextnbasecomp)
+            pathplot = miletos.plot_tser(pathvisu, \
+                                         dictmodl=dictmodl, \
+                                         boolfold=True, \
+                                         typefileplot=typefileplot, \
+                                         #listxdatvert=listxdatvert, \
+                                         strgextn=strgextn, \
+                                         lablxaxi=lablxaxi, \
+                                         lablyaxi=lablyaxi, \
+                                         strgtitl=strgtitl, \
+                                         epoc=epoc, \
+                                         peri=peri, \
+                                         #typesigncode='ephesos', \
+                                        )
+            
+            if dictefes['typesyst'] == 'psyspcur':
+                
+                # vertical zoom onto the phase curve
+                strgextn = '%s_pcurzoom' % (strgextnbasecomp)
+                pathplot = miletos.plot_tser(pathvisu, \
+                                             dictmodl=dictmodl, \
+                                             boolfold=True, \
+                                             typefileplot=typefileplot, \
+                                             #listxdatvert=listxdatvert, \
+                                             strgextn=strgextn, \
+                                             lablxaxi=lablxaxi, \
+                                             lablyaxi=lablyaxi, \
+                                             strgtitl=strgtitl, \
+                                             limtyaxi=[-500, None], \
+                                             epoc=epoc, \
+                                             peri=peri, \
+                                             #typesigncode='ephesos', \
+                                            )
+                
+                # horizontal zoom around the primary
+                strgextn = '%s_prim' % (strgextnbasecomp)
+                #limtxaxi = np.array([-24. * 0.7 * dictefes['duratrantotl'], 24. * 0.7 * dictefes['duratrantotl']])
+                limtxaxi = np.array([-2, 2.])
+                pathplot = miletos.plot_tser(pathvisu, \
+                                             dictmodl=dictmodl, \
+                                             boolfold=True, \
+                                             typefileplot=typefileplot, \
+                                             #listxdatvert=listxdatvert, \
+                                             strgextn=strgextn, \
+                                             lablxaxi=lablxaxi, \
+                                             lablyaxi=lablyaxi, \
+                                             strgtitl=strgtitl, \
+                                             limtxaxi=limtxaxi, \
+                                             epoc=epoc, \
+                                             peri=peri, \
+                                             #typesigncode='ephesos', \
+                                            )
+                
+                # horizontal zoom around the secondary
+                strgextn = '%s_seco' % (strgextnbasecomp)
+                limtxaxi += 0.5 * dictefes['pericomp'][j] * 24.
+                pathplot = miletos.plot_tser(pathvisu, \
+                                             dictmodl=dictmodl, \
+                                             boolfold=True, \
+                                             typefileplot=typefileplot, \
+                                             #listxdatvert=listxdatvert, \
+                                             strgextn=strgextn, \
+                                             lablxaxi=lablxaxi, \
+                                             lablyaxi=lablyaxi, \
+                                             strgtitl=strgtitl, \
+                                             limtxaxi=limtxaxi, \
+                                             limtyaxi=[-500, None], \
+                                             epoc=epoc, \
+                                             peri=peri, \
+                                             #typesigncode='ephesos', \
+                                            )
 
 
 def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
