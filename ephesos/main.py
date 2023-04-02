@@ -486,23 +486,35 @@ def proc_phas(gdat, j, t, phasthis):
                     # find spherical coordinates in the planet coordinate
                     thet = -0.5 * np.pi + np.arccos(zposgridsphr / np.sqrt(xposgridsphr**2 + yposgridsphr**2 + zposgridsphr**2))
                     phii = 0.5 * np.pi - np.arctan2(yposgridsphr, xposgridsphr)
-                
-                    print('gdat.ratibrgtcomp')
-                    print(gdat.ratibrgtcomp)
-                    print('gdat.latigridsphr')
-                    print(gdat.latigridsphr)
-                    print('thet')
-                    print(thet)
+                    
+                    if gdat.booldiag:
+                        if gdat.ratibrgtcomp is None:
+                            print('')
+                            print('')
+                            print('')
+                            print('gdat.typesyst')
+                            print(gdat.typesyst)
+                            print('gdat.typebrgtcomp')
+                            print(gdat.typebrgtcomp)
+                            print('gdat.ratibrgtcomp')
+                            print(gdat.ratibrgtcomp)
+                            print('gdat.latigridsphr')
+                            print(gdat.latigridsphr)
+                            print('thet')
+                            print(thet)
+                            raise Exception('gdat.ratibrgtcomp is None')
+                    
                     brgtraww = gdat.ratibrgtcomp * np.cos(thet + gdat.latigridsphr[j][gdat.indxplannoccgridcomp[j]])
                 
                     # longitudes of the unocculted pixels of the revolved (and tidally-locked) planet
                     gdat.longgridsphrrota = phii + gdat.longgridsphr[j][gdat.indxplannoccgridcomp[j]]
 
-                    if gdat.typebrgtcomp == 'heated':
+                    if gdat.typebrgtcomp == 'heated_rdis':
                         brgtraww *= (0.55 + 0.45 * np.sin(gdat.longgridsphrrota + np.pi * gdat.offsphascomp[j] / 180.))
-                    elif gdat.typebrgtcomp == 'sliced':
+                    elif gdat.typebrgtcomp == 'heated_sliced':
                         indxslic = (gdat.numbslic * ((gdat.longgridsphrrota % (2. * np.pi)) / np.pi / 2.)).astype(int)
                         brgtraww *= gdat.brgtsliccomp[indxslic]
+                
                 gdat.brgtcomp = nicomedia.retr_brgtlmdk(cosg, gdat.coeflmdk, brgtraww=brgtraww, typelmdk=gdat.typelmdk)# * gdat.areagrid
                 
                 fluxtotlcompthis += np.sum(gdat.brgtcomp)
@@ -725,9 +737,9 @@ def eval_modl( \
               ## type of the brightness of the companion
               ### it is only functional if typesyst is 'psyspcur'
               ### 'dark': companion completely dark
-              ### 'heated': companion irradiated by the primary with a sinusoidal in phase (e.g., a planet)
-              ### 'sliced': orange slices
-              ### 'isot': isothermal
+              ### 'heated_rdis': companion is an externally heated body with heat redistribution (efficiency and phase offset)
+              ### 'heated_sliced': companion has a heat distribution determined by the input temperatures of longitudinal slices
+              ### 'isot': companion is an internally heated, isothermal body
               typebrgtcomp='dark', \
               
               ## phase offset for the sinusoidal model
@@ -1202,8 +1214,8 @@ def eval_modl( \
     
         if gdat.maxmfactellp is None:
             gdat.maxmfactellp = 1.2
-
-        if gdat.typebrgtcomp == 'heated':
+        
+        if gdat.typebrgtcomp == 'heated_rdis' or gdat.typebrgtcomp == 'heated_sliced':
             if gdat.ratibrgtcomp is not None:
                 raise Exception('A brightness ratio is provided for a passively heated companion.')
             gdat.ratibrgtcomp = (1. / gdat.smaxcomp)**2
@@ -1211,9 +1223,8 @@ def eval_modl( \
             print('temp: fudge factor due to passband in the IR')
             gdat.ratibrgtcomp *= 5.
             
-        ## isothermal
-        if gdat.typebrgtcomp == 'isot':
-            if gdat.ratibrgtcomp is None:
+        if gdat.ratibrgtcomp is None:
+            if gdat.typebrgtcomp == 'isot':
                 gdat.ratibrgtcomp = 1.
 
     if gdat.masscomp is not None and gdat.massstar is not None:
@@ -1622,7 +1633,7 @@ def eval_modl( \
                 if gdat.tmptsliccomp is None:
                     gdat.tmptsliccomp = np.maximum(0.2 * np.random.randn(16) + 0.9, np.zeros(16))
                 
-                if gdat.typesyst == 'psyspcur' and gdat.tmptsliccomp is None and gdat.typebrgtcomp == 'sliced':
+                if gdat.typesyst == 'psyspcur' and gdat.tmptsliccomp is None and gdat.typebrgtcomp == 'heated_sliced':
                     raise Exception('')
 
                 if gdat.tmptsliccomp is not None:

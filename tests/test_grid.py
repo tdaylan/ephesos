@@ -221,7 +221,7 @@ for typesyst in listtypesyst:
         dictvaludefa['tolerrat'] = 0.005
         
         if typesyst == 'psyspcur':
-            dictvaludefa['typebrgtcomp'] = 'sinusoidal'
+            dictvaludefa['typebrgtcomp'] = 'heated_rdis'
             dictvaludefa['offsphas'] = 0.
 
         if typesyst == 'psysmoon':
@@ -279,7 +279,7 @@ for typesyst in listtypesyst:
             #dictlistvalubatc['defa']['defa']['diffphas'] = 0.00003
         
         if typesyst == 'psyspcur':
-            dictlistvalubatc['typebrgtcomp']['vari']['typebrgtcomp'] = np.array(['sinusoidal', 'sliced'])
+            dictlistvalubatc['typebrgtcomp']['vari']['typebrgtcomp'] = np.array(['heated_rdis', 'heated_sliced'])
         
         if typesyst == 'psyspcur':
             dictlistvalubatc['defa']['defa']['typecoor'] = 'comp'
@@ -343,7 +343,7 @@ for typesyst in listtypesyst:
                 else:
                     dicttemp[nametemp] = valu
             
-            #if dicttemp['typebrgtcomp'] == 'sliced':
+            #if dicttemp['typebrgtcomp'] == 'heated_sliced':
             #    raise Exception('')
             
             dictmodl = dict()
