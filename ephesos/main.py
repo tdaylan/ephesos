@@ -981,6 +981,12 @@ def eval_modl( \
             print('gdat.diffphasineg')
             print(gdat.diffphasineg)
             raise Exception('')
+        
+        if gdat.time.size == 0:
+            print('')
+            print('')
+            print('')
+            raise Exception('gdat.time.size == 0')
 
         if gdat.diffphaspcur is not None and not isinstance(gdat.diffphaspcur, float):
             print('gdat.diffphaspcur')
@@ -1160,6 +1166,8 @@ def eval_modl( \
             summgene(gdat.time)
             raise Exception('')
     
+    print('gdat.time')
+    print(gdat.time)
     minmtime = np.amin(gdat.time)
     maxmtime = np.amax(gdat.time)
     numbtime = gdat.time.size
