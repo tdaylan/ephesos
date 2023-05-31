@@ -1301,8 +1301,8 @@ def eval_modl( \
     if boolintp is None:
         if gdat.perimoon is not None or numbcomp > 1 or gdat.perispot is not None:
             if typeverb > 1:
-                print('Either the model has moon, stellar spots, or multiple companions. \
-                                                Will evaluate the model at each time (as opposed to interpolating phase curves)...')
+                print('Either the model has moon, stellar spots, or multiple companions.')
+                print('Will evaluate the model at each time (as opposed to interpolating phase curves)...')
             boolintp = False
         else:
             if typeverb > 1:
