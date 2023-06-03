@@ -147,7 +147,7 @@ def retr_fluxstartran(gdat, typecoor, indxgridrofi=None):
     return fluxstartran
 
 
-def make_framanim(gdat, t, phasthis, j=None, boolplotlcur=False):
+def make_framanim(gdat, t, phasthis, j=None):
     
     for namevarbanim in gdat.listnamevarbanim:
         
@@ -186,20 +186,26 @@ def make_framanim(gdat, t, phasthis, j=None, boolplotlcur=False):
                 if gdat.typesyst == 'cosc':
                     brgttemp = gdat.brgtlens
                 
-                #cmap = 'magma'
-                cmap = 'Blues_r'
+                cmap = 'magma'
+                #cmap = 'Blues_r'
                 cmap = mpl.colors.LinearSegmentedColormap.from_list("", ["black", "white","blue"])
                 imag = axis.imshow(brgttemp, origin='lower', interpolation='nearest', cmap=cmap, vmin=0., vmax=gdat.maxmbrgtstar)
         
-                if boolplotlcur:
+                if gdat.boolshowlcuranim:
                     axistser = figr.add_axes([0.2, 0.15, 0.6, 0.3], frameon=False)
                 
                     if j is None:
                         axistser.plot(gdat.time[:t], gdat.fluxtotl[:t], marker='', color='firebrick', ls='-', lw=1)
+                    
                     else:
                         phastemp = np.array(gdat.phascomp[j])
                         indx = np.argsort(phastemp)
                         axistser.plot(phastemp[indx], np.array(gdat.fluxtotlcomp[j])[indx], marker='', color='firebrick', ls='-', lw=1)
+                    
+                        minmydat = gdat.brgtstarnocc - 2. * gdat.rratcomp[j]**2 * gdat.brgtstarnocc
+                        maxmydat = gdat.brgtstarnocc + 2. * gdat.rratcomp[j]**2 * gdat.brgtstarnocc
+                        axistser.set_ylim([minmydat, maxmydat])
+                        axistser.set_xlim([-0.25, 0.75])
                     
                         #print('gdat.phascomp[j]')
                         #summgene(gdat.phascomp[j])
@@ -208,12 +214,6 @@ def make_framanim(gdat, t, phasthis, j=None, boolplotlcur=False):
                     
                     #xlim = 2. * 0.5 * np.array([-gdat.duratrantotl[j] / gdat.pericomp[j], gdat.duratrantotl[j] / gdat.pericomp[j]])
                     #axistser.set_xlim(xlim)
-                    axistser.set_xlim([-0.25, 0.75])
-                    
-                    minmydat = gdat.brgtstarnocc - 2. * gdat.rratcomp[j]**2 * gdat.brgtstarnocc
-                    maxmydat = gdat.brgtstarnocc + 2. * gdat.rratcomp[j]**2 * gdat.brgtstarnocc
-                    
-                    axistser.set_ylim([minmydat, maxmydat])
                     
                     axistser.axis('off')
 
@@ -253,17 +253,23 @@ def make_framanim(gdat, t, phasthis, j=None, boolplotlcur=False):
                 strgtitl = ''
                 axis.set_title(strgtitl)
             
-            if j is not None:
-                strgtextinit = 'Time from midtransit'
-                #timemtra = gdat.phascomp[j][-1] * gdat.pericomp[j] * 24.
-                timemtra = gdat.phascomp[j][-1] * gdat.pericomp[j] * 24. * 60.
-                #strgtextfinl = 'hour'
-                strgtextfinl = 'minutes'
-                if gdat.typelang == 'Turkish':
-                    strgtextinit = gdat.dictturk[strgtextinit]
-                    strgtextfinl = gdat.dictturk[strgtextfinl]
+            if gdat.boolshowlcuranim:
                 bbox = dict(boxstyle='round', ec='white', fc='white')
-                strgtext = '%s: %.2f %s \n Phase: %.3g' % (strgtextinit, timemtra, strgtextfinl, gdat.phascomp[j][-1])
+                if j is not None:
+                    strgtextinit = 'Time from midtransit'
+                    #timemtra = gdat.phascomp[j][-1] * gdat.pericomp[j] * 24.
+                    timemtra = gdat.phascomp[j][-1] * gdat.pericomp[j] * 24. * 60.
+                    #strgtextfinl = 'hour'
+                    strgtextfinl = 'minutes'
+                    if gdat.typelang == 'Turkish':
+                        strgtextinit = gdat.dictturk[strgtextinit]
+                        strgtextfinl = gdat.dictturk[strgtextfinl]
+                    strgtext = '%s: %.2f %s \n Phase: %.3g' % (strgtextinit, timemtra, strgtextfinl, gdat.phascomp[j][-1])
+                else:
+                    timemtra = gdat.time[t]
+                    strgtextinit = 'Time'
+                    strgtextfinl = 'days'
+                    strgtext = '%s: %.2f %s' % (strgtextinit, timemtra, strgtextfinl)
                 axis.text(0.5, 0.95, strgtext, bbox=bbox, transform=axis.transAxes, color='firebrick', ha='center')
             
             #tdpy.sign_code(axis, 'ephesos')
@@ -356,7 +362,7 @@ def calc_posifromphas(gdat, j, phastemp):
     Calculate body positions from phase
     '''
     xpos = gdat.smaxcomp[j] * np.sin(2. * np.pi * phastemp)
-    ypos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp) * gdat.cosicomp[j]
+    ypos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp) * gdat.cosicomp[j] * gdat.intgcompflip[j]
     zpos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp)
     
     if gdat.typecoor == 'star':
@@ -818,8 +824,14 @@ def eval_modl( \
               # path for visuals
               pathvisu=None, \
               
+              # label for the unit of time
+              lablunittime='BJD', \
+
               # Boolean flag to make an animation
               boolmakeanim=False, \
+              
+              # Boolean flag to show the light curve on the animation
+              boolshowlcuranim=True, \
 
               # title of the animation
               strgtitl=None, \
@@ -937,7 +949,7 @@ def eval_modl( \
 
     if isinstance(gdat.rratcomp, list):
         gdat.rratcomp = np.array(gdat.rratcomp)
-
+    
     if isinstance(gdat.masscomp, list):
         gdat.masscomp = np.array(gdat.masscomp)
 
@@ -949,7 +961,7 @@ def eval_modl( \
 
     if isinstance(gdat.cosicomp, list):
         gdat.cosicomp = np.array(gdat.cosicomp)
-
+    
     if isinstance(gdat.eccecomp, list):
         gdat.eccecomp = np.array(gdat.eccecomp)
 
@@ -958,6 +970,8 @@ def eval_modl( \
     
     numbcomp = gdat.pericomp.size
     indxcomp = np.arange(numbcomp)
+    
+    gdat.intgcompflip = np.random.randint(2, size=numbcomp) - 1
     
     if gdat.typesyst == 'psyspcur':
         if gdat.offsphascomp is None:
@@ -1166,8 +1180,6 @@ def eval_modl( \
             summgene(gdat.time)
             raise Exception('')
     
-    print('gdat.time')
-    print(gdat.time)
     minmtime = np.amin(gdat.time)
     maxmtime = np.amax(gdat.time)
     numbtime = gdat.time.size
@@ -1921,7 +1933,7 @@ def eval_modl( \
                         if boolevaltranprim:
                             gdat.fluxtotl[t] = retr_fluxstartrantotl(gdat, gdat.typecoor, gdat.boolgridstarbrgt)
                             if gdat.boolmakeanim:
-                                make_framanim(gdat, t, phasthis)
+                                make_framanim(gdat, t, phas[j][t])
                                 
                             
                 if gdat.boolmakeanim:
@@ -2113,7 +2125,7 @@ def eval_modl( \
         for name in dictinpt:
             if name != 'gdat':
                 dictefes[name] = getattr(gdat, name)#dictinpt[name]
-        plot_tser_dictefes(gdat.pathvisu, dictefes, '%s' % strgextn)
+        plot_tser_dictefes(gdat.pathvisu, dictefes, '%s' % strgextn, lablunittime)
         
     dictefes['timetotl'] = timemodu.time() - timeinit
     dictefes['timeredu'] = dictefes['timetotl'] / numbtime
@@ -2164,23 +2176,27 @@ def eval_modl( \
     return dictefes
 
 
-def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, typetarg='', typefileplot='png'):
+def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg='', typefileplot='png'):
 
     dictlabl = dict()
     dictlabl['root'] = dict()
     dictlabl['unit'] = dict()
     dictlabl['totl'] = dict()
     
-    listnamevarbcomp = ['pericomp', 'epocmtracomp', 'cosicomp', 'rsmacomp'] 
-    if dictefes['typesyst'] == 'psyspcur':
-        listnamevarbcomp += ['offsphascomp']
+    numbcomp = dictefes['pericomp'].size
+    indxcomp = np.arange(numbcomp)
+    listnamevarbcomp = []
+
+    for j in indxcomp:
+        listnamevarbcomp += ['pericom%d' % j, 'epocmtracom%d' % j, 'cosicom%d' % j, 'rsmacom%d' % j] 
+        listnamevarbcomp += ['radicom%d' % j]
+        listnamevarbcomp += ['typebrgtcom%d' % j]
+        if dictefes['typesyst'] == 'psyspcur':
+            listnamevarbcomp += ['offsphascom%d' % j]
     
     listnamevarbsimu = ['tolerrat']#, 'diffphas']
     listnamevarbstar = ['radistar']
     #listnamevarbstar += ['coeflmdklinr', 'coeflmdkquad']
-    
-    listnamevarbcomp += ['radicomp']
-    listnamevarbcomp += ['typebrgtcomp']
     
     listnamevarbsyst = listnamevarbstar + listnamevarbcomp
     listnamevarbtotl = listnamevarbsyst + listnamevarbsimu
@@ -2203,6 +2219,9 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, typetarg='', typefilepl
     # title for the plots
     strgtitl = retr_strgtitl(dictefes, listnamevarbcomp, dictlabl)
     
+    print('strgtitl')
+    print(strgtitl)
+
     #dicttemp['coeflmdk'] = np.array([dicttemp['coeflmdklinr'], dicttemp['coeflmdkquad']])
     
     # dictionary for the configuration
@@ -2214,8 +2233,6 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, typetarg='', typefilepl
     arrytser = np.empty((numbtime, numbener, 3))
     arrytser[:, 0, 0] = dictefes['time']
     arrytser[:, :, 1] = dictefes['rflx']
-    numbcomp = dictefes['pericomp'].size
-    indxcomp = np.arange(numbcomp)
     arrypcur = [[] for j in indxcomp]
     for j in indxcomp:
         arrypcur[j] = miletos.fold_tser(arrytser, dictefes['epocmtracomp'][j], dictefes['pericomp'][j])
@@ -2242,9 +2259,8 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, typetarg='', typefilepl
     #    if namevarbtotl != nameparavari or dictlistvalubatc[namebatc]['vari'][nameparavari].size == 1:
     #        dictstrgtitl[namevarbtotl] = dictefes[namevarbtotl]
     #strgtitl = retr_strgtitl(dictstrgtitl, dictefes, listnamevarbcomp, dictlabl)
-    strgtitl = ''
     #lablxaxi = 'Time from mid-transit [hours]'
-    lablxaxi = 'Time [BJD]'
+    lablxaxi = 'Time [%s]' % lablunittime
     lablyaxi = 'Relative flux - 1 [ppm]'
     
     if strgextninpt is None or strgextninpt == '':
@@ -2370,17 +2386,27 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
         if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
             strgtitl += ', '
         strgtitl += '$M_*$ = %.1f $M_\odot$' % dictefesinpt['massstar']
-        
-    cntr = 0
+    
+    print('listnamevarbcomp')
+    print(listnamevarbcomp)
+
     for kk, name in enumerate(listnamevarbcomp):
         
-        if name == 'epocmtracomp' or not name in dictefesinpt:
+        if name == 'epocmtracomp' or name == 'typebrgtcomp' or (not name[:-1] + 'p' in dictefesinpt and name in dictefesinpt):
             continue
         
-        if name == 'typebrgtcomp':
+        if name.startswith('epocmtracom'):
             continue
+
+        if name.startswith('typebrgtcom'):
+            continue
+
+        if name in dictefesinpt:
+            nameprim = name
+        else:
+            nameprim = name[:-1] + 'p'
         
-        if dictefesinpt[name] is None:
+        if dictefesinpt[nameprim] is None:
             print('')
             print('')
             print('')
@@ -2390,22 +2416,32 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
             print(name)
             raise Exception('dictefesinpt[name] is None')
 
-        for j, valu in enumerate(dictefesinpt[name]):
+        #for j, valu in enumerate(dictefesinpt[nameprim]):
             
-            if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
-                strgtitl += ', '
-            
-            strgtitl += '%s = ' % dictlabl['root'][name]
-            
-            if name == 'typebrgtcomp':
-                strgtitl += '%s' % (valu)
-            else:
-                strgtitl += '%.3g' % (valu)
-            
-            if name in dictlabl['unit'] and dictlabl['unit'][name] != '':
-                strgtitl += ' %s' % dictlabl['unit'][name]
-    
-            cntr += 1
+        print('nameprim')
+        print(nameprim)
+        print('dictefesinpt[nameprim]')
+        print(dictefesinpt[nameprim])
+
+        valu = dictefesinpt[nameprim][int(name[-1])]
+
+        if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
+            strgtitl += ', '
+        
+        if kk == 4:
+            strgtitl += '\n'
+        
+        strgtitl += '%s = ' % dictlabl['root'][name]
+        
+        if name == 'typebrgtcomp':
+            strgtitl += '%s' % (valu)
+        else:
+            strgtitl += '%.3g' % (valu)
+        
+        if name in dictlabl['unit'] and dictlabl['unit'][name] != '':
+            strgtitl += ' %s' % dictlabl['unit'][name]
+        
+        #cntr += 1
 
     return strgtitl
 

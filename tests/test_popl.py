@@ -34,14 +34,15 @@ dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompst
                                                                                                                                   typesyst, \
                                                                                                                                   
                                                                                                                                   typepoplsyst, \
-                                                                                                                                  epocmtracomp=0., \
+                                                                                                                                  #epocmtracomp=0., \
                                                                                                                                   booltoyysunn=True, \
                                                                                                                                   typesamporbtcomp='peri', \
-                                                                                                                                  minmnumbcompstar=1, \
+                                                                                                                                  minmnumbcompstar=8, \
                                                                                                                                   #minmradicomp=10., \
                                                                                                                                   minmmasscomp=300., \
                                                                                                                                   minmpericomp=1., \
                                                                                                                                   maxmpericomp=2., \
+                                                                                                                                  maxmcosicomp=0.1, \
                                                                                                                                   numbsyst=numbsyst, \
                                                                                                                                  )
 print('Visualizing the simulated population...')
@@ -104,6 +105,8 @@ dictefesinpt['typelmdk'] = 'quad'
 #dictefesinpt['typesyst'] = typesyst
 #dictefesinpt['typenorm'] = 'edgeleft'
 dictefesinpt['pathvisu'] = pathvisupopl
+dictefesinpt['boolmakeanim'] = True
+dictefesinpt['lablunittime'] = 'days'
 #dictefesinpt['typelang'] = typelang
 #dictefesinpt['typefileplot'] = typefileplot
 #dictefesinpt['booldiag'] = booldiag
