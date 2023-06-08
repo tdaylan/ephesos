@@ -1878,7 +1878,7 @@ def eval_modl( \
                         
                         for t, phasthis in enumerate(listphaseval[j]):
                             proc_phas(gdat, j, t, phasthis)
-
+                            
                 else:
                     
                     for t in tqdm(range(numbtime)):
@@ -1935,6 +1935,11 @@ def eval_modl( \
                             if gdat.boolmakeanim:
                                 make_framanim(gdat, t, phas[j][t])
                                 
+                        if gdat.booldiag:
+                            if t > 0:
+                                if abs(gdat.fluxtotl[t] - gdat.fluxtotl[t-1]) / gdat.fluxtotl[t] > 0.002:
+                                    raise Exception('Changed by more than 0.2 percent')
+                                    
                             
                 if gdat.boolmakeanim:
 

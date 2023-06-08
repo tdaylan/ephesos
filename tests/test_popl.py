@@ -14,6 +14,8 @@ from tdpy import summgene
 Compute the relative flux light curves of systems of bodies drawn from a population model
 '''
 
+np.random.seed(0)
+
 # type of the population of systems
 ## TESS 2-min target list during the nominal mission
 #typepoplsyst = 'tessprms2min'
