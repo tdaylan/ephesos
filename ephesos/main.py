@@ -1891,7 +1891,7 @@ def eval_modl( \
                                             
                         for j in indxcomp:
                             
-                            if gdat.verbtype > 1:
+                            if gdat.typeverb > 1:
                                 print('j')
                                 print(j)
                             
@@ -1907,7 +1907,7 @@ def eval_modl( \
                                    gdat.typecoor == 'star' and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.rratcomp[j]):
                                         boolevaltranflux = True
                             
-                            if gdat.verbtype > 1:
+                            if gdat.typeverb > 1:
                                 print('boolevaltranflux')
                                 print(boolevaltranflux)
 
