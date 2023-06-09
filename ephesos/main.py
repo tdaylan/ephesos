@@ -1883,45 +1883,47 @@ def eval_modl( \
                     
                     for t in tqdm(range(numbtime)):
                     #for t in range(numbtime):
-                        cntrtemp = 0
-                        boolevaltranprim = False
                         
+                        # Boolean flag to evaluate the flux at this time
+                        boolevaltranflux = False
+                        
+                        gdat.boolgridstarbrgt = np.copy(gdat.boolgridstarstar)
+                                            
                         for j in indxcomp:
+                            
+                            if gdat.verbtype > 1:
+                                print('j')
+                                print(j)
                             
                             if gdat.rratcomp[j] < gdat.tolerrat:
                                 continue
 
-                            if abs(phas[j][t]) > 0.25:
+                            if abs(phas[j][t]) > 0.25 and gdat.typebrgtcomp == 'dark':
                                 continue
                     
                             calc_posifromphas(gdat, j, phas[j][t])
                             if gdat.boolsystpsys:
                                 if gdat.typecoor == 'comp' and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.rratcomp[j]) or \
                                    gdat.typecoor == 'star' and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.rratcomp[j]):
-                                        boolevaltranprim = True
-                                        cntrtemp += 1
+                                        boolevaltranflux = True
+                            
+                            if gdat.verbtype > 1:
+                                print('boolevaltranflux')
+                                print(boolevaltranflux)
 
-                            if cntrtemp == 1:
-                                gdat.boolgridstarbrgt = np.copy(gdat.boolgridstarstar)
-                                            
-                            if boolevaltranprim:
+                            if boolevaltranflux:
                                 prep_dist(gdat, j)
                                 boolnocccomp = retr_boolnoccobjt(gdat, j)
                                 gdat.boolgridstarbrgt = gdat.boolgridstarbrgt & boolnocccomp
             
-                            
                             if gdat.perimoon is not None and a == 0:
 
                                 for jj in indxmoon[j]:
                                     
                                     if np.sqrt(gdat.xposmoon[j][jj][t]**2 + gdat.yposmoon[j][jj][t]**2) < 1. + rratmoon[j][jj]:
                                         
-                                        boolevaltranprim = True
-                                        cntrtemp += 1
+                                        boolevaltranflux = True
 
-                                        if cntrtemp == 1:
-                                            gdat.boolgridstarbrgt = np.copy(gdat.boolgridstarstar)
-                                            
                                         xposgridmoon = gdat.xposgridstar - gdat.xposmoon[j][jj][t]
                                         yposgridmoon = gdat.yposgridstar - gdat.yposmoon[j][jj][t]
                                         
@@ -1930,7 +1932,7 @@ def eval_modl( \
                                         
                                         gdat.boolgridstarbrgt = gdat.boolgridstarbrgt & boolnoccmoon
                     
-                        if boolevaltranprim:
+                        if boolevaltranflux:
                             gdat.fluxtotl[t] = retr_fluxstartrantotl(gdat, gdat.typecoor, gdat.boolgridstarbrgt)
                             if gdat.boolmakeanim:
                                 make_framanim(gdat, t, phas[j][t])

@@ -106,13 +106,15 @@ dictefesinpt = dict()
 dictefesinpt['typelmdk'] = 'quad'
 #dictefesinpt['typesyst'] = typesyst
 #dictefesinpt['typenorm'] = 'edgeleft'
-dictefesinpt['pathvisu'] = pathvisupopl
-dictefesinpt['boolmakeanim'] = True
 dictefesinpt['lablunittime'] = 'days'
 #dictefesinpt['typelang'] = typelang
 #dictefesinpt['typefileplot'] = typefileplot
 #dictefesinpt['booldiag'] = booldiag
-dictefesinpt['typeverb'] = 1
+
+#dictefesinpt['boolmakeanim'] = True
+#dictefesinpt['pathvisu'] = pathvisupopl
+dictefesinpt['typeverb'] = 2
+
 #dictefesinpt['boolintp'] = boolintp
 #dictefesinpt['boolwritover'] = boolwritover
 #dictefesinpt['strgextn'] = strgextn
