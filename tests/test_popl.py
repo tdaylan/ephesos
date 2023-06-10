@@ -111,9 +111,9 @@ dictefesinpt['lablunittime'] = 'days'
 #dictefesinpt['typefileplot'] = typefileplot
 #dictefesinpt['booldiag'] = booldiag
 
-#dictefesinpt['boolmakeanim'] = True
-#dictefesinpt['pathvisu'] = pathvisupopl
-#dictefesinpt['typeverb'] = 2
+dictefesinpt['boolmakeanim'] = True
+dictefesinpt['pathvisu'] = pathvisupopl
+dictefesinpt['typeverb'] = 2
 
 #dictefesinpt['boolintp'] = boolintp
 #dictefesinpt['boolwritover'] = boolwritover
