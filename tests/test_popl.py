@@ -29,20 +29,19 @@ pathvisupopl = pathpopl + 'visuals/'
 pathdatapopl = pathpopl + 'data/'
 
 # number of systems
-numbsyst = 30
+numbsyst = 3
 
 # get dictionaries for stars, companions, and moons
 dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompstar, indxmooncompstar = nicomedia.retr_dictpoplstarcomp( \
                                                                                                                                   typesyst, \
                                                                                                                                   
                                                                                                                                   typepoplsyst, \
-                                                                                                                                  #epocmtracomp=0., \
                                                                                                                                   booltoyysunn=True, \
                                                                                                                                   typesamporbtcomp='peri', \
                                                                                                                                   minmnumbcompstar=8, \
                                                                                                                                   #minmradicomp=10., \
                                                                                                                                   minmmasscomp=300., \
-                                                                                                                                  minmpericomp=1., \
+                                                                                                                                  minmpericomp=0.5, \
                                                                                                                                   maxmpericomp=2., \
                                                                                                                                   maxmcosicomp=0.1, \
                                                                                                                                   numbsyst=numbsyst, \
@@ -53,8 +52,6 @@ strgpoplstartotl = 'star' + typepoplsyst + 'totl'
 strgpoplcomptotl = 'compstar' + typepoplsyst + 'totl'
 strgpoplcomptran = 'compstar' + typepoplsyst + 'tran'
   
-#del dictpoplcomp[strgpoplcomptotl]['idenstar']
-#del dictpoplcomp[strgpoplcomptran]['idenstar']
 liststrgtitlcomp = []
 listboolcompexcl = []
 if typesyst == 'cosc':
@@ -113,7 +110,7 @@ dictefesinpt['lablunittime'] = 'days'
 
 dictefesinpt['boolmakeanim'] = True
 dictefesinpt['pathvisu'] = pathvisupopl
-dictefesinpt['typeverb'] = 2
+#dictefesinpt['typeverb'] = 2
 
 #dictefesinpt['boolintp'] = boolintp
 #dictefesinpt['boolwritover'] = boolwritover

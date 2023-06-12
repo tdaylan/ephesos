@@ -201,7 +201,8 @@ def make_framanim(gdat, t, phasthis, j=None):
                         axistser.plot(gdat.time[indxtimeinit:t], gdat.fluxtotl[indxtimeinit:t], marker='', color='firebrick', ls='-', lw=1)
                         axistser.set_xlim([gdat.time[t] - gdat.timeanimprev, gdat.time[t]])
                         sprd = np.amax(gdat.rratcomp)**2
-                        axistser.set_ylim([1. - 3. * sprd, 1. + sprd])
+                        ylim = gdat.brgtstarnocc * np.array([1. - 3. * sprd, 1. + sprd])
+                        axistser.set_ylim(ylim)
                     else:
                         phastemp = np.array(gdat.phascomp[j])
                         indx = np.argsort(phastemp)
@@ -1870,8 +1871,6 @@ def eval_modl( \
                     gdat.strgcompmoon = '_onlycomp'
                 
                 if gdat.boolmakeanim:
-                    print('gdat.listnamevarbanim')
-                    print(gdat.listnamevarbanim)
                     for namevarbanim in gdat.listnamevarbanim:
                         gdat.pathgiff[namevarbanim] = gdat.pathvisu + 'anim%s%s%s.gif' % (namevarbanim, gdat.strgextn, gdat.strgcompmoon)
                         gdat.cmndmakeanim[namevarbanim] = 'convert -delay 5 -density 200'
@@ -2019,73 +2018,73 @@ def eval_modl( \
             summgene(gdat.fluxtotl)
             raise Exception('')
     
-        # normalize the light curve
-        if typenorm != 'none':
-            
-            if gdat.booldiag:
-                if gdat.typesyst == 'cosc':
-                    if (gdat.fluxtotl / gdat.brgtstarnocc < 1. - 1e-6).any():
-                        print('Warning! Flux decreased in a self-lensing light curve.')
-                        print('gdat.fluxtotl')
-                        print(gdat.fluxtotl)
-                        #raise Exception('')
-
-            if gdat.typeverb > 1:
-                if gdat.typesyst == 'cosc':
-                    print('gdat.fluxtotl')
-                    summgene(gdat.fluxtotl)
-                print('Normalizing the light curve...')
-            
-            if typenorm == 'medi':
-                fact = np.median(gdat.fluxtotl)
-            elif typenorm == 'nocc':
-                fact = gdat.brgtstarnocc
-            elif typenorm == 'maxm':
-                fact = np.amax(gdat.fluxtotl)
-            elif typenorm == 'edgeleft':
-                fact = gdat.fluxtotl[0]
-            rflxtranmodl = gdat.fluxtotl / fact
-            
-            if gdat.booldiag:
-                if fact == 0.:
-                    print('typenorm')
-                    print(typenorm)
-                    print('')
-                    for j in indxcomp:
-                        print('gdat.fluxtotlcomp[j]')
-                        summgene(gdat.fluxtotlcomp[j])
-                    print('Normalization involved division by 0.')
-                    print('gdat.fluxtotl')
-                    summgene(gdat.fluxtotl)
-                    raise Exception('')
-                if gdat.typesyst == 'cosc':
-                    if (rflxtranmodl < 0.9).any():
-                        raise Exception('')
-
-            #if (rflxtranmodl > 1e2).any():
-            #    raise Exception('')
-
+    # normalize the light curve
+    if typenorm != 'none':
+        
         if gdat.booldiag:
-            if gdat.boolsystpsys and gdat.typesyst != 'psyspcur' and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6):
-                print('')
-                print('')
-                print('')
-                print('gdat.typesyst')
-                print(gdat.typesyst)
-                print('gdat.typelmdk')
-                print(gdat.typelmdk)
-                print('gdat.coeflmdk')
-                print(gdat.coeflmdk)
+            if gdat.typesyst == 'cosc':
+                if (gdat.fluxtotl / gdat.brgtstarnocc < 1. - 1e-6).any():
+                    print('Warning! Flux decreased in a self-lensing light curve.')
+                    print('gdat.fluxtotl')
+                    print(gdat.fluxtotl)
+                    #raise Exception('')
+
+        if gdat.typeverb > 1:
+            if gdat.typesyst == 'cosc':
                 print('gdat.fluxtotl')
                 summgene(gdat.fluxtotl)
-                print('gdat.brgtstarnocc')
-                print(gdat.brgtstarnocc)
-                raise Exception('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6)')
+            print('Normalizing the light curve...')
         
-            if False and np.amax(rflxtranmodl) > 1e6:
+        if typenorm == 'medi':
+            fact = np.median(gdat.fluxtotl)
+        elif typenorm == 'nocc':
+            fact = gdat.brgtstarnocc
+        elif typenorm == 'maxm':
+            fact = np.amax(gdat.fluxtotl)
+        elif typenorm == 'edgeleft':
+            fact = gdat.fluxtotl[0]
+        rflxtranmodl = gdat.fluxtotl / fact
+        
+        if gdat.booldiag:
+            if fact == 0.:
+                print('typenorm')
+                print(typenorm)
+                print('')
+                for j in indxcomp:
+                    print('gdat.fluxtotlcomp[j]')
+                    summgene(gdat.fluxtotlcomp[j])
+                print('Normalization involved division by 0.')
                 print('gdat.fluxtotl')
                 summgene(gdat.fluxtotl)
                 raise Exception('')
+            if gdat.typesyst == 'cosc':
+                if (rflxtranmodl < 0.9).any():
+                    raise Exception('')
+
+        #if (rflxtranmodl > 1e2).any():
+        #    raise Exception('')
+
+    if gdat.booldiag:
+        if gdat.boolsystpsys and gdat.typesyst != 'psyspcur' and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6):
+            print('')
+            print('')
+            print('')
+            print('gdat.typesyst')
+            print(gdat.typesyst)
+            print('gdat.typelmdk')
+            print(gdat.typelmdk)
+            print('gdat.coeflmdk')
+            print(gdat.coeflmdk)
+            print('gdat.fluxtotl')
+            summgene(gdat.fluxtotl)
+            print('gdat.brgtstarnocc')
+            print(gdat.brgtstarnocc)
+            raise Exception('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6)')
+    
+        if False and np.amax(rflxtranmodl) > 1e6:
+            print('gdat.fluxtotl')
+            summgene(gdat.fluxtotl)
+            raise Exception('')
 
     dictefes['rflx'] = rflxtranmodl
     
@@ -2239,9 +2238,6 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg=
     # title for the plots
     strgtitl = retr_strgtitl(dictefes, listnamevarbcomp, dictlabl)
     
-    print('strgtitl')
-    print(strgtitl)
-
     #dicttemp['coeflmdk'] = np.array([dicttemp['coeflmdklinr'], dicttemp['coeflmdkquad']])
     
     # dictionary for the configuration
@@ -2299,7 +2295,7 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg=
         else:
             strgener = ''
     
-        dictmodl['eval']['lcur'] = 1e6 * (dictefes['rflx'][:, e] - 1)
+        dictmodl['eval']['tser'] = 1e6 * (dictefes['rflx'][:, e] - 1)
 
         # time-series
         strgextn = '%s%s' % (strgextnbase, strgener)
@@ -2314,32 +2310,15 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg=
                                      #typesigncode='ephesos', \
                                     )
         
-        for j in indxcomp:
-            strgextnbasecomp = '%s%s_com%d' % (strgextnbase, strgener, j)
-            
-            epoc = dictefes['epocmtracomp'][j]
-            peri = dictefes['pericomp'][j]
-            
-            # phase curve
-            strgextn = '%s_pcur' % (strgextnbasecomp)
-            pathplot = miletos.plot_tser(pathvisu, \
-                                         dictmodl=dictmodl, \
-                                         boolfold=True, \
-                                         typefileplot=typefileplot, \
-                                         #listxdatvert=listxdatvert, \
-                                         strgextn=strgextn, \
-                                         lablxaxi=lablxaxi, \
-                                         lablyaxi=lablyaxi, \
-                                         strgtitl=strgtitl, \
-                                         epoc=epoc, \
-                                         peri=peri, \
-                                         #typesigncode='ephesos', \
-                                        )
-            
-            if dictefes['typesyst'] == 'psyspcur':
+        if numbcomp == 1:
+            for j in indxcomp:
+                strgextnbasecomp = '%s%s_com%d' % (strgextnbase, strgener, j)
                 
-                # vertical zoom onto the phase curve
-                strgextn = '%s_pcurzoom' % (strgextnbasecomp)
+                epoc = dictefes['epocmtracomp'][j]
+                peri = dictefes['pericomp'][j]
+                
+                # phase curve
+                strgextn = '%s_pcur' % (strgextnbasecomp)
                 pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              boolfold=True, \
@@ -2349,49 +2328,67 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg=
                                              lablxaxi=lablxaxi, \
                                              lablyaxi=lablyaxi, \
                                              strgtitl=strgtitl, \
-                                             limtyaxi=[-500, None], \
                                              epoc=epoc, \
                                              peri=peri, \
                                              #typesigncode='ephesos', \
                                             )
                 
-                # horizontal zoom around the primary
-                strgextn = '%s_prim' % (strgextnbasecomp)
-                #limtxaxi = np.array([-24. * 0.7 * dictefes['duratrantotl'], 24. * 0.7 * dictefes['duratrantotl']])
-                limtxaxi = np.array([-2, 2.])
-                pathplot = miletos.plot_tser(pathvisu, \
-                                             dictmodl=dictmodl, \
-                                             boolfold=True, \
-                                             typefileplot=typefileplot, \
-                                             #listxdatvert=listxdatvert, \
-                                             strgextn=strgextn, \
-                                             lablxaxi=lablxaxi, \
-                                             lablyaxi=lablyaxi, \
-                                             strgtitl=strgtitl, \
-                                             limtxaxi=limtxaxi, \
-                                             epoc=epoc, \
-                                             peri=peri, \
-                                             #typesigncode='ephesos', \
-                                            )
-                
-                # horizontal zoom around the secondary
-                strgextn = '%s_seco' % (strgextnbasecomp)
-                limtxaxi += 0.5 * dictefes['pericomp'][j] * 24.
-                pathplot = miletos.plot_tser(pathvisu, \
-                                             dictmodl=dictmodl, \
-                                             boolfold=True, \
-                                             typefileplot=typefileplot, \
-                                             #listxdatvert=listxdatvert, \
-                                             strgextn=strgextn, \
-                                             lablxaxi=lablxaxi, \
-                                             lablyaxi=lablyaxi, \
-                                             strgtitl=strgtitl, \
-                                             limtxaxi=limtxaxi, \
-                                             limtyaxi=[-500, None], \
-                                             epoc=epoc, \
-                                             peri=peri, \
-                                             #typesigncode='ephesos', \
-                                            )
+                if dictefes['typesyst'] == 'psyspcur':
+                    
+                    # vertical zoom onto the phase curve
+                    strgextn = '%s_pcurzoom' % (strgextnbasecomp)
+                    pathplot = miletos.plot_tser(pathvisu, \
+                                                 dictmodl=dictmodl, \
+                                                 boolfold=True, \
+                                                 typefileplot=typefileplot, \
+                                                 #listxdatvert=listxdatvert, \
+                                                 strgextn=strgextn, \
+                                                 lablxaxi=lablxaxi, \
+                                                 lablyaxi=lablyaxi, \
+                                                 strgtitl=strgtitl, \
+                                                 limtyaxi=[-500, None], \
+                                                 epoc=epoc, \
+                                                 peri=peri, \
+                                                 #typesigncode='ephesos', \
+                                                )
+                    
+                    # horizontal zoom around the primary
+                    strgextn = '%s_prim' % (strgextnbasecomp)
+                    #limtxaxi = np.array([-24. * 0.7 * dictefes['duratrantotl'], 24. * 0.7 * dictefes['duratrantotl']])
+                    limtxaxi = np.array([-2, 2.])
+                    pathplot = miletos.plot_tser(pathvisu, \
+                                                 dictmodl=dictmodl, \
+                                                 boolfold=True, \
+                                                 typefileplot=typefileplot, \
+                                                 #listxdatvert=listxdatvert, \
+                                                 strgextn=strgextn, \
+                                                 lablxaxi=lablxaxi, \
+                                                 lablyaxi=lablyaxi, \
+                                                 strgtitl=strgtitl, \
+                                                 limtxaxi=limtxaxi, \
+                                                 epoc=epoc, \
+                                                 peri=peri, \
+                                                 #typesigncode='ephesos', \
+                                                )
+                    
+                    # horizontal zoom around the secondary
+                    strgextn = '%s_seco' % (strgextnbasecomp)
+                    limtxaxi += 0.5 * dictefes['pericomp'][j] * 24.
+                    pathplot = miletos.plot_tser(pathvisu, \
+                                                 dictmodl=dictmodl, \
+                                                 boolfold=True, \
+                                                 typefileplot=typefileplot, \
+                                                 #listxdatvert=listxdatvert, \
+                                                 strgextn=strgextn, \
+                                                 lablxaxi=lablxaxi, \
+                                                 lablyaxi=lablyaxi, \
+                                                 strgtitl=strgtitl, \
+                                                 limtxaxi=limtxaxi, \
+                                                 limtyaxi=[-500, None], \
+                                                 epoc=epoc, \
+                                                 peri=peri, \
+                                                 #typesigncode='ephesos', \
+                                                )
 
 
 def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
@@ -2407,9 +2404,6 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
             strgtitl += ', '
         strgtitl += '$M_*$ = %.1f $M_\odot$' % dictefesinpt['massstar']
     
-    print('listnamevarbcomp')
-    print(listnamevarbcomp)
-
     for kk, name in enumerate(listnamevarbcomp):
         
         if name == 'epocmtracomp' or name == 'typebrgtcomp' or (not name[:-1] + 'p' in dictefesinpt and name in dictefesinpt):
@@ -2438,11 +2432,6 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
 
         #for j, valu in enumerate(dictefesinpt[nameprim]):
             
-        print('nameprim')
-        print(nameprim)
-        print('dictefesinpt[nameprim]')
-        print(dictefesinpt[nameprim])
-
         valu = dictefesinpt[nameprim][int(name[-1])]
 
         if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
