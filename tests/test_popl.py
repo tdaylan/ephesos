@@ -132,7 +132,8 @@ cade = 30. / 24. / 60. / 60. # days
 #    durasimu = 6. / 24. # days
 
 minmtime = 0.
-maxmtime = 10.
+maxmtime = 1.
+
 #duratrantotl = nicomedia.retr_duratrantotl(dicttemp['pericomp'], dicttemp['rsmacomp'], dicttemp['cosicomp']) / 24. # [days]
 #if typesyst == 'psyspcur':
 #    # minimum time

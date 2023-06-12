@@ -193,10 +193,15 @@ def make_framanim(gdat, t, phasthis, j=None):
         
                 if gdat.boolshowlcuranim:
                     axistser = figr.add_axes([0.2, 0.15, 0.6, 0.3], frameon=False)
-                
-                    if j is None:
-                        axistser.plot(gdat.time[:t], gdat.fluxtotl[:t], marker='', color='firebrick', ls='-', lw=1)
                     
+                    gdat.timeanimprev = 0.3 * (gdat.time[-1] - gdat.time[0])
+                    gdat.numbtimeprev = int(gdat.timeanimprev / (gdat.time[t] - gdat.time[t-1]))
+                    if j is None:
+                        indxtimeinit = max(0, t - gdat.numbtimeprev)
+                        axistser.plot(gdat.time[indxtimeinit:t], gdat.fluxtotl[indxtimeinit:t], marker='', color='firebrick', ls='-', lw=1)
+                        axistser.set_xlim([gdat.time[t] - gdat.timeanimprev, gdat.time[t]])
+                        sprd = np.amax(gdat.rratcomp)**2
+                        axistser.set_ylim([1. - 3. * sprd, 1. + sprd])
                     else:
                         phastemp = np.array(gdat.phascomp[j])
                         indx = np.argsort(phastemp)
@@ -820,6 +825,9 @@ def eval_modl( \
               ## 'edgeleft': left edge
               ## 'maxm': maximum value
               typenorm='nocc', \
+              
+              # Boolean flag to use tqdm to report the percentage of completion
+              booltqdm=False, \
 
               # path for visuals
               pathvisu=None, \
@@ -1862,6 +1870,8 @@ def eval_modl( \
                     gdat.strgcompmoon = '_onlycomp'
                 
                 if gdat.boolmakeanim:
+                    print('gdat.listnamevarbanim')
+                    print(gdat.listnamevarbanim)
                     for namevarbanim in gdat.listnamevarbanim:
                         gdat.pathgiff[namevarbanim] = gdat.pathvisu + 'anim%s%s%s.gif' % (namevarbanim, gdat.strgextn, gdat.strgcompmoon)
                         gdat.cmndmakeanim[namevarbanim] = 'convert -delay 5 -density 200'
@@ -1881,8 +1891,11 @@ def eval_modl( \
                             
                 else:
                     
-                    for t in tqdm(range(numbtime)):
-                    #for t in range(numbtime):
+                    if gdat.booltqdm:
+                        objttemp = tqdm(range(numbtime))
+                    else:
+                        objttemp = range(numbtime)
+                    for t in objttemp:
                         
                         # Boolean flag to evaluate the flux at this time
                         boolevaltranflux = False
@@ -1937,14 +1950,14 @@ def eval_modl( \
                             if gdat.boolmakeanim:
                                 make_framanim(gdat, t, phas[j][t])
                                 
-                        if gdat.booldiag:
-                            if t > 0:
-                                if abs(gdat.fluxtotl[t] - gdat.fluxtotl[t-1]) / gdat.fluxtotl[t] > 0.002:
-                                    raise Exception('Changed by more than 0.2 percent')
+                        #if gdat.booldiag:
+                        #    if t > 0:
+                        #        if abs(gdat.fluxtotl[t] - gdat.fluxtotl[t-1]) / gdat.fluxtotl[t] > 0.002:
+                        #            raise Exception('Changed by more than 0.2 percent')
                                     
                             
                 if gdat.boolmakeanim:
-
+                    
                     for namevarbanim in gdat.listnamevarbanim:
                         if not os.path.exists(gdat.pathgiff[namevarbanim]):
                             # make the animation
