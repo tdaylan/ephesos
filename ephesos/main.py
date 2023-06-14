@@ -392,7 +392,7 @@ def calc_posifromphas(gdat, j, phastemp):
     
     # x_0 and y_0
 
-    # x, y, z by rotating wrt arpacomp, inclcomp, loancomp, 
+    # find (x, y, z) by rotating (x_0, y_0, 0) wrt arpacomp, inclcomp, loancomp 
     xpos = gdat.smaxcomp[j] * np.sin(2. * np.pi * phastemp)
     ypos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp) * gdat.cosicomp[j] * gdat.intgcompflip[j]
     zpos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp)
