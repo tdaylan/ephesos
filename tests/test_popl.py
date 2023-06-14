@@ -18,9 +18,9 @@ np.random.seed(2)
 
 # type of the population of systems
 ## TESS 2-min target list during the nominal mission
-#typepoplsyst = 'tessprms2min'
-typepoplsyst = 'gene'
-typesyst = 'psys'
+#typepoplsyst = 'TESS_PrimaryMission_2min'
+typepoplsyst = 'General'
+typesyst = 'PlanetarySystem'
 
 # path of the folder for visuals
 pathbase = os.environ['EPHESOS_DATA_PATH'] + '/'
@@ -55,10 +55,10 @@ strgpoplcomptran = 'compstar' + typepoplsyst + 'tran'
   
 liststrgtitlcomp = []
 listboolcompexcl = []
-if typesyst == 'cosc':
+if typesyst == 'CompactObjectStellarCompanion':
     liststrgtitlcomp.append('Compact Objects with a stellar companion')
     lablsampgene = 'COSC'
-if typesyst == 'psys' or typesyst == 'psyspcur':
+if typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithPhaseCurve':
     liststrgtitlcomp.append('Planets')
     lablsampgene = 'planet'
 if typesyst == 'psysmoon':
@@ -68,7 +68,7 @@ if typesyst == 'psysmoon':
 listdictlablcolrpopl = []
 listdictlablcolrpopl.append(dict())
 listdictlablcolrpopl[-1][strgpoplcomptotl] = ['All', 'black']
-if typesyst == 'psys' or typesyst == 'psyspcur' or typesyst == 'cosc':
+if typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithPhaseCurve' or typesyst == 'CompactObjectStellarCompanion':
     listdictlablcolrpopl[-1][strgpoplcomptran] = ['Transiting', 'blue']
 listboolcompexcl.append(False)
 
@@ -122,7 +122,7 @@ dictefesinpt['pathvisu'] = pathvisupopl
 ## cadence of simulation
 cade = 30. / 24. / 60. / 60. # days
 ### duration of simulation
-#if typesyst == 'psyspcur':
+#if typesyst == 'PlanetarySystemWithPhaseCurve':
 #    durasimu = dicttemp['pericomp']
 #    if namebatc == 'longbase':
 #        durasimu *= 3.
@@ -133,7 +133,7 @@ minmtime = 0.
 maxmtime = 1.
 
 #duratrantotl = nicomedia.retr_duratrantotl(dicttemp['pericomp'], dicttemp['rsmacomp'], dicttemp['cosicomp']) / 24. # [days]
-#if typesyst == 'psyspcur':
+#if typesyst == 'PlanetarySystemWithPhaseCurve':
 #    # minimum time
 #    minmtime = -0.25 * durasimu
 #    # maximum time
@@ -147,26 +147,11 @@ maxmtime = 1.
 time = np.arange(minmtime, maxmtime, cade)
 
 listnamevarb = ['peri', 'epocmtra', 'rsma', 'cosi']
-if typesyst == 'psys':
+if typesyst == 'PlanetarySystem':
     listnamevarb += ['rrat']
 
 for k in range(numbsyst):
     
-    print('dictpoplcomp[pericomp][indxcompstar[k]]')
-    print(dictpoplcomp['pericomp'][indxcompstar[k]])
-
-    print('dictpoplcomp[inclcomp][indxcompstar[k]]')
-    print(dictpoplcomp['inclcomp'][indxcompstar[k]])
-
-    print('dictpoplcomp[cosicomp][indxcompstar[k]]')
-    print(dictpoplcomp['cosicomp'][indxcompstar[k]])
-
-    print('dictpoplcomp[rsmacomp][indxcompstar[k]]')
-    print(dictpoplcomp['rsmacomp'][indxcompstar[k]])
-
-    print('dictpoplcomp[radicomp][indxcompstar[k]]')
-    print(dictpoplcomp['radicomp'][indxcompstar[k]])
-
     if indxcompstar[k].size == 0:
         print('')
         print('')

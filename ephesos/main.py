@@ -199,7 +199,7 @@ def make_framanim(gdat, t, phasthis, j=None):
                         brgttemp = np.zeros_like(gdat.brgtgridstar)
                         brgttemp[gdat.boolgridstarbrgt] = gdat.brgtgridstar[gdat.boolgridstarbrgt]
                 
-                if gdat.typesyst == 'cosc':
+                if gdat.typesyst == 'CompactObjectStellarCompanion':
                     brgttemp = gdat.brgtlens
                 
                 cmap = 'magma'
@@ -419,7 +419,7 @@ def proc_phas(gdat, j, t, phasthis):
     
     calc_posifromphas(gdat, j, phasthis)
     
-    if gdat.typesyst == 'psyspcur':
+    if gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
         
         boolevaltranprim = True
 
@@ -428,19 +428,19 @@ def proc_phas(gdat, j, t, phasthis):
             
             if gdat.boolsystpsys and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.factwideanim * gdat.rratcomp[j]):
                 boolevaltranprim = True
-            elif gdat.typesyst == 'cosc' and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.factwideanim * gdat.wdthslen[j]):
+            elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.factwideanim * gdat.wdthslen[j]):
                 boolevaltranprim = True
             else:
                 boolevaltranprim = False
             
-            #if gdat.typesyst == 'cosc':
+            #if gdat.typesyst == 'CompactObjectStellarCompanion':
             #    print('temp')
             #    boolevaltranprim = True
         
         if gdat.typecoor == 'star':
             if gdat.boolsystpsys and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.factwideanim * gdat.rratcomp[j]):
                 boolevaltranprim = True
-            elif gdat.typesyst == 'cosc' and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.factwideanim * gdat.wdthslen[j]):
+            elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.factwideanim * gdat.wdthslen[j]):
                 boolevaltranprim = True
             else:
                 boolevaltranprim = False
@@ -481,7 +481,7 @@ def proc_phas(gdat, j, t, phasthis):
         fluxtotlcompthis = gdat.brgtprim
 
         if gdat.booldiag:
-            if gdat.typesyst == 'psys':
+            if gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
                 if fluxtotlcompthis > gdat.brgtstarnocc:
                     print('')
                     print('')
@@ -590,7 +590,7 @@ def proc_phas(gdat, j, t, phasthis):
                 #    print('')
         
         if gdat.booldiag:
-            if gdat.typesyst == 'psys':
+            if gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
                 if fluxtotlcompthis > gdat.brgtstarnocc:
                     print('')
                     print('')
@@ -629,7 +629,7 @@ def proc_phas(gdat, j, t, phasthis):
             gdat.boolgridcompthislasr = gdat.distgridcompthis < 0.5 * gdat.rratcomp[j]
 
     
-        if gdat.typesyst == 'cosc':
+        if gdat.typesyst == 'CompactObjectStellarCompanion':
             # distance from the points in the source grid to the star
             gdat.diststargridsour = np.sqrt((gdat.xposgridsour - gdat.xposstargridcomp[j])**2 + (gdat.yposgridsour - gdat.yposstargridcomp[j])**2)
             
@@ -699,7 +699,7 @@ def proc_phas(gdat, j, t, phasthis):
             fluxtotlcompthis += fluxtotlfram
         
         if gdat.booldiag:
-            if gdat.typesyst == 'psys':
+            if gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
                 if fluxtotlcompthis > gdat.brgtstarnocc:
                     print('')
                     print('')
@@ -738,10 +738,11 @@ def eval_modl( \
               time, \
               
               # type of the model system
-              ## 'psys': planetary system
+              ## 'PlanetarySystemWithPhaseCurve': planetary system with phase curve
               typesyst, \
               
-              # companions
+              # orbital parameters
+              ## companions
               ## orbital periods of the companions
               pericomp, \
               
@@ -772,8 +773,8 @@ def eval_modl( \
               ## mass of the companions
               masscomp=None, \
               
-              ## type of the brightness of the companion
-              ### it is only functional if typesyst is 'psyspcur'
+              ## type of the brightness of the companions
+              ### it is only functional if typesyst is 'PlanetarySystemWithPhaseCurve'
               ### 'dark': companion completely dark
               ### 'heated_rdis': companion is an externally heated body with heat redistribution (efficiency and phase offset)
               ### 'heated_sliced': companion has a heat distribution determined by the input temperatures of longitudinal slices
@@ -1011,7 +1012,7 @@ def eval_modl( \
     elif gdat.cosicomp is not None and gdat.inclcomp is None:
         gdat.intgcompflip = np.random.randint(2, size=numbcomp) - 1
     
-    if gdat.typesyst == 'psyspcur':
+    if gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
         if gdat.offsphascomp is None:
             gdat.offsphascomp = np.zeros(numbcomp)
 
@@ -1024,7 +1025,7 @@ def eval_modl( \
         else:
             gdat.typecoor = 'star'
 
-    gdat.boolsystpsys = gdat.typesyst.startswith('psys')
+    gdat.boolsystpsys = gdat.typesyst.startswith('PlanetarySystemWithPhaseCurve')
     
     # check inputs
     if gdat.booldiag:
@@ -1059,7 +1060,7 @@ def eval_modl( \
             raise Exception('')
         
         
-        if gdat.typesyst.startswith('psys') and (gdat.rratcomp is None or not np.isfinite(gdat.rratcomp).all()):
+        if gdat.typesyst.startswith('PlanetarySystemWithPhaseCurve') and (gdat.rratcomp is None or not np.isfinite(gdat.rratcomp).all()):
             print('')
             print('')
             print('')
@@ -1106,7 +1107,7 @@ def eval_modl( \
             print(gdat.massstar)
             raise Exception('')
 
-        if gdat.typesyst == 'cosc':
+        if gdat.typesyst == 'CompactObjectStellarCompanion':
             
             if gdat.typecoor == 'star':
                 raise Exception('')
@@ -1129,7 +1130,7 @@ def eval_modl( \
         if gdat.inclcomp is not None and gdat.cosicomp is not None:
             raise Exception('')
         
-        if gdat.typesyst != 'cosc' and (gdat.rsmacomp is None or not np.isfinite(gdat.rsmacomp).all()):
+        if gdat.typesyst != 'CompactObjectStellarCompanion' and (gdat.rsmacomp is None or not np.isfinite(gdat.rsmacomp).all()):
             print('')
             print('')
             print('')
@@ -1137,7 +1138,7 @@ def eval_modl( \
             print(gdat.rsmacomp)
             raise Exception('gdat.rsmacomp is None or not np.isfinite(gdat.rsmacomp).all()')
         
-        if gdat.typesyst == 'cosc':
+        if gdat.typesyst == 'CompactObjectStellarCompanion':
             if gdat.massstar is None:
                 raise Exception('')
         
@@ -1188,7 +1189,7 @@ def eval_modl( \
         print('boolintp')
         print(boolintp)
     
-    if gdat.typesyst == 'cosc':
+    if gdat.typesyst == 'CompactObjectStellarCompanion':
         if typeverb > 1:
             print('typemodllens')
             print(typemodllens)
@@ -1237,7 +1238,7 @@ def eval_modl( \
             gdat.cmndmakeanim = dict()
             gdat.cmnddeleimag = dict()
             gdat.listnamevarbanim = ['flux']
-            if gdat.typesyst == 'cosc':
+            if gdat.typesyst == 'CompactObjectStellarCompanion':
                 gdat.listnamevarbanim += ['posifrstphotlens', 'posisecophotlens', 'fluxfrstlens', 'fluxsecolens']#, 'brgtgridsour' 'cntsfrstlens', 'cntssecolens']
     
         if gdat.strgextn != '':
@@ -1268,7 +1269,7 @@ def eval_modl( \
     if gdat.rsmacomp is not None:
         gdat.smaxcomp = (1. + gdat.rratcomp) / gdat.rsmacomp
     
-    if gdat.typesyst == 'psyspcur':
+    if gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
     
         if gdat.maxmfactellp is None:
             gdat.maxmfactellp = 1.2
@@ -1287,9 +1288,9 @@ def eval_modl( \
 
     if gdat.masscomp is not None and gdat.massstar is not None:
         
-        if gdat.typesyst == 'psys' or gdat.typesyst == 'psyspcur':
+        if gdat.typesyst == 'PlanetarySystemWithPhaseCurve' or gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
             gdat.masscompsolr = gdat.masscomp / gdat.dictfact['msme']
-        elif gdat.typesyst == 'cosc' or gdat.typesyst == 'sbin':
+        elif gdat.typesyst == 'CompactObjectStellarCompanion' or gdat.typesyst == 'sbin':
             gdat.masscompsolr = gdat.masscomp
         else:
             print('gdat.typesyst')
@@ -1362,7 +1363,7 @@ def eval_modl( \
     if boolcompmoon and boolintp:
         raise Exception('')
 
-    gdat.boolsphr = gdat.typesyst == 'psys' or gdat.typesyst == 'psyspcur' or gdat.typesyst == 'psysmoon' or \
+    gdat.boolsphr = gdat.typesyst == 'PlanetarySystemWithPhaseCurve' or gdat.typesyst == 'PlanetarySystemWithPhaseCurve' or gdat.typesyst == 'psysmoon' or \
                                                             gdat.typesyst == 'psysttvr' or gdat.typesyst == 'psyslasr' or \
                     gdat.typesyst == 'psysdiskedgehori' or gdat.typesyst == 'psysdiskedgevert' or gdat.typesyst == 'psysdiskface' or gdat.typesyst == 'sbin'
     
@@ -1382,7 +1383,7 @@ def eval_modl( \
     
     dictefes['duratrantotl'] = gdat.duratrantotl
         
-    if gdat.typesyst == 'cosc':
+    if gdat.typesyst == 'CompactObjectStellarCompanion':
         if gdat.typemodllens == 'gaus':
             gdat.dcyctrantotlhalf = gdat.smaxcomp / gdat.radistar / gdat.cosicomp
         if typeverb > 1:
@@ -1437,7 +1438,7 @@ def eval_modl( \
         indxtimecomp = [[] for j in indxcomp]
         
         if gdat.diffphasineg is None:
-            if typesyst == 'cosc':
+            if typesyst == 'CompactObjectStellarCompanion':
                 gdat.diffphasineg = 0.00005
             else:
                 if numbcomp == 1 and gdat.rratcomp[0] > 0.5:
@@ -1509,7 +1510,7 @@ def eval_modl( \
     
     else:
     
-        if gdat.typesyst == 'cosc':
+        if gdat.typesyst == 'CompactObjectStellarCompanion':
             
             gdat.radieins = chalcedon.retr_radieinssbin(gdat.masscomp, gdat.smaxcompasun) / gdat.radistar
             gdat.wdthslen = np.minimum(2. * gdat.radieins, np.ones_like(gdat.masscomp))
@@ -1648,7 +1649,7 @@ def eval_modl( \
 
             for j in indxcomp:
                 
-                if gdat.typesyst == 'cosc':
+                if gdat.typesyst == 'CompactObjectStellarCompanion':
                     limtgridxpos = gdat.wdthslen[j]
                     limtgridypos = gdat.wdthslen[j]
                 else:
@@ -1691,7 +1692,7 @@ def eval_modl( \
                 if gdat.tmptsliccomp is None:
                     gdat.tmptsliccomp = np.maximum(0.2 * np.random.randn(16) + 0.9, np.zeros(16))
                 
-                if gdat.typesyst == 'psyspcur' and gdat.tmptsliccomp is None and gdat.typebrgtcomp == 'heated_sliced':
+                if gdat.typesyst == 'PlanetarySystemWithPhaseCurve' and gdat.tmptsliccomp is None and gdat.typebrgtcomp == 'heated_sliced':
                     raise Exception('')
 
                 if gdat.tmptsliccomp is not None:
@@ -1714,7 +1715,7 @@ def eval_modl( \
                     gdat.precphotflorcomp = 1e6 / gdat.xposgridcomp[j].size
                     print('Photometric precision floor achieved by this resolution: %g ppm' % gdat.precphotflorcomp)
             
-        if gdat.typesyst == 'cosc' and gdat.typemodllens == 'phdy':
+        if gdat.typesyst == 'CompactObjectStellarCompanion' and gdat.typemodllens == 'phdy':
             gdat.diffgridsour = gdat.diffgrid / gdat.factosampsour
             
             gdat.areagridsour = gdat.diffgridsour**2
@@ -1786,7 +1787,7 @@ def eval_modl( \
         cosg = np.sqrt(1. - gdat.distgridstar[gdat.indxgridstarstar]**2)
         gdat.brgtgridstar[gdat.indxgridstarstar] = nicomedia.retr_brgtlmdk(cosg, gdat.coeflmdk, typelmdk=gdat.typelmdk)# * gdat.areagrid
         
-        if gdat.typesyst == 'cosc':
+        if gdat.typesyst == 'CompactObjectStellarCompanion':
             
             #metrcomp = 3e-10 * gdat.xposgridsour[0].size * gdat.xposgridcomp[0].size
             metrcomp = 3e-10 * gdat.xposgridstar.size * gdat.xposgridcomp[0].size
@@ -1889,7 +1890,7 @@ def eval_modl( \
         gdat.fluxtotl = np.full(numbtime, gdat.brgtstarnocc)
         
         if gdat.typemodllens == 'gaus':
-            if gdat.typesyst == 'cosc':
+            if gdat.typesyst == 'CompactObjectStellarCompanion':
                 gdat.fluxtotl += gdat.brgtstarnocc * np.exp(-(phas[0] / gdat.dcyctrantotlhalf[j])**2)
         else:
             for a in range(numbitermoon):
@@ -2022,7 +2023,7 @@ def eval_modl( \
                     
                     if gdat.phascomp[j].size > 1:
                         
-                        if gdat.typesyst == 'cosc':
+                        if gdat.typesyst == 'CompactObjectStellarCompanion':
                             indxphaseval = indxtime
                         else:
                             indxphaseval = np.where((phas[j] >= np.amin(gdat.phascomp[j])) & (phas[j] <= np.amax(gdat.phascomp[j])))[0]
@@ -2031,7 +2032,7 @@ def eval_modl( \
                             intptemp = scipy.interpolate.interp1d(gdat.phascomp[j], gdat.fluxtotlcomp[j], fill_value=gdat.brgtstarnocc, \
                                                                                                         bounds_error=False)(phas[j][indxphaseval])
                             
-                            if gdat.typesyst == 'cosc':
+                            if gdat.typesyst == 'CompactObjectStellarCompanion':
                                 if gdat.booldiag:
                                     if np.amin(intptemp) / gdat.brgtstarnocc > 1.1:
                                         raise Exception('')
@@ -2056,7 +2057,7 @@ def eval_modl( \
     if typenorm != 'none':
         
         if gdat.booldiag:
-            if gdat.typesyst == 'cosc':
+            if gdat.typesyst == 'CompactObjectStellarCompanion':
                 if (gdat.fluxtotl / gdat.brgtstarnocc < 1. - 1e-6).any():
                     print('Warning! Flux decreased in a self-lensing light curve.')
                     print('gdat.fluxtotl')
@@ -2064,7 +2065,7 @@ def eval_modl( \
                     #raise Exception('')
 
         if gdat.typeverb > 1:
-            if gdat.typesyst == 'cosc':
+            if gdat.typesyst == 'CompactObjectStellarCompanion':
                 print('gdat.fluxtotl')
                 summgene(gdat.fluxtotl)
             print('Normalizing the light curve...')
@@ -2091,7 +2092,7 @@ def eval_modl( \
                 print('gdat.fluxtotl')
                 summgene(gdat.fluxtotl)
                 raise Exception('')
-            if gdat.typesyst == 'cosc':
+            if gdat.typesyst == 'CompactObjectStellarCompanion':
                 if (rflxtranmodl < 0.9).any():
                     raise Exception('')
 
@@ -2099,7 +2100,7 @@ def eval_modl( \
         #    raise Exception('')
 
     if gdat.booldiag:
-        if gdat.boolsystpsys and gdat.typesyst != 'psyspcur' and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6):
+        if gdat.boolsystpsys and gdat.typesyst != 'PlanetarySystemWithPhaseCurve' and np.amax(gdat.fluxtotl) > gdat.brgtstarnocc * (1. + 1e-6):
             print('')
             print('')
             print('')
@@ -2244,7 +2245,7 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg=
         listnamevarbcomp += ['pericom%d' % j, 'epocmtracom%d' % j, 'cosicom%d' % j, 'rsmacom%d' % j] 
         listnamevarbcomp += ['radicom%d' % j]
         listnamevarbcomp += ['typebrgtcom%d' % j]
-        if dictefes['typesyst'] == 'psyspcur':
+        if dictefes['typesyst'] == 'PlanetarySystemWithPhaseCurve':
             listnamevarbcomp += ['offsphascom%d' % j]
     
     listnamevarbsimu = ['tolerrat']#, 'diffphas']
@@ -2367,7 +2368,7 @@ def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg=
                                              #typesigncode='ephesos', \
                                             )
                 
-                if dictefes['typesyst'] == 'psyspcur':
+                if dictefes['typesyst'] == 'PlanetarySystemWithPhaseCurve':
                     
                     # vertical zoom onto the phase curve
                     strgextn = '%s_pcurzoom' % (strgextnbasecomp)
@@ -2433,7 +2434,7 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
     strgtitl = ''
     if 'radistar' in dictefesinpt:
         strgtitl += '$R_*$ = %.1f $R_\odot$' % dictefesinpt['radistar']
-    if dictefesinpt['typesyst'] == 'cosc' and 'massstar' in dictefesinpt:
+    if dictefesinpt['typesyst'] == 'CompactObjectStellarCompanion' and 'massstar' in dictefesinpt:
         if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
             strgtitl += ', '
         strgtitl += '$M_*$ = %.1f $M_\odot$' % dictefesinpt['massstar']
