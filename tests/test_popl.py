@@ -40,12 +40,13 @@ dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompst
                                                                                                                                   typesamporbtcomp='peri', \
                                                                                                                                   minmnumbcompstar=8, \
                                                                                                                                   #minmradicomp=10., \
-                                                                                                                                  minmmasscomp=300., \
+                                                                                                                                  minmmasscomp=10., \
                                                                                                                                   minmpericomp=0.5, \
                                                                                                                                   maxmpericomp=2., \
                                                                                                                                   maxmcosicomp=0.1, \
                                                                                                                                   numbsyst=numbsyst, \
-                                                                                                                                 )
+                                                                                                                                )
+
 print('Visualizing the simulated population...')
 
 strgpoplstartotl = 'star' + typepoplsyst + 'totl'
@@ -151,6 +152,21 @@ if typesyst == 'psys':
 
 for k in range(numbsyst):
     
+    print('dictpoplcomp[pericomp][indxcompstar[k]]')
+    print(dictpoplcomp['pericomp'][indxcompstar[k]])
+
+    print('dictpoplcomp[inclcomp][indxcompstar[k]]')
+    print(dictpoplcomp['inclcomp'][indxcompstar[k]])
+
+    print('dictpoplcomp[cosicomp][indxcompstar[k]]')
+    print(dictpoplcomp['cosicomp'][indxcompstar[k]])
+
+    print('dictpoplcomp[rsmacomp][indxcompstar[k]]')
+    print(dictpoplcomp['rsmacomp'][indxcompstar[k]])
+
+    print('dictpoplcomp[radicomp][indxcompstar[k]]')
+    print(dictpoplcomp['radicomp'][indxcompstar[k]])
+
     if indxcompstar[k].size == 0:
         print('')
         print('')

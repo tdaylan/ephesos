@@ -147,6 +147,22 @@ def retr_fluxstartran(gdat, typecoor, indxgridrofi=None):
     return fluxstartran
 
 
+def retr_pathbaseanimfram(gdat, namevarbanim):
+    
+    pathbaseanimfram = gdat.pathvisu + '%s%s%s_Frame' % (namevarbanim, gdat.strgextn, gdat.strgcompmoon)
+    
+    return pathbaseanimfram
+   
+   
+def retr_pathanimfram(gdat, namevarbanim, t):
+    
+    pathbaseanimfram = retr_pathbaseanimfram(gdat, namevarbanim)
+
+    path = pathbaseanimfram + '%04d.%s' % (t, gdat.typefileplot)
+    
+    return path
+   
+   
 def make_framanim(gdat, t, phasthis, j=None):
     
     for namevarbanim in gdat.listnamevarbanim:
@@ -156,8 +172,8 @@ def make_framanim(gdat, t, phasthis, j=None):
 
         if not os.path.exists(gdat.pathgiff[namevarbanim]):
             
-            path = gdat.pathvisu + '%s%s%s_%04d.%s' % (namevarbanim, gdat.strgextn, gdat.strgcompmoon, t, gdat.typefileplot)
-        
+            path = retr_pathanimfram(gdat, namevarbanim, t)
+            
             gdat.cmndmakeanim[namevarbanim] += ' %s' % path
             gdat.cmnddeleimag[namevarbanim] += ' %s' % path
         
@@ -194,7 +210,7 @@ def make_framanim(gdat, t, phasthis, j=None):
                 if gdat.boolshowlcuranim:
                     axistser = figr.add_axes([0.2, 0.15, 0.6, 0.3], frameon=False)
                     
-                    gdat.timeanimprev = 0.3 * (gdat.time[-1] - gdat.time[0])
+                    gdat.timeanimprev = 0.5 * (gdat.time[-1] - gdat.time[0])
                     gdat.numbtimeprev = int(gdat.timeanimprev / (gdat.time[t] - gdat.time[t-1]))
                     if j is None:
                         indxtimeinit = max(0, t - gdat.numbtimeprev)
@@ -367,6 +383,16 @@ def calc_posifromphas(gdat, j, phastemp):
     '''
     Calculate body positions from phase
     '''
+    
+    # Mean anomaly
+
+    # eccentric anomaly
+
+    # true anomaly
+    
+    # x_0 and y_0
+
+    # x, y, z by rotating wrt arpacomp, inclcomp, loancomp, 
     xpos = gdat.smaxcomp[j] * np.sin(2. * np.pi * phastemp)
     ypos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp) * gdat.cosicomp[j] * gdat.intgcompflip[j]
     zpos = gdat.smaxcomp[j] * np.cos(2. * np.pi * phastemp)
@@ -980,7 +1006,10 @@ def eval_modl( \
     numbcomp = gdat.pericomp.size
     indxcomp = np.arange(numbcomp)
     
-    gdat.intgcompflip = np.random.randint(2, size=numbcomp) - 1
+    if gdat.cosicomp is None and gdat.inclcomp is None:
+        raise Exception('gdat.cosicomp and gdat.inclcomp should not be None at the same time.')
+    elif gdat.cosicomp is not None and gdat.inclcomp is None:
+        gdat.intgcompflip = np.random.randint(2, size=numbcomp) - 1
     
     if gdat.typesyst == 'psyspcur':
         if gdat.offsphascomp is None:
@@ -1875,7 +1904,12 @@ def eval_modl( \
                         gdat.pathgiff[namevarbanim] = gdat.pathvisu + 'anim%s%s%s.gif' % (namevarbanim, gdat.strgextn, gdat.strgcompmoon)
                         gdat.cmndmakeanim[namevarbanim] = 'convert -delay 5 -density 200'
                         gdat.cmnddeleimag[namevarbanim] = 'rm'
-                
+                    
+                        pathbasedele = retr_pathbaseanimfram(gdat, namevarbanim)
+                        cmnd = 'rm %s*' % pathbasedele
+                        print(cmnd)
+                        os.system(cmnd)
+
                 if boolintp:
                 
                     for j in indxcomp:
@@ -2149,7 +2183,7 @@ def eval_modl( \
     dictefes['timetotl'] = timemodu.time() - timeinit
     dictefes['timeredu'] = dictefes['timetotl'] / numbtime
 
-    if gdat.booldiag and dictefes['timeredu'] > 1e-1:
+    if gdat.booldiag and dictefes['timeredu'] > 1e-1 and not gdat.boolmakeanim:
         print('Took too long to execute...')
         #raise Exception('')
     
