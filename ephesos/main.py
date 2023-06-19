@@ -47,7 +47,7 @@ def prep_dist(gdat, j, typecoor):
         gdat.xposgridcompthis = gdat.xposgridstar - gdat.xposcompgridstar[j]
         gdat.yposgridcompthis = gdat.yposgridstar - gdat.yposcompgridstar[j]
     
-    if gdat.boolsphr:
+    if gdat.boolsystpsys:
         # distance from the companion
         if typecoor == 'comp':
             gdat.distgridcompthis = gdat.distgridcomp[j]
@@ -66,10 +66,29 @@ def retr_boolnoccobjt(gdat, j, typeoccu='comp'):
     Return a grid of Booleans indicating which prid points are not occulted
     '''
     
-    if gdat.boolsphr:
+    if gdat.boolsystpsys:
         if typeoccu == 'comp':
             boolnocccomp = gdat.distgridcompthis > gdat.rratcomp[j]
         
+            if gdat.typesyst == 'PlanetarySystemWithRingsInclinedHorizontal':
+                boolnoccdisk = (gdat.xposgridcompthis / 1.75 / gdat.rratcomp[j])**2 + (gdat.yposgridcompthis / 0.2 / gdat.rratcomp[j])**2 > 1.
+                print('gdat.typecoor')
+                print(gdat.typecoor)
+                print('boolnoccdisk')
+                summgene(boolnoccdisk)
+                print('boolnocccomp')
+                summgene(boolnocccomp)
+
+                boolnocccomp = boolnocccomp & boolnoccdisk
+               
+            elif gdat.typesyst == 'PlanetarySystemWithRingsInclinedVertical':
+                boolnoccdisk = (gdat.yposgridcompthis / 1.75 / gdat.rratcomp[j])**2 + (gdat.xposgridcompthis / 0.2 / gdat.rratcomp[j])**2 > 1.
+                boolnocccomp = boolnocccomp & boolnoccdisk
+               
+            elif gdat.typesyst == 'PlanetarySystemWithRingsFaceOn':
+                boolnoccdisk = (gdat.distgridcompthis > 1.5 * gdat.rratcomp[j]) & (gdat.distgridcompthis < 1.75 * gdat.rratcomp[j])
+                boolnocccomp = boolnocccomp & boolnoccdisk
+    
         if typeoccu == 'star':
             boolnocccomp = gdat.distgridstarthis > 1.
         
@@ -82,17 +101,6 @@ def retr_boolnoccobjt(gdat, j, typeoccu='comp'):
 
         boolnocccomp = boolnocccomp.reshape(gdat.xposgridcompthis.shape)
 
-    elif gdat.typesyst == 'psysdiskedgehori':
-        booldisk = (gdat.xposgridcompthis / 1.75 / gdat.rratcomp[j])**2 + (gdat.yposgridcompthis / 0.2 / gdat.rratcomp[j])**2 > 1.
-        boolnocccomp = boolnocccomp & booldisk
-       
-    elif gdat.typesyst == 'psysdiskedgevert':
-        booldisk = (gdat.yposgridcompthis / 1.75 / gdat.rratcomp[j])**2 + (gdat.xposgridcompthis / 0.2 / gdat.rratcomp[j])**2 > 1.
-        boolnocccomp = boolnocccomp & booldisk
-       
-    elif gdat.typesyst == 'psysdiskface':
-        boolnocccomp = boolnocccomp & ((gdat.distgridcompthis > 1.5 * gdat.rratcomp[j]) & (gdat.distgridcompthis < 1.75 * gdat.rratcomp[j]))
-    
     else:
         print('')
         print('')
@@ -185,6 +193,9 @@ def make_framanim(gdat, t, typecoor, j=None, typecolr='real', typemrkr='none'):
         
             figr, axis = plt.subplots(figsize=(6, 6))
             
+            if not gdat.boolevaltranprim:
+                raise Exception('')
+
             if namevarbanim == 'flux':
                 if gdat.boolsystpsys:
                     if typecoor == 'comp':
@@ -441,39 +452,39 @@ def proc_phas(gdat, j, t, phasthis, typecoor):
     
     if gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
         
-        boolevaltranprim = True
+        gdat.boolevaltranprim = True
 
     else:
         if typecoor == 'comp':
             
             if gdat.boolsystpsys and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.factwideanim * gdat.rratcomp[j]):
-                boolevaltranprim = True
+                gdat.boolevaltranprim = True
             elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.factwideanim * gdat.wdthslen[j]):
-                boolevaltranprim = True
+                gdat.boolevaltranprim = True
             else:
-                boolevaltranprim = False
+                gdat.boolevaltranprim = False
             
             #if gdat.typesyst == 'CompactObjectStellarCompanion':
             #    print('temp')
-            #    boolevaltranprim = True
+            #    gdat.boolevaltranprim = True
         
         if typecoor == 'star':
             if gdat.boolsystpsys and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.factwideanim * gdat.rratcomp[j]):
-                boolevaltranprim = True
+                gdat.boolevaltranprim = True
             elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.factwideanim * gdat.wdthslen[j]):
-                boolevaltranprim = True
+                gdat.boolevaltranprim = True
             else:
-                boolevaltranprim = False
+                gdat.boolevaltranprim = False
 
     #print('t')
     #print(t)
     #print('phasthis')
     #print(phasthis)
-    #print('boolevaltranprim')
-    #print(boolevaltranprim)
+    #print('gdat.boolevaltranprim')
+    #print(gdat.boolevaltranprim)
     #print('')
 
-    if boolevaltranprim:
+    if gdat.boolevaltranprim:
         
         if typecoor == 'comp':
             
@@ -1953,7 +1964,7 @@ def eval_modl( \
                             continue
                         
                         for t, phasthis in enumerate(listphaseval[j]):
-                            proc_phas(gdat, j, t, phasthis)
+                            proc_phas(gdat, j, t, phasthis, gdat.typecoor)
                             
                 else:
                     
@@ -2514,9 +2525,13 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
 
         if name in dictefesinpt:
             nameprim = name
-        else:
+        elif name[-3:] == 'com':
             nameprim = name[:-1] + 'p'
-        
+        else:
+            print('name')
+            print(name)
+            raise Exception('')
+
         if dictefesinpt[nameprim] is None:
             print('')
             print('')

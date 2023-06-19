@@ -37,6 +37,26 @@ print(typesyst)
 # number of systems
 numbsyst = 3
 
+boolsystpsys = typesyst.startswith('PlanetarySystem')
+boolsystpsysring = typesyst.startswith('PlanetarySystemWithRings')
+
+
+if boolsystpsys:
+    if typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithNonKeplerianObjects':
+        minmnumbcompstar = 8
+        maxmnumbcompstar = 100
+    elif boolsystpsysring:
+        minmnumbcompstar = 1
+        maxmnumbcompstar = 1
+    else:
+        print('typesyst')
+        print(typesyst)
+        raise Exception('')
+else:
+    print('typesyst')
+    print(typesyst)
+    raise Exception('')
+
 # get dictionaries for stars, companions, and moons
 dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompstar, indxmooncompstar = nicomedia.retr_dictpoplstarcomp( \
                                                                                                                                   typesyst, \
@@ -44,7 +64,8 @@ dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompst
                                                                                                                                   typepoplsyst, \
                                                                                                                                   booltoyysunn=True, \
                                                                                                                                   typesamporbtcomp='peri', \
-                                                                                                                                  minmnumbcompstar=8, \
+                                                                                                                                  minmnumbcompstar=minmnumbcompstar, \
+                                                                                                                                  maxmnumbcompstar=maxmnumbcompstar, \
                                                                                                                                   #minmradicomp=10., \
                                                                                                                                   minmmasscomp=10., \
                                                                                                                                   minmpericomp=0.5, \
@@ -64,7 +85,7 @@ listboolcompexcl = []
 if typesyst == 'CompactObjectStellarCompanion':
     liststrgtitlcomp.append('Compact Objects with a stellar companion')
     lablsampgene = 'COSC'
-elif typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithPhaseCurve' or typesyst == 'PlanetarySystemWithRings':
+elif boolsystpsys:
     liststrgtitlcomp.append('Planets')
     lablsampgene = 'planet'
 elif typesyst == 'psysmoon':
@@ -118,6 +139,7 @@ dictefesinpt['typelmdk'] = 'quad'
 #dictefesinpt['typesyst'] = typesyst
 #dictefesinpt['typenorm'] = 'edgeleft'
 dictefesinpt['lablunittime'] = 'days'
+dictefesinpt['booltqdm'] = True
 #dictefesinpt['typelang'] = typelang
 #dictefesinpt['typefileplot'] = typefileplot
 #dictefesinpt['booldiag'] = booldiag
@@ -158,8 +180,6 @@ maxmtime = 1.
 #    maxmtime = 0.5 * 1.5 * duratrantotl
 # time axis
 time = np.arange(minmtime, maxmtime, cade)
-
-boolsystpsys = typesyst.startswith('PlanetarySystem')
 
 listnamevarb = ['peri', 'epocmtra', 'rsma', 'cosi']
 if boolsystpsys:
