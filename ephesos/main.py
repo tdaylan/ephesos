@@ -1109,13 +1109,16 @@ def eval_modl( \
             raise Exception('')
 
         if gdat.boolsystpsys and not ((gdat.radistar is not None and gdat.radicomp is not None) or gdat.rratcomp is not None):
+            print('')
+            print('')
+            print('')
             print('gdat.radistar')
             print(gdat.radistar)
             print('gdat.radicomp')
             print(gdat.radicomp)
             print('gdat.rratcomp')
             print(gdat.rratcomp)
-            raise Exception('')
+            raise Exception('gdat.boolsystpsys and not ((gdat.radistar is not None and gdat.radicomp is not None) or gdat.rratcomp is not None)')
         
         if gdat.rsmacomp is None and not (gdat.masscomp is not None and gdat.massstar is not None):
             print('')
@@ -2038,7 +2041,7 @@ def eval_modl( \
         gdat.xposgridfull, gdat.yposgridfull = np.meshgrid(arrystar, arrystar)
         
         numbsnap = 3
-        indxtimesnap = np.linspace(0., gdat.numbtime, numbsnap).astype(int)
+        indxtimesnap = np.linspace(0., gdat.numbtime - 1, numbsnap).astype(int)
         for t in indxtimesnap:
             proc_time(gdat, t, 'full')
             make_framanim(gdat, t, 'full', typecolr=gdat.typecolrsnap, typemrkr='none')

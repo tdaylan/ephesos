@@ -159,8 +159,10 @@ maxmtime = 1.
 # time axis
 time = np.arange(minmtime, maxmtime, cade)
 
+boolsystpsys = typesyst.startswith('PlanetarySystem')
+
 listnamevarb = ['peri', 'epocmtra', 'rsma', 'cosi']
-if typesyst == 'PlanetarySystem':
+if boolsystpsys:
     listnamevarb += ['rrat']
 
 for k in range(numbsyst):
@@ -183,6 +185,9 @@ for k in range(numbsyst):
         dictefesinpt['%scomp' % namevarb] = dictpoplcomp['%scomp' % namevarb][indxcompstar[k]]
     
     dictefesinpt['strgextn'] = '%s_%04d' % (typesyst, k)
+    
+    print('dictefesinpt')
+    print(dictefesinpt)
 
     # generate light curve
     dictefesoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
