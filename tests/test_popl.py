@@ -1,5 +1,5 @@
 import numpy as np
-import os
+import os, sys
 
 import matplotlib as mpl
 mpl.use('agg')
@@ -14,19 +14,25 @@ from tdpy import summgene
 Compute the relative flux light curves of systems of bodies drawn from a population model
 '''
 
+# path of the folder for visuals
+pathbase = os.environ['EPHESOS_DATA_PATH'] + '/'
+pathpopl = pathbase + 'Population/'
+pathvisupopl = pathpopl + 'visuals/'
+pathdatapopl = pathpopl + 'data/'
+
+# fix the seed
 np.random.seed(2)
 
 # type of the population of systems
 ## TESS 2-min target list during the nominal mission
 #typepoplsyst = 'TESS_PrimaryMission_2min'
 typepoplsyst = 'General'
-typesyst = 'PlanetarySystem'
 
-# path of the folder for visuals
-pathbase = os.environ['EPHESOS_DATA_PATH'] + '/'
-pathpopl = pathbase + 'Population/'
-pathvisupopl = pathpopl + 'visuals/'
-pathdatapopl = pathpopl + 'data/'
+#typesyst = 'PlanetarySystem'
+typesyst = sys.argv[1]
+
+print('typesyst')
+print(typesyst)
 
 # number of systems
 numbsyst = 3
@@ -58,12 +64,19 @@ listboolcompexcl = []
 if typesyst == 'CompactObjectStellarCompanion':
     liststrgtitlcomp.append('Compact Objects with a stellar companion')
     lablsampgene = 'COSC'
-if typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithPhaseCurve':
+elif typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithPhaseCurve' or typesyst == 'PlanetarySystemWithRings':
     liststrgtitlcomp.append('Planets')
     lablsampgene = 'planet'
-if typesyst == 'psysmoon':
+elif typesyst == 'psysmoon':
     liststrgtitlcomp.append('Exomoons')
     lablsampgene = 'exomoon'
+else:
+    print('')
+    print('')
+    print('')
+    print('typesyst')
+    print(typesyst)
+    raise Exception('typesyst undefined.')
 
 listdictlablcolrpopl = []
 listdictlablcolrpopl.append(dict())
