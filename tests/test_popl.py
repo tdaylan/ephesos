@@ -17,8 +17,6 @@ Compute the relative flux light curves of systems of bodies drawn from a populat
 # path of the folder for visuals
 pathbase = os.environ['EPHESOS_DATA_PATH'] + '/'
 pathpopl = pathbase + 'Population/'
-pathvisupopl = pathpopl + 'visuals/'
-pathdatapopl = pathpopl + 'data/'
 
 # fix the seed
 np.random.seed(2)
@@ -28,26 +26,38 @@ np.random.seed(2)
 #typepoplsyst = 'TESS_PrimaryMission_2min'
 typepoplsyst = 'General'
 
-#typesyst = 'PlanetarySystem'
-typesyst = sys.argv[1]
+# compound typesyst
+typesystCompound = sys.argv[1]
+typesyst = typesystCompound.split('_')[0]
 
+pathpoplanls = pathpopl + typesystCompound + '/'
 print('typesyst')
 print(typesyst)
 
 # number of systems
-numbsyst = 3
+numbsyst = 1000
 
 boolsystpsys = typesyst.startswith('PlanetarySystem')
 boolsystpsysring = typesyst.startswith('PlanetarySystemWithRings')
 
-
 if boolsystpsys:
-    if typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithNonKeplerianObjects':
-        minmnumbcompstar = 8
-        maxmnumbcompstar = 100
+    if typesyst== 'PlanetarySystem' or typesyst == 'PlanetarySystemWithNonKeplerianObjects':
+        if typesystCompound == 'PlanetarySystem_Single':
+            minmnumbcompstar = 1
+            maxmnumbcompstar = 1
+            typesamporbtcomp = 'peri'
+        elif typesystCompound == 'PlanetarySystemWithNonKeplerianObjects':
+            minmnumbcompstar = 2
+            maxmnumbcompstar = 2
+            typesamporbtcomp = 'smax'
+        else:
+            minmnumbcompstar = 8
+            maxmnumbcompstar = 10
+            typesamporbtcomp = 'peri'
     elif boolsystpsysring:
         minmnumbcompstar = 1
         maxmnumbcompstar = 1
+        typesamporbtcomp = 'peri'
     else:
         print('typesyst')
         print(typesyst)
@@ -63,7 +73,7 @@ dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompst
                                                                                                                                   
                                                                                                                                   typepoplsyst, \
                                                                                                                                   booltoyysunn=True, \
-                                                                                                                                  typesamporbtcomp='peri', \
+                                                                                                                                  typesamporbtcomp=typesamporbtcomp, \
                                                                                                                                   minmnumbcompstar=minmnumbcompstar, \
                                                                                                                                   maxmnumbcompstar=maxmnumbcompstar, \
                                                                                                                                   #minmradicomp=10., \
@@ -109,6 +119,7 @@ listboolcompexcl.append(False)
 typeanls = '%s' % (typesyst)
 pergamon.init( \
               typeanls, \
+              pathbase=pathpoplanls, \
               dictpopl=dictpoplcomp, \
               
               listdictlablcolrpopl=listdictlablcolrpopl, \
@@ -117,8 +128,6 @@ pergamon.init( \
               
               lablsampgene=lablsampgene, \
 
-              pathvisu=pathvisupopl, \
-              pathdata=pathdatapopl, \
               #boolsortpoplsize=False, \
              )
 
@@ -142,10 +151,11 @@ dictefesinpt['lablunittime'] = 'days'
 dictefesinpt['booltqdm'] = True
 #dictefesinpt['typelang'] = typelang
 #dictefesinpt['typefileplot'] = typefileplot
-#dictefesinpt['booldiag'] = booldiag
+
+#dictefesinpt['booldiag'] = False
 
 dictefesinpt['boolmakeanim'] = True
-dictefesinpt['pathvisu'] = pathvisupopl
+dictefesinpt['pathvisu'] = pathpoplanls
 #dictefesinpt['typeverb'] = 2
 
 #dictefesinpt['boolintp'] = boolintp
@@ -206,9 +216,6 @@ for k in range(numbsyst):
     
     dictefesinpt['strgextn'] = '%s_%04d' % (typesyst, k)
     
-    print('dictefesinpt')
-    print(dictefesinpt)
-
     # generate light curve
     dictefesoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
 
