@@ -1429,6 +1429,7 @@ def eval_modl( \
     if boolcompmoon and boolintp:
         raise Exception('')
 
+    # to be deleted
     gdat.boolsphr = gdat.typesyst == 'PlanetarySystem' or gdat.typesyst == 'PlanetarySystemWithPhaseCurve' or \
                     gdat.typesyst == 'PlanetarySystemWithPhaseCurve' or gdat.typesyst == 'PlanetarySystemWithMoons' or \
                     gdat.typesyst == 'psysttvr' or \
@@ -1708,7 +1709,7 @@ def eval_modl( \
             gdat.longgridsphr = [[] for j in gdat.indxcomp]
             gdat.latigridsphr = [[] for j in gdat.indxcomp]
             
-            if gdat.boolsphr:
+            if gdat.boolsystpsys:
                 
                 # Booleans indicating the region outside the planet in the companion grid
                 gdat.booloutsplangridcomp = [[] for j in gdat.indxcomp]
@@ -1774,7 +1775,7 @@ def eval_modl( \
                 
                 gdat.indxplangridcomp[j] = np.where(gdat.boolplangridcomp[j])
 
-                if gdat.boolsphr:
+                if gdat.boolsystpsys:
                     gdat.booloutsplangridcomp[j] = gdat.distgridcomp[j] > gdat.rratcomp[j]
                 
                     gdat.boolinsicompgridcomp[j] = ~gdat.booloutsplangridcomp[j]
