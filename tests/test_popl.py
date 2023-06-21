@@ -40,8 +40,12 @@ numbsyst = 1000
 boolsystpsys = typesyst.startswith('PlanetarySystem')
 boolsystpsysring = typesyst.startswith('PlanetarySystemWithRings')
 
-boolcalcdistcomp = False
+minmtime = 0.
+maxmtime = 2.
 
+boolcalcdistcomp = False
+# number of systems to visualize via ephesos
+numbsystvisu = 2
 if boolsystpsys:
     if typesyst== 'PlanetarySystem' or typesyst == 'PlanetarySystemWithNonKeplerianObjects':
         if typesystCompound == 'PlanetarySystem_Single':
@@ -49,11 +53,13 @@ if boolsystpsys:
             maxmnumbcompstar = 1
             typesamporbtcomp = 'peri'
         elif typesystCompound == 'PlanetarySystemWithNonKeplerianObjects':
-            minmnumbcompstar = 2
-            maxmnumbcompstar = 2
+            minmnumbcompstar = 1
+            maxmnumbcompstar = 1
             typesamporbtcomp = 'smax'
+            numbsystvisu = 0
         elif typesystCompound == 'PlanetarySystem_Multiple':
             boolcalcdistcomp = True
+            numbsystvisu = 0
             minmnumbcompstar = 8
             maxmnumbcompstar = 10
             typesamporbtcomp = 'peri'
@@ -87,7 +93,7 @@ dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompst
                                                                                                                                   maxmnumbcompstar=maxmnumbcompstar, \
                                                                                                                                   #minmradicomp=10., \
                                                                                                                                   minmmasscomp=10., \
-                                                                                                                                  minmpericomp=0.5, \
+                                                                                                                                  minmpericomp=0.4, \
                                                                                                                                   maxmpericomp=2., \
                                                                                                                                   maxmcosicomp=0.1, \
                                                                                                                                   numbsyst=numbsyst, \
@@ -118,7 +124,8 @@ dictefesinpt['typelmdk'] = 'quad'
 #dictefesinpt['typesyst'] = typesyst
 #dictefesinpt['typenorm'] = 'edgeleft'
 dictefesinpt['lablunittime'] = 'days'
-dictefesinpt['booltqdm'] = True
+dictefesinpt['booltqdm'] = False
+dictefesinpt['typeverb'] = 0
 #dictefesinpt['typelang'] = typelang
 #dictefesinpt['typefileplot'] = typefileplot
 
@@ -133,7 +140,7 @@ dictefesinpt['boolcalcdistcomp'] = boolcalcdistcomp
 #dictefesinpt['typecoor'] = typecoor
 
 ## cadence of simulation
-cade = 30. / 24. / 60. / 60. # days
+cade = 4. / 60. / 24. # days
 ### duration of simulation
 #if typesyst == 'PlanetarySystemWithPhaseCurve':
 #    durasimu = dicttemp['pericomp']
@@ -141,9 +148,6 @@ cade = 30. / 24. / 60. / 60. # days
 #        durasimu *= 3.
 #else:
 #    durasimu = 6. / 24. # days
-
-minmtime = 0.
-maxmtime = 10.
 
 #duratrantotl = nicomedia.retr_duratrantotl(dicttemp['pericomp'], dicttemp['rsmacomp'], dicttemp['cosicomp']) / 24. # [days]
 #if typesyst == 'PlanetarySystemWithPhaseCurve':
@@ -163,17 +167,27 @@ listnamevarb = ['peri', 'epocmtra', 'rsma', 'cosi']
 if boolsystpsys:
     listnamevarb += ['rrat']
 
-# number of systems to visualize via ephesos
-numbsystvisu = 2
+from tqdm import tqdm
 
-for k in range(numbsyst):
+if boolcalcdistcomp:
+    listnamefeatmult = ['rateppcr', 'numbppcr', 'minmcompdist']
+    for name in listnamefeatmult:
+        dictpoplstar[strgpoplstartotl][name] = np.empty(dictpoplstar[strgpoplstartotl]['radistar'].size)
 
-    if k < numbsystvisu:
-        dictefesinpt['boolmakesnap'] = True
+print('Running ephesos on each system...')
+for k in tqdm(range(numbsyst)):
+    
+    if typesystCompound == 'PlanetarySystem_Multiple':
+        dictefesinpt['boolmakeimaglfov'] = False
+        dictefesinpt['boolplotdistcomp'] = True
+        dictefesinpt['boolmakeanim'] = False
+        dictefesinpt['pathvisu'] = pathvisu
+    elif k < numbsystvisu:
+        dictefesinpt['boolmakeimaglfov'] = True
         dictefesinpt['boolmakeanim'] = True
         dictefesinpt['pathvisu'] = pathvisu
     else:
-        dictefesinpt['boolmakesnap'] = False
+        dictefesinpt['boolmakeimaglfov'] = False
         dictefesinpt['boolmakeanim'] = False
         dictefesinpt['pathvisu'] = None
     
@@ -199,8 +213,15 @@ for k in range(numbsyst):
     # generate light curve
     dictefesoutp = ephesos.eval_modl(time, typesyst, **dictefesinpt)
 
-for name in ['rateppcr', 'numbppcr', 'minmdistcomp']:
-    dictpoplcomp[strgpoplcomptotl][name] = dictefesoutp[name]
+    if boolcalcdistcomp:
+        for name in listnamefeatmult:
+            if not np.isscalar(dictefesoutp[name]):
+                print('name')
+                print(name)
+                print( dictefesoutp[name].shape)
+                raise Exception('')
+    
+            dictpoplstar[strgpoplstartotl][name][k] = dictefesoutp[name]
 
 print('Visualizing the simulated population...')
 liststrgtitlcomp = []
@@ -222,30 +243,41 @@ else:
     print(typesyst)
     raise Exception('typesyst undefined.')
 
-listdictlablcolrpopl = []
-listdictlablcolrpopl.append(dict())
-listdictlablcolrpopl[-1][strgpoplcomptotl] = ['All', 'black']
-if typesyst == 'PlanetarySystem' or typesyst == 'PlanetarySystemWithPhaseCurve' or typesyst == 'CompactObjectStellarCompanion':
-    listdictlablcolrpopl[-1][strgpoplcomptran] = ['Transiting', 'blue']
-listboolcompexcl.append(False)
-
 pathbase = pathpoplanls + 'pergamon/'
 os.system('mkdir -p %s' % pathbase)
-
 typeanls = '%s' % (typesyst)
-pergamon.init( \
-              typeanls, \
-              pathbase=pathbase, \
-              dictpopl=dictpoplcomp, \
-              
-              listdictlablcolrpopl=listdictlablcolrpopl, \
-              listboolcompexcl=listboolcompexcl, \
-              listtitlcomp=liststrgtitlcomp, \
-              
-              lablsampgene=lablsampgene, \
 
-              #boolsortpoplsize=False, \
-             )
+listdictlablcolrpopl = []
+
+if typesystCompound == 'PlanetarySystem_Multiple':
+    dictpopl = dictpoplstar
+    listdictlablcolrpopl.append(dict())
+    listdictlablcolrpopl[-1][strgpoplstartotl] = ['All', 'black']
+    listboolcompexcl.append(True)
+
+else:
+    dictpopl = dictpoplcomp
+    listdictlablcolrpopl.append(dict())
+    listdictlablcolrpopl[-1][strgpoplcomptotl] = ['All', 'black']
+    if typesyst == 'PlanetarySystemWithNonKeplerianObjects':
+        listdictlablcolrpopl[-1]['AnomalousNKF'] = ['Anomalous NKF', 'blue']
+        indx = np.where(dictpoplcomp[strgpoplcomptotl]['factnonkcomp'] < 0.3)[0]
+        pergamon.retr_subp(dictpoplcomp, None, None, strgpoplcomptotl, 'AnomalousNKF', indx)
+    listboolcompexcl.append(True)
+
+pergamon.init( \
+             typeanls, \
+             pathbase=pathbase, \
+             dictpopl=dictpopl, \
+             
+             listdictlablcolrpopl=listdictlablcolrpopl, \
+             listboolcompexcl=listboolcompexcl, \
+             listtitlcomp=liststrgtitlcomp, \
+             
+             lablsampgene=lablsampgene, \
+
+             #boolsortpoplsize=False, \
+            )
 
 
 
