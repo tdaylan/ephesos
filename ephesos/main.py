@@ -36,6 +36,19 @@ import chalcedon
 import tdpy
 from tdpy import summgene
 
+def retr_listtypesyst():
+    
+    listtypesyst = [ \
+                    'PlanetarySystem', \
+                    'PlanetarySystemWithPhaseCurve', \
+                    'PlanetarySystemWithMoons', \
+                    'PlanetarySystemWithRingsFaceOn', \
+                    'PlanetarySystemWithRingsInclinedVertical', \
+                    'PlanetarySystemWithRingsInclinedHorizontal', \
+                   ]
+    
+    return listtypesyst
+
 
 def retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp'):
     '''
