@@ -9,6 +9,8 @@ import nicomedia
 import ephesos
 import pergamon
 from tdpy import summgene
+import tdpy
+
 
 '''
 Compute the relative flux light curves of systems of bodies drawn from a population model
@@ -140,7 +142,20 @@ dictefesinpt['boolcalcdistcomp'] = boolcalcdistcomp
 #dictefesinpt['typecoor'] = typecoor
 
 ## cadence of simulation
-cade = 4. / 60. / 24. # days
+
+cade = 2. / 60. / 24. # days
+
+# minimum period in the ensemble
+minmperi = 1e100
+for k in range(numbsystvisu):
+    minmperi = min(np.amin(dictpoplcomp[strgpoplcomptotl]['pericomp'][k]), minmperi)
+if cade > 5e-3 * minmperi:
+    print('1e-3 * minmperi')
+    print(1e-3 * minmperi)
+    facttime, lablunittime = tdpy.retr_timeunitdays(cade)
+    raise Exception('Simulation cadence (%g %s) is too long, which will undersample the motion of the innermost companion and diminish animation quality.' % \
+                                                                                                                                        (cade * facttime, lablunittime))
+
 ### duration of simulation
 #if typesyst == 'PlanetarySystemWithPhaseCurve':
 #    durasimu = dicttemp['pericomp']
