@@ -189,18 +189,23 @@ if boolcalcdistcomp:
     for name in listnamefeatmult:
         dictpoplstar[strgpoplstartotl][name] = np.empty(dictpoplstar[strgpoplstartotl]['radistar'].size)
 
+if typesystCompound == 'PlanetarySystem_Multiple':
+    dictefesinpt['boolplotdistcomp'] = True
+else:
+    dictefesinpt['boolplotdistcomp'] = False
+
 print('Running ephesos on each system...')
 for k in tqdm(range(numbsyst)):
     
-    if typesystCompound == 'PlanetarySystem_Multiple':
-        dictefesinpt['boolmakeimaglfov'] = False
-        dictefesinpt['boolplotdistcomp'] = True
-        dictefesinpt['boolmakeanim'] = False
-        dictefesinpt['pathvisu'] = pathvisu
-    elif k < numbsystvisu:
-        dictefesinpt['boolmakeimaglfov'] = True
-        dictefesinpt['boolmakeanim'] = True
-        dictefesinpt['pathvisu'] = pathvisu
+    if k < numbsystvisu:
+        if typesystCompound == 'PlanetarySystem_Multiple':
+            dictefesinpt['boolmakeimaglfov'] = False
+            dictefesinpt['boolmakeanim'] = False
+            dictefesinpt['pathvisu'] = pathvisu
+        else:
+            dictefesinpt['boolmakeimaglfov'] = True
+            dictefesinpt['boolmakeanim'] = True
+            dictefesinpt['pathvisu'] = pathvisu
     else:
         dictefesinpt['boolmakeimaglfov'] = False
         dictefesinpt['boolmakeanim'] = False
