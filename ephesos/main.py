@@ -518,7 +518,7 @@ def retr_anomdist(phas, smax, ecce):
     dist = smax * (1. - ecce * np.cos(anomecce))
     
     # true anomaly
-    anomtrue = np.arccos((np.cos(anomecce) - ecce) / (1. - ecce * anomecce))
+    anomtrue = np.arccos((np.cos(anomecce) - ecce) / (1. - ecce * np.cos(anomecce)))
     if anomecce > np.pi:
         anomtrue += (np.pi - anomtrue)
     elif anomecce < 0.:
