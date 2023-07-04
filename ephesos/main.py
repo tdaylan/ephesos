@@ -1434,7 +1434,7 @@ def eval_modl( \
         
         if gdat.typesyst == 'PlanetarySystemWithPhaseCurve' or gdat.typesyst == 'PlanetarySystemWithPhaseCurve':
             gdat.masscompsolr = gdat.masscomp / gdat.dictfact['msme']
-        elif gdat.typesyst == 'CompactObjectStellarCompanion' or gdat.typesyst == 'sbin':
+        elif gdat.typesyst == 'CompactObjectStellarCompanion' or gdat.typesyst == 'StellarBinary':
             gdat.masscompsolr = gdat.masscomp
         else:
             print('gdat.typesyst')
@@ -1559,7 +1559,7 @@ def eval_modl( \
                     print('gdat.typesyst')
                     print(gdat.typesyst)
                     raise Exception('')
-                if gdat.typesyst == 'sbin' and (gdat.rratcomp == 0).any():
+                if gdat.typesyst == 'StellarBinary' and (gdat.rratcomp == 0).any():
                     raise Exception('')
             
             if gdat.boolfast and gdat.rratcomp.ndim == 2 and gdat.boolrscllcur:

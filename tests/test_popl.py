@@ -85,21 +85,26 @@ print(minmnumbcompstar)
 print('maxmnumbcompstar')
 print(maxmnumbcompstar)
 # get dictionaries for stars, companions, and moons
-dictpoplstar, dictpoplcomp, dictpoplmoon, dictcompnumb, dictcompindx, indxcompstar, indxmooncompstar = nicomedia.retr_dictpoplstarcomp( \
-                                                                                                                                  typesyst, \
-                                                                                                                                  
-                                                                                                                                  typepoplsyst, \
-                                                                                                                                  booltoyysunn=True, \
-                                                                                                                                  typesamporbtcomp=typesamporbtcomp, \
-                                                                                                                                  minmnumbcompstar=minmnumbcompstar, \
-                                                                                                                                  maxmnumbcompstar=maxmnumbcompstar, \
-                                                                                                                                  #minmradicomp=10., \
-                                                                                                                                  minmmasscomp=10., \
-                                                                                                                                  minmpericomp=0.4, \
-                                                                                                                                  maxmpericomp=2., \
-                                                                                                                                  maxmcosicomp=0.1, \
-                                                                                                                                  numbsyst=numbsyst, \
-                                                                                                                                )
+dictnico = nicomedia.retr_dictpoplstarcomp( \
+                                            typesyst, \
+                                            
+                                            typepoplsyst, \
+                                            booltoyysunn=True, \
+                                            typesamporbtcomp=typesamporbtcomp, \
+                                            minmnumbcompstar=minmnumbcompstar, \
+                                            maxmnumbcompstar=maxmnumbcompstar, \
+                                            #minmradicomp=10., \
+                                            minmmasscomp=10., \
+                                            minmpericomp=0.4, \
+                                            maxmpericomp=2., \
+                                            maxmcosicomp=0.1, \
+                                            numbsyst=numbsyst, \
+                                          )
+
+# parse nicomedia output
+dictpoplstar = dictnico['dictpoplstar']
+dictpoplcomp = dictnico['dictpoplcomp']
+indxcompstar = dictnico['indxcompstar']
 
 
 strgpoplstartotl = 'star' + typepoplsyst + 'totl'
