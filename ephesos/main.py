@@ -2310,7 +2310,8 @@ def eval_modl( \
             print('gdat.listalphline[j]')
             print(gdat.listalphline[j])
             
-            raise Exception('')
+            #raise Exception('')
+            
             #for t in gdat.indxtime:
             #    gdat.listsegm[j].append([gdat.dictvarborbt['posicompgridprim'][t, j, 0], gdat.dictvarborbt['posicompgridprim'][t, j, 1]])
 
