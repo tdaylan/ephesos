@@ -36,8 +36,6 @@ import chalcedon
 import tdpy
 from tdpy import summgene
 
-plt.style.use('dark_background')
-
 
 def retr_listtypesyst():
     
@@ -199,12 +197,13 @@ def make_imag(gdat, t, typecoor, typecolr='real', typemrkr='none', j=None, booli
         
             figr, axis = plt.subplots(figsize=(6, 6))
             
-            if gdat.booldiag:
-                if not hasattr(gdat, 'boolevalflux'):
-                    raise Exception('')
-            
             if namevarbanim == 'flux':
                 if not boolimaglfov:
+            
+                    if gdat.booldiag:
+                        if not hasattr(gdat, 'boolevalflux'):
+                            raise Exception('')
+            
                     if gdat.boolevalflux:
                         if gdat.boolsystpsys:
                             if typecoor == 'comp':
@@ -1032,6 +1031,8 @@ def eval_modl( \
 
               ## Boolean flag to add Mercury in the large-FOV image
               boolinclmercimaglfov=False, \
+                
+              typeplotback='black', \
 
               # type of light curve plot
               ## 'inst': inset
@@ -1149,6 +1150,9 @@ def eval_modl( \
 
     gdat.boolsystpsys = gdat.typesyst.startswith('PlanetarySystem')
     
+    if gdat.typeplotback == 'black':
+        plt.style.use('dark_background')
+        
     if gdat.boolcalcdistcomp:
         dictefes['distcomp'] = np.empty((gdat.numbcomp, gdat.numbcomp))
 
@@ -2277,7 +2281,7 @@ def eval_modl( \
             liststrg = ['x', 'y', 'z']
             for j in gdat.indxcomp:
                 for a in range(3):
-                    if (not (gdat.dictvarborbt['posicompgridprim'][:, j, a] > 0).any() or 
+                    if (gdat.pericomp[j] < (gdat.time[-1] - gdat.time[0])) and (not (gdat.dictvarborbt['posicompgridprim'][:, j, a] > 0).any() or 
                         not (gdat.dictvarborbt['posicompgridprim'][:, j, a] < 0).any()) and not (gdat.dictvarborbt['posicompgridprim'][:, j, a] == 0).all():
                         print('')
                         print('')
