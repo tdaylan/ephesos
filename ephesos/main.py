@@ -2293,6 +2293,19 @@ def eval_modl( \
                         print('gdat.dictvarborbt[posicompgridprim][:, j, a]')
                         summgene(gdat.dictvarborbt['posicompgridprim'][:, j, a])
                         raise Exception('All values are one-sided for %s-axis!' % liststrg[a])
+        
+        if gdat.booldiag:
+            for j in gdat.indxcomp:
+                if gdat.xposcompgridstar[j].size:
+                    print('')
+                    print('')
+                    print('')
+                    print('j')
+                    print(j)
+                    print('gdat.xposcompgridstar[j]')
+                    summgene(gdat.xposcompgridstar[j])
+                    raise Exception('gdat.xposcompgridstar[j] is empty!')
+
 
         #gdat.listsegm = [[] for j in gdat.indxcomp]
         gdat.numbsegmfade = 10
