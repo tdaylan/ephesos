@@ -120,9 +120,9 @@ dictnico = nicomedia.retr_dictpoplstarcomp( \
                                           )
 
 # parse nicomedia output
-dictpoplstar = dictnico['dictpoplstar']
-dictpoplcomp = dictnico['dictpoplcomp']
-indxcompstar = dictnico['indxcompstar']
+dictpoplstar = dictnico['dictpopl']['star']
+dictpoplcomp = dictnico['dictpopl']['comp']
+indxcompstar = dictnico['dictindx']['comp']['star']
 
 
 strgpoplstartotl = 'star' + typepoplsyst + 'totl'

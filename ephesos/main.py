@@ -327,6 +327,8 @@ def make_imag(gdat, t, typecoor, typecolr='real', typemrkr='none', j=None, booli
             
                     axis.add_patch(plt.Circle((0, 0), 1., color='orange'))
                     for j in gdat.indxcomp:
+                        print('gdat.xposcompgridstar[j]')
+                        print(gdat.xposcompgridstar[j])
                         axis.add_patch(plt.Circle((gdat.xposcompgridstar[j], gdat.yposcompgridstar[j]), gdat.radicomp[j], color=gdat.listcolrcomp[j]))
                         #axis.plot(gdat.dictvarborbt['posicompgridprim'][:, j, 0], gdat.dictvarborbt['posicompgridprim'][:, j, 1], ls='-', color=gdat.listcolrcomp[j])
                         
