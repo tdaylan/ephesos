@@ -925,8 +925,8 @@ def eval_modl( \
               sinwmoon=None, \
               
               # type of model for lensing
-              ## 'phdy': photodynamically calculated
-              ## 'gaus': Gaussian
+              ## 'phdy': calculated photodynamically via ray tracing
+              ## 'Gaussian': Gaussian centered at conjuction
               typemodllens='phdy', \
 
               # spots
