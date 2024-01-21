@@ -2090,24 +2090,24 @@ def eval_modl( \
                     gdat.listphaseval[j] = [np.arange(-0.25, -phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur)]
                     
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
-                        gdat.listphaseval[j].append(np.arange(-phasingr - deltphasineghalf, -phasingr + deltphasineghalf, gdat.diffphasineg))
+                        gdat.listphaseval[j].append(np.arange(-phasingr[j] - deltphasineghalf[j], -phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
 
-                    gdat.listphaseval[j].append(np.arange(-phasingr + deltphasineghalf, phasingr - deltphasineghalf, gdat.diffphasintr[j]))
+                    gdat.listphaseval[j].append(np.arange(-phasingr[j] + deltphasineghalf[j], phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
                                                    
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
-                        gdat.listphaseval[j].append(np.arange(phasingr - deltphasineghalf, phasingr + deltphasineghalf, gdat.diffphasineg))
+                        gdat.listphaseval[j].append(np.arange(phasingr[j] - deltphasineghalf[j], phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                     
-                    gdat.listphaseval[j].append(np.arange(phasingr + deltphasineghalf, 0.5 - phasingr - deltphasineghalf, gdat.diffphaspcur))
+                    gdat.listphaseval[j].append(np.arange(phasingr[j] + deltphasineghalf[j], 0.5 - phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur))
                     
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
-                        gdat.listphaseval[j].append(np.arange(0.5 - phasingr - deltphasineghalf, 0.5 - phasingr + deltphasineghalf, gdat.diffphasineg))
+                        gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] - deltphasineghalf[j], 0.5 - phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                                                    
-                    gdat.listphaseval[j].append(np.arange(0.5 - phasingr + deltphasineghalf, 0.5 + phasingr - deltphasineghalf, gdat.diffphasintr[j]))
+                    gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] + deltphasineghalf[j], 0.5 + phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
                                                    
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
-                        gdat.listphaseval[j].append(np.arange(0.5 + phasingr - deltphasineghalf, 0.5 + phasingr + deltphasineghalf, gdat.diffphasineg))
+                        gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] - deltphasineghalf[j], 0.5 + phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                     
-                    gdat.listphaseval[j].append(np.arange(0.5 + phasingr + deltphasineghalf, 0.75 + gdat.diffphaspcur, gdat.diffphaspcur))
+                    gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] + deltphasineghalf[j], 0.75 + gdat.diffphaspcur, gdat.diffphaspcur))
                     
                     gdat.listphaseval[j] = np.concatenate(gdat.listphaseval[j])
                 else:
@@ -2279,8 +2279,6 @@ def eval_modl( \
         
     if gdat.boolmakeimaglfov:
         
-        if gdat.numbcomp > 1:
-            raise Exception('')
         gdat.maxmsmaxcomp = np.amax(gdat.smaxcomp)
         gdat.limtposiimag = [-1.5 * gdat.maxmsmaxcomp, 1.5 * gdat.maxmsmaxcomp]
         numbimaglfov = 20
