@@ -111,6 +111,8 @@ def retr_lumistartran(gdat, typecoor, boolrofi):
     indxgridrofi = np.where(boolrofi)
     lumistartran = retr_lumistartranrofi(gdat, typecoor, indxgridrofi)
     
+    print('lumistartran')
+    summgene(lumistartran)
     lumistartran = np.sum(lumistartran)
 
     return lumistartran
@@ -893,6 +895,9 @@ def eval_modl( \
               ### 'isot': companion is an internally heated, isothermal body
               typebrgtcomp='dark', \
               
+              ## Boolean flag to include occultor crossings
+              boolmodlplancros=False, \
+
               ## phase offset for the sinusoidal model
               offsphascomp=None, \
 
@@ -1087,6 +1092,12 @@ def eval_modl( \
     dictefes = dict()
     dictefes['dictinpt'] = dictinpt
 
+    # Boolean flag to profile (track) time budget
+    gdat.boolproftime = True
+    
+    # Boolean flag to halt execution if the time budget is excessive (only to be used during diagnosis)
+    gdat.boolstopproftime = True
+    
     if typeverb > 1:
         print('Estimating the light curve via eval_modl()...')
         
@@ -1145,7 +1156,7 @@ def eval_modl( \
         gdat.tolerrat = 3e-3
     
     if gdat.typecoor is None:
-        if gdat.numbcomp == 1 and gdat.typesyst != 'PlanetarySystemWithMoons':
+        if gdat.numbcomp == 1 and gdat.typesyst != 'PlanetarySystemWithMoons' or not gdat.boolmodlplancros:
             gdat.typecoor = 'comp'
         else:
             gdat.typecoor = 'star'
@@ -1500,7 +1511,7 @@ def eval_modl( \
                 print(smaxmoontemp)
     
     if gdat.boolintp is None:
-        if gdat.perimoon is not None or gdat.numbcomp > 1 or gdat.perispot is not None:
+        if gdat.perimoon is not None or gdat.numbcomp > 1 and gdat.boolmodlplancros or gdat.perispot is not None:
             if typeverb > 1:
                 print('Either the model has moon, stellar spots, or multiple companions.')
                 print('Will evaluate the model at each time (as opposed to interpolating phase curves)...')
@@ -1592,10 +1603,12 @@ def eval_modl( \
             gdat.diffphaspcur = 0.02
         
         if gdat.diffphasintr is None:
-            if gdat.boolsystpsys and np.isfinite(gdat.duratranfull):
-                gdat.diffphasintr = 0.0005
-            else:
-                gdat.diffphasintr = 0.0001
+            gdat.diffphasintr = np.empty(gdat.numbcomp)
+            for j in gdat.indxcomp:
+                if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                    gdat.diffphasintr[j] = 0.0005
+                else:
+                    gdat.diffphasintr[j] = 0.0001
         
         if typeverb > 1:
             if np.isfinite(gdat.duratranfull):
@@ -1966,15 +1979,16 @@ def eval_modl( \
         if not gdat.boolcalcdistcomp:
             arrystar = np.arange(-1. - 2. * gdat.diffgridstar, 1. + 3. * gdat.diffgridstar, gdat.diffgridstar)
             gdat.xposgridstar, gdat.yposgridstar = np.meshgrid(arrystar, arrystar)
-            gdat.precphotflorstar = 1e6 / gdat.xposgridstar.size
+            gdat.numbpixlgridstar = gdat.xposgridstar.size
+            gdat.precphotflorstar = 1e6 / gdat.numbpixlgridstar
             
             if gdat.typeverb > 0:
-                if gdat.xposgridstar.size > 1e3 and gdat.typecoor == 'star':
+                if gdat.numbpixlgridstar > 1e3 and gdat.typecoor == 'star':
                     print('Warning! typecoor is %s. Too many points (%d) in the star grid due to resolution being too high (%g). It will take too long to evaluate the light curve.' % \
-                                                                                                                            (gdat.typecoor, gdat.xposgridstar.size, gdat.diffgridstar))
+                                                                                                                            (gdat.typecoor, gdat.numbpixlgridstar, gdat.diffgridstar))
 
             if gdat.typeverb > 1:
-                print('Number of pixels in the stellar grid: %d' % (gdat.xposgridstar.size))
+                print('Number of pixels in the stellar grid: %d' % (gdat.numbpixlgridstar))
                 print('Photometric precision floor achieved by this resolution: %g ppm' % gdat.precphotflorstar)
 
             # distance to the star in the star grid
@@ -1994,7 +2008,7 @@ def eval_modl( \
             if gdat.typesyst == 'CompactObjectStellarCompanion':
                 
                 #metrcomp = 3e-10 * gdat.xposgridsour[0].size * gdat.xposgridcomp[0].size
-                metrcomp = 3e-10 * gdat.xposgridstar.size * gdat.xposgridcomp[0].size
+                metrcomp = 3e-10 * gdat.numbpixlgridstar * gdat.xposgridcomp[0].size
                 
                 if gdat.typeverb > 1:
                     print('Estimated execution time per time sample: %g ms' % metrcomp)
@@ -2028,6 +2042,7 @@ def eval_modl( \
                     print('The model will be evaluated over %d time samples. tqdm will be used to indicate progress.' % gdat.numbtime)
         
         if gdat.typecoor == 'star' or gdat.boolmakeimaglfov:
+            # coordinates of the companion in a grid where the star is stationary
             gdat.xposcompgridstar = [[] for j in gdat.indxcomp]
             gdat.yposcompgridstar = [[] for j in gdat.indxcomp]
             gdat.zposcompgridstar = [[] for j in gdat.indxcomp]
@@ -2036,6 +2051,7 @@ def eval_modl( \
                 gdat.yposmoon = [[[] for jj in indxmoon[j]] for j in gdat.indxcomp]
             
         if gdat.typecoor == 'comp':
+            # coordinates of the star in a list of grids where each companion is stationary, respectively
             gdat.xposstargridcomp = [[] for j in gdat.indxcomp]
             gdat.yposstargridcomp = [[] for j in gdat.indxcomp]
             gdat.zposstargridcomp = [[] for j in gdat.indxcomp]
@@ -2045,29 +2061,38 @@ def eval_modl( \
             gdat.numbphaseval = np.empty(gdat.numbcomp, dtype=int)
             for j in gdat.indxcomp:
                 if np.isfinite(gdat.duratrantotl[j]):
+                    
+                    # array of durations of phase oversampled for the total transit
                     if gdat.typesyst.startswith('PlanetarySystemWithRings'):
-                        gdat.phastrantotl = 2. * gdat.duratrantotl / gdat.pericomp[j]
+                        gdat.phastrantotl = 2. * gdat.duratrantotl / gdat.pericomp
                     else:
-                        gdat.phastrantotl = gdat.duratrantotl / gdat.pericomp[j]
+                        gdat.phastrantotl = gdat.duratrantotl / gdat.pericomp
+                    
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                        # array of durations of phase oversampled for the full transit
                         if gdat.typesyst.startswith('PlanetarySystemWithRings'):
-                            gdat.phastranfull = 2. * gdat.duratranfull[j] / gdat.pericomp[j]
+                            gdat.phastranfull = 2. * gdat.duratranfull / gdat.pericomp
                         else:
-                            gdat.phastranfull = gdat.duratranfull[j] / gdat.pericomp[j]
-                        # inlclude a fudge factor of 1.1
+                            gdat.phastranfull = gdat.duratranfull / gdat.pericomp
+                        
+                        # array of durations of phase oversampled for the ingress and egress, inlcluding a fudge factor
                         deltphasineg = 1.1 * (gdat.phastrantotl - gdat.phastranfull) / 2.
-                        phasingr = (gdat.phastrantotl + gdat.phastranfull) / 4.
+                        
                         deltphasineghalf = 0.5 * deltphasineg
+                        
+                        # array of the phase of the ingress and egress
+                        phasingr = (gdat.phastrantotl + gdat.phastranfull) / 4.
+                        
                     else:
                         phasingr = gdat.phastrantotl / 2.
                         deltphasineghalf = 0.
                     
-                    gdat.listphaseval[j] = [np.arange(-0.25, -phasingr - deltphasineghalf, gdat.diffphaspcur)]
+                    gdat.listphaseval[j] = [np.arange(-0.25, -phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur)]
                     
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         gdat.listphaseval[j].append(np.arange(-phasingr - deltphasineghalf, -phasingr + deltphasineghalf, gdat.diffphasineg))
 
-                    gdat.listphaseval[j].append(np.arange(-phasingr + deltphasineghalf, phasingr - deltphasineghalf, gdat.diffphasintr))
+                    gdat.listphaseval[j].append(np.arange(-phasingr + deltphasineghalf, phasingr - deltphasineghalf, gdat.diffphasintr[j]))
                                                    
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         gdat.listphaseval[j].append(np.arange(phasingr - deltphasineghalf, phasingr + deltphasineghalf, gdat.diffphasineg))
@@ -2077,7 +2102,7 @@ def eval_modl( \
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         gdat.listphaseval[j].append(np.arange(0.5 - phasingr - deltphasineghalf, 0.5 - phasingr + deltphasineghalf, gdat.diffphasineg))
                                                    
-                    gdat.listphaseval[j].append(np.arange(0.5 - phasingr + deltphasineghalf, 0.5 + phasingr - deltphasineghalf, gdat.diffphasintr))
+                    gdat.listphaseval[j].append(np.arange(0.5 - phasingr + deltphasineghalf, 0.5 + phasingr - deltphasineghalf, gdat.diffphasintr[j]))
                                                    
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                         gdat.listphaseval[j].append(np.arange(0.5 + phasingr - deltphasineghalf, 0.5 + phasingr + deltphasineghalf, gdat.diffphasineg))
@@ -2128,7 +2153,8 @@ def eval_modl( \
                         cmnd = 'rm %s*' % pathbasedele
                         print(cmnd)
                         os.system(cmnd)
-
+                
+                # evaluate the brightness as a interpolate 
                 if gdat.boolintp:
                     
                     if gdat.booltqdm:
@@ -2158,6 +2184,7 @@ def eval_modl( \
                         objttemp = tqdm(range(gdat.numbtime))
                     else:
                         objttemp = range(gdat.numbtime)
+                    
                     for t in objttemp:
                         proc_time(gdat, t, gdat.typecoor)
 
@@ -2294,17 +2321,17 @@ def eval_modl( \
                         summgene(gdat.dictvarborbt['posicompgridprim'][:, j, a])
                         raise Exception('All values are one-sided for %s-axis!' % liststrg[a])
         
-        if gdat.booldiag:
-            for j in gdat.indxcomp:
-                if gdat.xposcompgridstar[j].size:
-                    print('')
-                    print('')
-                    print('')
-                    print('j')
-                    print(j)
-                    print('gdat.xposcompgridstar[j]')
-                    summgene(gdat.xposcompgridstar[j])
-                    raise Exception('gdat.xposcompgridstar[j] is empty!')
+            if gdat.typecoor == 'star':
+                for j in gdat.indxcomp:
+                    if gdat.xposcompgridstar[j].size:
+                        print('')
+                        print('')
+                        print('')
+                        print('j')
+                        print(j)
+                        print('gdat.xposcompgridstar[j]')
+                        summgene(gdat.xposcompgridstar[j])
+                        raise Exception('gdat.xposcompgridstar[j] is empty!')
 
 
         #gdat.listsegm = [[] for j in gdat.indxcomp]
@@ -2336,7 +2363,6 @@ def eval_modl( \
 
         for t in indxtimeimaglfov:
             
-            #proc_time(gdat, t, 'star')
             make_imag(gdat, t, 'star', typecolr=gdat.typecolrimaglfov, typemrkr='none', boolimaglfov=True)
             make_imag(gdat, t, 'star', typecolr=gdat.typecolrimaglfov, typemrkr='tail', boolimaglfov=True)
             make_imag(gdat, t, 'star', typecolr=gdat.typecolrimaglfov, typemrkr='taillabl', boolimaglfov=True)
@@ -2512,6 +2538,9 @@ def eval_modl( \
 
 def proc_time(gdat, t, typecoor):
     
+    if gdat.boolproftime:
+        timeinit = timemodu.time()
+    
     # Boolean flag to evaluate the flux at this time
     gdat.boolevalflux = False
     
@@ -2571,6 +2600,8 @@ def proc_time(gdat, t, typecoor):
                 
                 if typecoor == 'comp':
                     gdat.boolgridcompoutscomp = retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp')
+                    print('gdat.boolintp')
+                    print(gdat.boolintp)
                     gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
                 elif typecoor == 'star':
                     gdat.boolgridstaroutscomp = retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp')
@@ -2587,6 +2618,33 @@ def proc_time(gdat, t, typecoor):
     if gdat.boolmakeanim:
         make_imag(gdat, t, typecoor)
    
+    if gdat.boolproftime:
+        timeexec = timemodu.time() - timeinit
+        print('proc_time() took %s seconds.' % timeexec)
+                    
+    if gdat.boolstopproftime:
+        if timeexec > 0.1:
+            print('')
+            print('')
+            print('')
+            print('gdat.typesyst')
+            print(gdat.typesyst)
+            print('gdat.numbcomp')
+            print(gdat.numbcomp)
+            print('gdat.typecoor')
+            print(gdat.typecoor)
+            print('gdat.numbpixlgridstar')
+            print(gdat.numbpixlgridstar)
+            print('gdat.boolintp')
+            print(gdat.boolintp)
+            print('timeexec')
+            print(timeexec)
+            print('gdat.numbtime')
+            print(gdat.numbtime)
+            print('gdat.numbtime * timeexec')
+            print(gdat.numbtime * timeexec)
+            raise Exception('Computation has taken too long.')
+
                             
 def plot_tser_dictefes(pathvisu, dictefes, strgextninpt, lablunittime, typetarg='', typefileplot='png'):
 
