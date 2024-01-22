@@ -2095,6 +2095,10 @@ def eval_modl( \
                         phasingr = gdat.phastrantotl / 2.
                         deltphasineghalf = 0.
                     
+                    print('phasingr')
+                    print(phasingr)
+                    print('deltphasineghalf')
+                    print(deltphasineghalf)
                     gdat.listphaseval[j] = [np.arange(-0.25, -phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur)]
                     
                     if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
