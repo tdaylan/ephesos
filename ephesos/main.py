@@ -329,18 +329,10 @@ def make_imag(gdat, t, typecoor, typecolr='real', typemrkr='none', j=None, booli
             
                     axis.add_patch(plt.Circle((0, 0), 1., color='orange'))
                     for j in gdat.indxcomp:
-                        print('gdat.xposcompgridstar[j]')
-                        print(gdat.xposcompgridstar[j])
                         axis.add_patch(plt.Circle((gdat.xposcompgridstar[j], gdat.yposcompgridstar[j]), gdat.radicomp[j], color=gdat.listcolrcomp[j]))
                         #axis.plot(gdat.dictvarborbt['posicompgridprim'][:, j, 0], gdat.dictvarborbt['posicompgridprim'][:, j, 1], ls='-', color=gdat.listcolrcomp[j])
                         
                         for ou in gdat.indxsegmfade:
-                            print('ou')
-                            print(ou)
-                            print('gdat.listalphline[j][ou]')
-                            print(gdat.listalphline[j][ou])
-                            print('gdat.indxtimesegmfade[ou]')
-                            summgene(gdat.indxtimesegmfade[ou])
                             axis.plot(gdat.dictvarborbt['posicompgridprim'][gdat.indxtimesegmfade[ou], j, 0], \
                                       gdat.dictvarborbt['posicompgridprim'][gdat.indxtimesegmfade[ou], j, 1], alpha=gdat.listalphline[j][ou], \
                                                                                                                                             ls='-', color=gdat.listcolrcomp[j])
@@ -1723,6 +1715,22 @@ def eval_modl( \
                         gdat.resoplan = 0.1
                 
                 gdat.diffgridstar = 1e-3
+                
+                if gdat.booldiag:
+                    if len(gdat.rratcomp) == 0:
+                        print('')
+                        print('')
+                        print('')
+                        print('gdat.typesyst')
+                        print(gdat.typesyst)
+                        print('gdat.rratcomp')
+                        print(gdat.rratcomp)
+                        print('gdat.tolerrat')
+                        print(gdat.tolerrat)
+                        print('gdat.rratcomp > gdat.tolerrat')
+                        print(gdat.rratcomp > gdat.tolerrat)
+                        raise Exception('len(gdat.rratcomp) == 0')
+
                 gdat.diffgridcomp = min(0.02, gdat.resoplan * np.amin(gdat.rratcomp[gdat.rratcomp > gdat.tolerrat]))
             
             if gdat.booldiag:
@@ -2344,17 +2352,8 @@ def eval_modl( \
         for j in gdat.indxcomp:
             for ou in gdat.indxsegmfade:
                 gdat.listalphline[j][ou] = np.mean(gdat.dictvarborbt['anomtrue'][gdat.indxtimesegmfade[ou], j])
-                print('gdat.indxtimesegmfade[ou]')
-                summgene(gdat.indxtimesegmfade[ou])
-                print('gdat.listalphline[j][ou]')
-                summgene(gdat.listalphline[j][ou])
             gdat.listalphline[j] -= np.amin(gdat.listalphline[j])
             gdat.listalphline[j] /= np.amax(gdat.listalphline[j])
-            
-            print('gdat.listalphline[j]')
-            print(gdat.listalphline[j])
-            
-            #raise Exception('')
             
             #for t in gdat.indxtime:
             #    gdat.listsegm[j].append([gdat.dictvarborbt['posicompgridprim'][t, j, 0], gdat.dictvarborbt['posicompgridprim'][t, j, 1]])
