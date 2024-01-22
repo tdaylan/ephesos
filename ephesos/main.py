@@ -164,14 +164,14 @@ def retr_pathanimfram(gdat, namevarbanim, t, boolimaglfov):
     pathbaseanimfram = retr_pathbaseanimfram(gdat, namevarbanim)
     
     if boolimaglfov:
-        path = pathbaseanimfram + '_ImageLargeFOV%04d.%s' % (t, gdat.typefileplot)
+        path = pathbaseanimfram + '_DiagramLargeFOV%04d.%s' % (t, gdat.typefileplot)
     else:
         path = pathbaseanimfram + '_Frame%04d.%s' % (t, gdat.typefileplot)
     
     return path
    
    
-def make_imag(gdat, t, typecoor, typecolr='real', typemrkr='none', j=None, boolimaglfov=False):
+def make_imag(gdat, t, typecolr='real', typemrkr='none', j=None):
     
     if gdat.booldiag:
         if j is None and typecoor == 'comp':
@@ -2198,7 +2198,7 @@ def eval_modl( \
                         objttemp = range(gdat.numbtime)
                     
                     for t in objttemp:
-                        proc_time(gdat, t, gdat.typecoor)
+                        proc_time(gdat, t)
 
                 if gdat.boolmakeanim:
                     
@@ -2362,11 +2362,10 @@ def eval_modl( \
             #for t in gdat.indxtime:
             #    gdat.listsegm[j].append([gdat.dictvarborbt['posicompgridprim'][t, j, 0], gdat.dictvarborbt['posicompgridprim'][t, j, 1]])
 
-        for t in indxtimeimaglfov:
-            
-            make_imag(gdat, t, 'star', typecolr=gdat.typecolrimaglfov, typemrkr='none', boolimaglfov=True)
-            make_imag(gdat, t, 'star', typecolr=gdat.typecolrimaglfov, typemrkr='tail', boolimaglfov=True)
-            make_imag(gdat, t, 'star', typecolr=gdat.typecolrimaglfov, typemrkr='taillabl', boolimaglfov=True)
+        #for t in indxtimeimaglfov:
+        #    make_diag(gdat, t, typecolr=gdat.typecolrimaglfov, typemrkr='none')
+        #    make_diag(gdat, t, typecolr=gdat.typecolrimaglfov, typemrkr='tail')
+        #    make_diag(gdat, t, typecolr=gdat.typecolrimaglfov, typemrkr='taillabl')
     
     
     if not gdat.boolcalcdistcomp:
@@ -2537,7 +2536,7 @@ def eval_modl( \
     return dictefes
 
 
-def proc_time(gdat, t, typecoor):
+def proc_time(gdat, t):
     
     if gdat.boolproftime:
         timeinit = timemodu.time()
@@ -2617,7 +2616,7 @@ def proc_time(gdat, t, typecoor):
             gdat.lumisyst[t] = retr_lumistartran(gdat, typecoor, gdat.boolgridstarlght)
         
     if gdat.boolmakeanim:
-        make_imag(gdat, t, typecoor)
+        make_imag(gdat, t)
    
     if gdat.boolproftime:
         timeexec = timemodu.time() - timeinit
