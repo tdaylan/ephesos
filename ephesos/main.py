@@ -111,8 +111,6 @@ def retr_lumistartran(gdat, typecoor, boolrofi):
     indxgridrofi = np.where(boolrofi)
     lumistartran = retr_lumistartranrofi(gdat, typecoor, indxgridrofi)
     
-    print('lumistartran')
-    summgene(lumistartran)
     lumistartran = np.sum(lumistartran)
 
     return lumistartran
