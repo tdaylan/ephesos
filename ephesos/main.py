@@ -171,6 +171,9 @@ def retr_pathanimfram(gdat, namevarbanim, t, boolimaglfov):
    
 def make_imag(gdat, t, typecolr='real', typemrkr='none', j=None):
     
+    # temp (boolimaglfov will probably be deleted)
+    boolimaglfov = False
+
     if gdat.booldiag:
         if j is None and typecoor == 'comp':
             raise Exception('')
