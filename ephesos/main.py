@@ -1655,12 +1655,12 @@ def eval_modl( \
             raise Exception('gdat.rratcomp is empty.')
     
     if typecalc == 'simpboxx':
-        
         for j in gdat.indxcomp:
             indxtimetran = np.where((gdat.phascomp[j] < gdat.duratrantotl[j] / gdat.pericomp[j]) | (gdat.phascomp[j] > 1. -  gdat.duratrantotl[j] / gdat.pericomp[j]))[0]
             rflxtranmodl = np.ones_like(gdat.phascomp)
             rflxtranmodl[indxtimetran] -= gdat.rratcomp**2
-    
+    elif len(rratcomp) == 0:
+        pass
     else:
         
         if not gdat.boolcalcdistcomp:
@@ -2091,7 +2091,7 @@ def eval_modl( \
                         
                     else:
                         phasingr = gdat.phastrantotl / 2.
-                        deltphasineghalf = 0.
+                        deltphasineghalf = np.zeros(gdat.numbcomp)
                     
                     print('phasingr')
                     print(phasingr)
