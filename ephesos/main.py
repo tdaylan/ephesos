@@ -2237,18 +2237,28 @@ def eval_modl( \
                                 diff = gdat.lumistarnocc - intptemp
                                 gdat.lumisyst[indxphaseval] -= diff
 
+                                if gdat.booldiag:
+                                    if not gdat.boolcalcdistcomp:
+                                        if not np.isfinite(gdat.lumisyst).all() or (gdat.lumisyst < 0).any():
+                                            print('')
+                                            print('')
+                                            print('')
+                                            print('gdat.lumisyst')
+                                            summgene(gdat.lumisyst)
+                                            raise Exception('')
+    
                     else:
                         gdat.lumisyst = np.full_like(gdat.phascomp[j], gdat.lumistarnocc)
         
-    if gdat.booldiag:
-        if not gdat.boolcalcdistcomp:
-            if not np.isfinite(gdat.lumisyst).all() or (gdat.lumisyst < 0).any():
-                print('')
-                print('')
-                print('')
-                print('gdat.lumisyst')
-                summgene(gdat.lumisyst)
-                raise Exception('')
+        if gdat.booldiag:
+            if not gdat.boolcalcdistcomp:
+                if not np.isfinite(gdat.lumisyst).all() or (gdat.lumisyst < 0).any():
+                    print('')
+                    print('')
+                    print('')
+                    print('gdat.lumisyst')
+                    summgene(gdat.lumisyst)
+                    raise Exception('')
     
     # planet-planet crossings
     if gdat.boolcalcdistcomp:
