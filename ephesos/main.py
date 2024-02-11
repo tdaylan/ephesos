@@ -189,9 +189,7 @@ def make_imag(gdat, t, typecolr='real', typemrkr='none', j=None):
         #    continue
         
         boolexst = os.path.exists(gdat.pathgiff[namevarbanim])
-        if boolexst:
-            print('Skipping the animation. File found at %s...' % gdat.pathgiff[namevarbanim])
-        else:
+        if not boolexst:
             
             path = retr_pathanimfram(gdat, namevarbanim, t, boolimaglfov, j)
             
@@ -248,11 +246,11 @@ def make_imag(gdat, t, typecolr='real', typemrkr='none', j=None):
                             print(gdat.typesyst)
                             raise Exception('Could not define brgttemp.')
                     else:
-                        if typecoor == 'comp':
+                        if gdat.typecoor == 'comp':
                             # primary brightness in the companion grid
                             brgttemp = np.zeros_like(gdat.xposgridcomp[j])
                             
-                        if typecoor == 'star':
+                        if gdat.typecoor == 'star':
                             brgttemp = gdat.brgtprimgridprim
 
                     cmap = 'magma'
@@ -462,16 +460,6 @@ def retr_brgtlens(gdat, t):
     return flux
 
 
-#def funcanom(anommean, anomecce, ecce):
-#    '''
-#    g(E) as defined in Eq 42 in Murray and Correia in Exoplanets (ed Sara Seager)
-#    '''
-#
-#    funcanom = anomecce - ecce * np.sin(anomecce) - anommean
-#    
-#    return funcanom
-
-
 def funcanomderi(anomecce, ecce):
     '''
     Derivative of g(E) as defined in Eq 42 in Murray and Correia in Exoplanets (ed Sara Seager)
@@ -543,23 +531,34 @@ def retr_posifromphas_efes(gdat, j, t, phas):
 
     # find the position in the observer's frame (x, y, z) by performing three Euler rotations about Z, X, and Z axis on the position in the original frame (x_0, y_0, 0)
     # where the three rotations correspond to the the three orbital elements: argument of periapse (arpacomp), inclination (inclcomp), and longitude of the ascending node (loancomp)
-    xpos = dist * (np.cos(gdat.loancomp[j]) * np.cos(gdat.arpacomp[j] + anomtrue) - \
-                   np.sin(gdat.loancomp[j]) * np.sin(gdat.arpacomp[j] + anomtrue) * np.cos(np.pi / 180. * gdat.inclcomp[j]))
-    ypos = dist * (np.sin(gdat.loancomp[j]) * np.cos(gdat.arpacomp[j] + anomtrue) + \
-                   np.cos(gdat.loancomp[j]) * np.sin(gdat.arpacomp[j] + anomtrue) * np.cos(np.pi / 180. * gdat.inclcomp[j]))
-    zpos = dist * np.sin(gdat.arpacomp[j] + anomtrue) * np.sin(np.pi / 180. * gdat.inclcomp[j])
+    xpos = dist * (np.cos(gdat.loancomp[j]) * np.cos(gdat.arpacomp[j] + anomtrue + np.pi / 2) - \
+                   np.sin(gdat.loancomp[j]) * np.sin(gdat.arpacomp[j] + anomtrue + np.pi / 2) * np.cos(np.pi / 180. * gdat.inclcomp[j]))
+    ypos = dist * (np.sin(gdat.loancomp[j]) * np.cos(gdat.arpacomp[j] + anomtrue + np.pi / 2) + \
+                   np.cos(gdat.loancomp[j]) * np.sin(gdat.arpacomp[j] + anomtrue + np.pi / 2) * np.cos(np.pi / 180. * gdat.inclcomp[j]))
+    zpos = dist * np.sin(gdat.arpacomp[j] + anomtrue + np.pi / 2) * np.sin(np.pi / 180. * gdat.inclcomp[j])
     
     if gdat.booldiag:
         if not np.isfinite(xpos) or not np.isfinite(ypos) or not np.isfinite(zpos):
             print('')
             print('')
-            print('')
+            print('gdat.listphaseval[j][t]')
+            print(gdat.listphaseval[j][t])
+            print('phas')
+            print(phas)
+            print('gdat.eccecomp[j]')
+            print(gdat.eccecomp[j])
+            print('gdat.smaxcomp[j]')
+            print(gdat.smaxcomp[j])
+            print('gdat.loancomp[j]')
+            print(gdat.loancomp[j])
             print('anommean')
             print(anommean)
             print('anomecce')
             print(anomecce)
             print('anomtrue')
             print(anomtrue)
+            print('dist')
+            print(dist)
             print('gdat.arpacomp')
             print(gdat.arpacomp)
             print('gdat.inclcomp')
@@ -1141,7 +1140,7 @@ def eval_modl( \
     gdat.indxcomp = np.arange(gdat.numbcomp)
     
     if gdat.loancomp is None:
-        gdat.loancomp = np.zeros(gdat.numbcomp)
+        gdat.loancomp = np.full(gdat.numbcomp, fill_value=np.pi)
     
     if gdat.arpacomp is None:
         gdat.arpacomp = np.zeros(gdat.numbcomp)
@@ -1674,7 +1673,7 @@ def eval_modl( \
                 rflxtranmodl = np.ones_like(gdat.phascomp)
                 rflxtranmodl[indxtimetran] -= gdat.rratcomp**2
         elif len(rratcomp) == 0:
-            gdat.lumisyst = np.ones(gdat.numbtime)
+            rflxtranmodl = np.ones(gdat.numbtime)
         else:
             
             if gdat.boolmakeanim:
@@ -2108,17 +2107,17 @@ def eval_modl( \
                             phasingr = gdat.phastrantotl / 2.
                             deltphasineghalf = np.zeros(gdat.numbcomp)
                         
-                        print('phasingr')
-                        print(phasingr)
-                        print('deltphasineghalf')
-                        print(deltphasineghalf)
+                        # before ingress
                         gdat.listphaseval[j] = [np.arange(-0.25, -phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur)]
                         
+                        # ingress
                         if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                             gdat.listphaseval[j].append(np.arange(-phasingr[j] - deltphasineghalf[j], -phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
-
+                        
+                        # in transit, after ingress
                         gdat.listphaseval[j].append(np.arange(-phasingr[j] + deltphasineghalf[j], phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
-                                                       
+                        
+                        # 
                         if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
                             gdat.listphaseval[j].append(np.arange(phasingr[j] - deltphasineghalf[j], phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                         
@@ -2178,22 +2177,26 @@ def eval_modl( \
                             print(cmnd)
                             os.system(cmnd)
                     
+                    print('gdat.boolintp')
+                    print(gdat.boolintp)
                     # evaluate the brightness as a interpolate 
                     if gdat.boolintp:
                         
-                        if gdat.booltqdm:
-                            objttemp = tqdm(range(gdat.numbphaseval[j]))
-                        else:
-                            objttemp = range(gdat.numbphaseval[j])
+                        for j in gdat.indxcomp:
                             
-                        for t in range(gdat.listphaseval[j].size):
-                            for j in gdat.indxcomp:
-                                if not np.isfinite(gdat.duratrantotl[j]) or gdat.duratrantotl[j] == 0.:
-                                    continue
-                             
-                                if gdat.boolsystpsys and gdat.rratcomp[j] < gdat.tolerrat:
-                                    continue
+                            if not np.isfinite(gdat.duratrantotl[j]) or gdat.duratrantotl[j] == 0.:
+                                continue
                             
+                            if gdat.boolsystpsys and gdat.rratcomp[j] < gdat.tolerrat:
+                                continue
+                            
+                            if gdat.booltqdm:
+                                objttemp = tqdm(range(gdat.numbphaseval[j]))
+                            else:
+                                objttemp = range(gdat.numbphaseval[j])
+                            
+                            for t in objttemp:
+                                
                                 proc_phaseval(gdat, j, t)
                                 
                                 if gdat.boolmakeanim:
@@ -2269,73 +2272,79 @@ def eval_modl( \
                     summgene(gdat.lumisyst)
                     raise Exception('')
     
-        # normalize the light curve
-        if typenorm != 'none':
-            
-            if gdat.booldiag:
-                if gdat.typesyst == 'CompactObjectStellarCompanion':
-                    if (gdat.lumisyst / gdat.lumistarnocc < 1. - 1e-6).any():
-                        print('Warning! Flux decreased in a self-lensing light curve.')
-                        print('gdat.lumisyst')
-                        print(gdat.lumisyst)
-                        #raise Exception('')
+            # normalize the light curve
+            if typenorm != 'none':
+                
+                if gdat.booldiag:
+                    if gdat.typesyst == 'CompactObjectStellarCompanion':
+                        if (gdat.lumisyst / gdat.lumistarnocc < 1. - 1e-6).any():
+                            print('Warning! Flux decreased in a self-lensing light curve.')
+                            print('gdat.lumisyst')
+                            print(gdat.lumisyst)
+                            #raise Exception('')
 
-            if gdat.typeverb > 1:
-                if gdat.typesyst == 'CompactObjectStellarCompanion':
+                if gdat.typeverb > 1:
+                    if gdat.typesyst == 'CompactObjectStellarCompanion':
+                        print('gdat.lumisyst')
+                        summgene(gdat.lumisyst)
+                    print('Normalizing the light curve...')
+                
+                if typenorm == 'medi':
+                    fact = np.median(gdat.lumisyst)
+                elif typenorm == 'nocc':
+                    
+                    print('gdat.numbcomp')
+                    print(gdat.numbcomp)
+                    print('rratcomp')
+                    print(rratcomp)
+
+                    fact = gdat.lumistarnocc
+                elif typenorm == 'maxm':
+                    fact = np.amax(gdat.lumisyst)
+                elif typenorm == 'edgeleft':
+                    fact = gdat.lumisyst[0]
+                rflxtranmodl = gdat.lumisyst / fact
+                
+                if gdat.booldiag:
+                    if fact == 0.:
+                        print('typenorm')
+                        print(typenorm)
+                        print('')
+                        for j in gdat.indxcomp:
+                            print('gdat.lumisysteval[j]')
+                            summgene(gdat.lumisysteval[j])
+                        print('Normalization involved division by 0.')
+                        print('gdat.lumisyst')
+                        summgene(gdat.lumisyst)
+                        raise Exception('')
+                    if gdat.typesyst == 'CompactObjectStellarCompanion':
+                        if (rflxtranmodl < 0.9).any():
+                            raise Exception('')
+
+                #if (rflxtranmodl > 1e2).any():
+                #    raise Exception('')
+
+            if gdat.booldiag:
+                if gdat.boolsystpsys and gdat.typesyst != 'PlanetarySystemWithPhaseCurve' and np.amax(gdat.lumisyst) > gdat.lumistarnocc * (1. + 1e-6):
+                    print('')
+                    print('')
+                    print('')
+                    print('gdat.typesyst')
+                    print(gdat.typesyst)
+                    print('gdat.typelmdk')
+                    print(gdat.typelmdk)
+                    print('gdat.coeflmdk')
+                    print(gdat.coeflmdk)
                     print('gdat.lumisyst')
                     summgene(gdat.lumisyst)
-                print('Normalizing the light curve...')
+                    print('gdat.lumistarnocc')
+                    print(gdat.lumistarnocc)
+                    raise Exception('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.lumisyst) > gdat.lumistarnocc * (1. + 1e-6)')
             
-            if typenorm == 'medi':
-                fact = np.median(gdat.lumisyst)
-            elif typenorm == 'nocc':
-                fact = gdat.lumistarnocc
-            elif typenorm == 'maxm':
-                fact = np.amax(gdat.lumisyst)
-            elif typenorm == 'edgeleft':
-                fact = gdat.lumisyst[0]
-            rflxtranmodl = gdat.lumisyst / fact
-            
-            if gdat.booldiag:
-                if fact == 0.:
-                    print('typenorm')
-                    print(typenorm)
-                    print('')
-                    for j in gdat.indxcomp:
-                        print('gdat.lumisysteval[j]')
-                        summgene(gdat.lumisysteval[j])
-                    print('Normalization involved division by 0.')
+                if False and np.amax(rflxtranmodl) > 1e6:
                     print('gdat.lumisyst')
                     summgene(gdat.lumisyst)
                     raise Exception('')
-                if gdat.typesyst == 'CompactObjectStellarCompanion':
-                    if (rflxtranmodl < 0.9).any():
-                        raise Exception('')
-
-            #if (rflxtranmodl > 1e2).any():
-            #    raise Exception('')
-
-        if gdat.booldiag:
-            if gdat.boolsystpsys and gdat.typesyst != 'PlanetarySystemWithPhaseCurve' and np.amax(gdat.lumisyst) > gdat.lumistarnocc * (1. + 1e-6):
-                print('')
-                print('')
-                print('')
-                print('gdat.typesyst')
-                print(gdat.typesyst)
-                print('gdat.typelmdk')
-                print(gdat.typelmdk)
-                print('gdat.coeflmdk')
-                print(gdat.coeflmdk)
-                print('gdat.lumisyst')
-                summgene(gdat.lumisyst)
-                print('gdat.lumistarnocc')
-                print(gdat.lumistarnocc)
-                raise Exception('gdat.boolsystpsys and gdat.typesyst != psyspcur and np.amax(gdat.lumisyst) > gdat.lumistarnocc * (1. + 1e-6)')
-        
-            if False and np.amax(rflxtranmodl) > 1e6:
-                print('gdat.lumisyst')
-                summgene(gdat.lumisyst)
-                raise Exception('')
 
         dictefes['rflx'] = rflxtranmodl
         
@@ -2382,8 +2391,17 @@ def eval_modl( \
             print(gdat.pericomp)
             print('gdat.rratcomp')
             print(gdat.rratcomp)
+            print('gdat.rsmacomp')
+            print(gdat.rsmacomp)
+            print('gdat.cosicomp')
+            print(gdat.cosicomp)
+            print('gdat.duratrantotl')
+            print(gdat.duratrantotl)
             print('gdat.time')
             summgene(gdat.time)
+            for j in gdat.indxcomp:
+                print('gdat.lumisysteval[j]')
+                summgene(gdat.lumisysteval[j])
             print('(dictefes[rflx]')
             summgene(dictefes['rflx'])
             raise Exception('')
@@ -2757,8 +2775,7 @@ def plot_tser_dictefes( \
     #    else:
     #        dictmodl['eval']['labl'] = '%s' % (dictlistvalubatc[namebatc]['vari'][nameparavari][k])
     
-    #listcolr = ['g', 'b', 'firebrick', 'orange', 'olive']
-    #dictmodl['eval']['colr'] = listcolr[k]
+    listcolr = np.array(['g', 'b', 'firebrick', 'orange', 'olive'])
 
     duratrantotl = nicomedia.retr_duratrantotl(dictefes['pericomp'], dictefes['rsmacomp'], dictefes['cosicomp']) / 24. # [days]
     
@@ -2796,9 +2813,8 @@ def plot_tser_dictefes( \
         
         dictmodl['eval']['tser'] = 1e6 * (dictefes['rflx'][:, e] - 1)
         
-        print('dictmodl[eval][se]')
-        summgene(dictmodl['eval']['tser'])
-
+        dictmodl['eval']['colr'] = 'b'
+        
         # time-series
         strgextn = '%s%s' % (strgextnbase, strgener)
         pathplot = miletos.plot_tser(pathvisu, \
