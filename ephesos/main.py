@@ -51,7 +51,7 @@ def retr_listtypesyst():
     return listtypesyst
 
 
-def retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp'):
+def retr_boolgridouts(gdat, j, typecoor, typeoccu='comp'):
     '''
     Return a grid of Booleans on either grid indicating which prid points are not occulted by the companion or the primary
     typeoccu == 'comp' returns the Booleans outside the companion
@@ -81,6 +81,7 @@ def retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp'):
                 
         if typeoccu == 'star':
             if typecoor == 'comp':
+                # distance to the primary in the grid of the companion j
                 boolnocccomp = gdat.distfromprimgridcomp[j] > 1.
             else:
                 raise Exception('')
@@ -104,26 +105,26 @@ def retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp'):
     return boolnocccomp
 
 
-def retr_lumistartran(gdat, typecoor, boolrofi):
+def retr_lumistartran(gdat, typecoor, boolrofi, j=None):
     '''
     Calculate the total flux of a star on the grid
     '''
     indxgridrofi = np.where(boolrofi)
-    lumistartran = retr_lumistartranrofi(gdat, typecoor, indxgridrofi)
+    lumistartran = retr_lumistartranrofi(gdat, typecoor, indxgridrofi, j)
     
     lumistartran = np.sum(lumistartran)
 
     return lumistartran
 
 
-def retr_lumistartranrofi(gdat, typecoor, indxgridrofi=None):
+def retr_lumistartranrofi(gdat, typecoor, indxgridrofi, j=None):
     '''
     Calculate the relative flux from a brightness map
     '''
     
     if typecoor == 'comp' or typecoor == 'sour':
         if typecoor == 'comp':
-            dist = gdat.diststargridcomp
+            dist = gdat.distfromprimgridcomp[j]
             areapixl = gdat.areapixlcomp
         if typecoor == 'sour':
             dist = gdat.diststargridsour
@@ -401,8 +402,8 @@ def calc_brgtprimgridcomp(gdat, j, t):
         ## when the companion is behind the primary
         gdat.indxgridcompprimnocc = np.where(gdat.boolgridcompinsdprim)
     
-    cosg = np.sqrt(1. - gdat.diststargridcomp[gdat.indxgridcompprimnocc]**2)
-    brgtprim = np.zeros_like(gdat.diststargridcomp)
+    cosg = np.sqrt(1. - gdat.distfromprimgridcomp[j][gdat.indxgridcompprimnocc]**2)
+    brgtprim = np.zeros_like(gdat.distfromprimgridcomp[j])
     brgtprim[gdat.indxgridcompprimnocc] = nicomedia.retr_brgtlmdk(cosg, gdat.coeflmdk, typelmdk=gdat.typelmdk) * gdat.areapixlstar
     
     return brgtprim
@@ -480,7 +481,7 @@ def func_anom(anommean, anomecce, ecce):
     return funcanom
 
 
-def retr_anomdist(phas, smax, ecce):
+def retr_anomdist(phas, smax, ecce, booldiag=False):
     '''
     Calculate the mean, eccentric, true anomaly, and distance-to-planet from phase, orbits's semi-major axis and eccentricity
     '''
@@ -490,11 +491,12 @@ def retr_anomdist(phas, smax, ecce):
     # Mean anomaly
     anommean = 2. * np.pi * phas
   
-
     # eccentric anomaly
     anomecce = anommean
     errr = abs(func_anom(anommean, anomecce, ecce))
-    while errr > 1e-6:
+    
+    # temp -- this part is not well tested because it is not entering the while loop
+    while errr > 1e-10:
         funcanom = func_anom(anommean, anomecce, ecce)
         funcanomderi = funcanomderi(anomecce, ecce)
         
@@ -503,17 +505,39 @@ def retr_anomdist(phas, smax, ecce):
         
         # g(E) at the trial eccentric anomaly
         errr = abs(func_anom(anommean, anomecce, ecce))
-
+        
     # distance from the  star
     dist = smax * (1. - ecce * np.cos(anomecce))
     
     # true anomaly
-    anomtrue = np.arccos((np.cos(anomecce) - ecce) / (1. - ecce * np.cos(anomecce)))
+    anomtrueinit = np.arccos((np.cos(anomecce) - ecce) / (1. - ecce * np.cos(anomecce)))
     if anomecce > np.pi:
-        anomtrue += (np.pi - anomtrue)
+        anomtrue = anomtrueinit + 2. * abs(np.pi - anomtrueinit)
     elif anomecce < 0.:
-        anomtrue *= -1.
-    
+        anomtrue = -anomtrueinit
+    else:
+        anomtrue = anomtrueinit
+
+    if booldiag:
+        if ecce < 0.01:
+            if abs(2. * np.pi * phas - anomtrue) > 0.01:
+                print('')
+                print('')
+                print('')
+                print('ecce')
+                print(ecce)
+                print('phas')
+                print(phas)
+                print('anommean')
+                print(anommean)
+                print('anomecce')
+                print(anomecce)
+                print('anomtrueinit')
+                print(anomtrueinit)
+                print('anomtrue')
+                print(anomtrue)
+                raise Exception('anomtrue calculation is anomalous.')
+
     return anommean, anomecce, anomtrue, dist
 
 
@@ -522,7 +546,7 @@ def retr_posifromphas_efes(gdat, j, t, phas):
     Calculate body positions from phase
     '''
     
-    anommean, anomecce, anomtrue, dist = retr_anomdist(phas, gdat.smaxcomp[j], gdat.eccecomp[j])
+    anommean, anomecce, anomtrue, dist = retr_anomdist(phas, gdat.smaxcomp[j], gdat.eccecomp[j], booldiag=gdat.booldiag)
     
     # initial position in a frame where the the orbit lies in the x-y plane and the semi-major axis is aligned with the x-axis
     xposinit = dist * np.cos(anomtrue)
@@ -531,6 +555,7 @@ def retr_posifromphas_efes(gdat, j, t, phas):
 
     # find the position in the observer's frame (x, y, z) by performing three Euler rotations about Z, X, and Z axis on the position in the original frame (x_0, y_0, 0)
     # where the three rotations correspond to the the three orbital elements: argument of periapse (arpacomp), inclination (inclcomp), and longitude of the ascending node (loancomp)
+    # pi / 2 terms shift the definition of anomtrue by 90 degrees to bring true anomy == 0 (and phase == 0) to inferior conjunction
     xpos = dist * (np.cos(gdat.loancomp[j]) * np.cos(gdat.arpacomp[j] + anomtrue + np.pi / 2) - \
                    np.sin(gdat.loancomp[j]) * np.sin(gdat.arpacomp[j] + anomtrue + np.pi / 2) * np.cos(np.pi / 180. * gdat.inclcomp[j]))
     ypos = dist * (np.sin(gdat.loancomp[j]) * np.cos(gdat.arpacomp[j] + anomtrue + np.pi / 2) + \
@@ -539,6 +564,7 @@ def retr_posifromphas_efes(gdat, j, t, phas):
     
     if gdat.booldiag:
         if not np.isfinite(xpos) or not np.isfinite(ypos) or not np.isfinite(zpos):
+            print('')
             print('')
             print('')
             print('gdat.listphaseval[j][t]')
@@ -639,21 +665,21 @@ def proc_phaseval(gdat, j, t):
     if gdat.boolevalflux:
         
         # distance to the primary in the grid of the companion j
-        gdat.diststargridcomp = np.sqrt(((gdat.xposgridcomp[j] - gdat.xposstargridcomp[j]))**2 + \
-                                        ((gdat.yposgridcomp[j] - gdat.yposstargridcomp[j]))**2)
+        gdat.distfromprimgridcomp[j] = np.sqrt((gdat.xposgridcomp[j] - gdat.xposstargridcomp[j])**2 + \
+                                        (gdat.yposgridcomp[j] - gdat.yposstargridcomp[j])**2)
         
-        # Booleans indicating whether the points in the grid of the companion j, are within the primary
-        gdat.boolgridcompinsdprim = gdat.diststargridcomp < 1.
+        # Booleans indicating whether the points in the grid of the companion j, are inside the primary
+        gdat.boolgridcompinsdprim = gdat.distfromprimgridcomp[j] < 1.
         
         if gdat.boolsystpsys:
             
             if abs(gdat.listphaseval[j][t]) < 0.25 or (gdat.boolmakeimaglfov or gdat.boolmakeanim):
                 
-                # Booleans indicating whether companion grid points are within the star and occulted
+                # Booleans indicating whether companion grid points are inside the star and occulted
                 gdat.boolgridcompstaroccu = gdat.boolgridcompinsdprim & gdat.boolgridcompinsdcomp[j]
                 
                 # stellar flux occulted
-                deltlumi = -retr_lumistartran(gdat, 'comp', gdat.boolgridcompstaroccu)
+                deltlumi = -retr_lumistartran(gdat, 'comp', gdat.boolgridcompstaroccu, j)
                 
                 if gdat.booldiag:
                     if gdat.typesyst == 'PlanetarySystem':
@@ -668,15 +694,13 @@ def proc_phaseval(gdat, j, t):
                 
         # brightness of the companion
         if gdat.typebrgtcomp != 'dark':
+            
             if abs(gdat.listphaseval[j][t]) < 0.25:
                 gdat.indxplannoccgridcomp[j] = gdat.indxplangridcomp[j]
             else:
-                
-                # distance to the star from the companion grid
-                gdat.distfromprimgridcomp[j] = np.sqrt((gdat.xposgridcomp[j] - gdat.xposstargridcomp[j])**2 + (gdat.yposgridcomp[j] - gdat.yposstargridcomp)**2)
 
                 # Booleans indicating the region outside the star in the companion grid
-                gdat.booloutsstargridcomp = retr_boolgridnocc(gdat, j, 'comp', typeoccu='star')
+                gdat.booloutsstargridcomp = retr_boolgridouts(gdat, j, 'comp', typeoccu='star')
                 
                 # Booleans indicating the planetary region region outside the star in the companion grid
                 gdat.boolplannoccgridcomp = gdat.booloutsstargridcomp & gdat.boolplangridcomp[j]
@@ -737,7 +761,7 @@ def proc_phaseval(gdat, j, t):
             # distance from the points in the source grid to the star
             gdat.diststargridsour = np.sqrt((gdat.xposgridsour - gdat.xposstargridcomp[j])**2 + (gdat.yposgridsour - gdat.yposstargridcomp[j])**2)
             
-            # Booleans indicating whether source grid points are within the star
+            # Booleans indicating whether source grid points are inside the star
             gdat.boolstargridsour = gdat.diststargridsour < 1.
             
             if gdat.booldiag:
@@ -756,15 +780,12 @@ def proc_phaseval(gdat, j, t):
 
             gdat.indxgridsourstar = np.where(gdat.boolstargridsour)
                 
-            # distance from the points in the companion grid to the star
-            gdat.diststargridcomp = np.sqrt((gdat.xposgridcomp[j] - gdat.xposstargridcomp[j])**2 + (gdat.yposgridcomp[j] - gdat.yposstargridcomp[j])**2)
-            
-            # calculate the lensed brightness within the companion grid
+            # calculate the lensed brightness inside the companion grid
             gdat.brgtlens = retr_brgtlens(gdat, t)
             
-            # calculate the brightness within the companion grid
+            # calculate the brightness inside the companion grid
             gdat.indxgridcompinsdprim = np.where(gdat.boolgridcompinsdprim)
-            gdat.lumistarplan = np.sum(retr_lumistartran(gdat, 'comp', gdat.indxgridcompinsdprim))
+            gdat.lumistarplan = np.sum(retr_lumistartran(gdat, 'comp', gdat.indxgridcompinsdprim, j))
             
             print('gdat.lumistarplan')
             print(gdat.lumistarplan)
@@ -1656,6 +1677,7 @@ def eval_modl( \
         gdat.distfromcompgridstar = [[] for j in gdat.indxcomp]
     
     if gdat.typecoor == 'comp':
+        # distance to the primary in the grid of the companion j
         gdat.distfromprimgridcomp = [[] for j in gdat.indxcomp]
     
     gdat.phascomp = [[] for j in gdat.indxcomp]
@@ -1965,7 +1987,7 @@ def eval_modl( \
 
                     if gdat.boolsystpsys:
                         
-                        gdat.boolgridcompoutscomp[j] = retr_boolgridnocc(gdat, j, gdat.typecoor, typeoccu='comp')
+                        gdat.boolgridcompoutscomp[j] = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
                     
                         if gdat.booldiag:
                             if gdat.boolgridcompoutscomp[j].ndim != 2:
@@ -2045,10 +2067,10 @@ def eval_modl( \
             # distance to the star in the star grid
             gdat.distgridstar = np.sqrt(gdat.xposgridstar**2 + gdat.yposgridstar**2)
             
-            # Booleans indicating whether star grid points are within the star
+            # Booleans indicating whether star grid points are inside the star
             gdat.boolgridstarinsdstar = gdat.distgridstar < 1.
             
-            # indices of the star grid points within the star
+            # indices of the star grid points inside the star
             gdat.indxgridstarstar = np.where(gdat.boolgridstarinsdstar)
             
             # stellar brightness in the star grid
@@ -2694,17 +2716,17 @@ def proc_time(gdat, t):
                 if gdat.boolevalflux:
                     
                     if typecoor == 'comp':
-                        gdat.boolgridcompoutscomp = retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp')
+                        gdat.boolgridcompoutscomp = retr_boolgridouts(gdat, j, typecoor, typeoccu='comp')
                         gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
                     elif typecoor == 'star':
-                        gdat.boolgridstaroutscomp = retr_boolgridnocc(gdat, j, typecoor, typeoccu='comp')
+                        gdat.boolgridstaroutscomp = retr_boolgridouts(gdat, j, typecoor, typeoccu='comp')
                         gdat.boolgridstarlght = gdat.boolgridstarlght & gdat.boolgridstaroutscomp
                     else:
                         raise Exception('')
             
     if gdat.boolevalflux:
         if typecoor == 'comp':
-            gdat.lumisyst[t] = retr_lumistartran(gdat, typecoor, gdat.boolgridcomplght)
+            gdat.lumisyst[t] = retr_lumistartran(gdat, typecoor, gdat.boolgridcomplght, j)
         elif typecoor == 'star':
             gdat.lumisyst[t] = retr_lumistartran(gdat, typecoor, gdat.boolgridstarlght)
         
@@ -2833,8 +2855,6 @@ def plot_tser_dictefes( \
     #    if namevarbtotl != nameparavari or dictlistvalubatc[namebatc]['vari'][nameparavari].size == 1:
     #        dictstrgtitl[namevarbtotl] = dictefes[namevarbtotl]
     #strgtitl = retr_strgtitl(dictstrgtitl, dictefes, listnamevarbcomp, dictlabl)
-    #lablxaxi = 'Time from mid-transit [hours]'
-    lablxaxi = 'Time [%s]' % lablunittime
     lablyaxi = 'Relative flux - 1 [ppm]'
     
     if strgextninpt is None or strgextninpt == '':
@@ -2868,7 +2888,6 @@ def plot_tser_dictefes( \
                                      #listxdatvert=listxdatvert, \
                                     
                                      strgextn=strgextn, \
-                                     lablxaxi=lablxaxi, \
                                      lablyaxi=lablyaxi, \
                                      strgtitl=strgtitl, \
                                      #typesigncode='ephesos', \
@@ -2878,86 +2897,82 @@ def plot_tser_dictefes( \
             for j in indxcomp:
                 strgextnbasecomp = '%s%s_com%d' % (strgextnbase, strgener, j)
                 
-                epoc = dictefes['epocmtracomp'][j]
+                epocmtra = dictefes['epocmtracomp'][j]
                 peri = dictefes['pericomp'][j]
+                duratrantotl = dictefes['duratrantotl'][j]
                 
-                # phase curve
-                strgextn = '%s_pcur' % (strgextnbasecomp)
+                # horizontal zoom around the primary
+                strgextn = '%s_prim' % (strgextnbasecomp)
+                limtxaxi = np.array([-duratrantotl, duratrantotl])
                 pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              boolfold=True, \
                                              typefileplot=typefileplot, \
                                              #listxdatvert=listxdatvert, \
                                              strgextn=strgextn, \
-                                             lablxaxi=lablxaxi, \
                                              lablyaxi=lablyaxi, \
                                              strgtitl=strgtitl, \
-                                             epoc=epoc, \
+                                             limtxaxi=limtxaxi, \
+                                             epoc=epocmtra, \
                                              peri=peri, \
                                              typeplotback=typeplotback, \
                                              #typesigncode='ephesos', \
                                             )
                 
-                if dictefes['typesyst'] == 'PlanetarySystemEmittingCompanion':
-                    
-                    # vertical zoom onto the phase curve
-                    strgextn = '%s_pcurzoom' % (strgextnbasecomp)
-                    pathplot = miletos.plot_tser(pathvisu, \
-                                                 dictmodl=dictmodl, \
-                                                 boolfold=True, \
-                                                 typefileplot=typefileplot, \
-                                                 #listxdatvert=listxdatvert, \
-                                                 strgextn=strgextn, \
-                                                 lablxaxi=lablxaxi, \
-                                                 lablyaxi=lablyaxi, \
-                                                 strgtitl=strgtitl, \
-                                                 limtyaxi=[-500, None], \
-                                                 epoc=epoc, \
-                                                 peri=peri, \
-                                                 typeplotback=typeplotback, \
-                                                 #typesigncode='ephesos', \
-                                                )
-                    
-                    # horizontal zoom around the primary
-                    strgextn = '%s_prim' % (strgextnbasecomp)
-                    #limtxaxi = np.array([-24. * 0.7 * dictefes['duratrantotl'], 24. * 0.7 * dictefes['duratrantotl']])
-                    limtxaxi = np.array([-2, 2.])
-                    pathplot = miletos.plot_tser(pathvisu, \
-                                                 dictmodl=dictmodl, \
-                                                 boolfold=True, \
-                                                 typefileplot=typefileplot, \
-                                                 #listxdatvert=listxdatvert, \
-                                                 strgextn=strgextn, \
-                                                 lablxaxi=lablxaxi, \
-                                                 lablyaxi=lablyaxi, \
-                                                 strgtitl=strgtitl, \
-                                                 limtxaxi=limtxaxi, \
-                                                 epoc=epoc, \
-                                                 peri=peri, \
-                                                 typeplotback=typeplotback, \
-                                                 #typesigncode='ephesos', \
-                                                )
-                    
-                    # horizontal zoom around the secondary
-                    strgextn = '%s_seco' % (strgextnbasecomp)
-                    limtxaxi += 0.5 * dictefes['pericomp'][j] * 24.
-                    pathplot = miletos.plot_tser(pathvisu, \
-                                                 dictmodl=dictmodl, \
-                                                 boolfold=True, \
-                                                 typefileplot=typefileplot, \
-                                                 #listxdatvert=listxdatvert, \
-                                                 strgextn=strgextn, \
-                                                 lablxaxi=lablxaxi, \
-                                                 lablyaxi=lablyaxi, \
-                                                 strgtitl=strgtitl, \
-                                                 limtxaxi=limtxaxi, \
-                                                 limtyaxi=[-500, None], \
-                                                 epoc=epoc, \
-                                                 peri=peri, \
-                                                 typeplotback=typeplotback, \
-                                                 #typesigncode='ephesos', \
-                                                )
+                # horizontal zoom around the secondary
+                strgextn = '%s_seco' % (strgextnbasecomp)
+                pathplot = miletos.plot_tser(pathvisu, \
+                                             dictmodl=dictmodl, \
+                                             boolfold=True, \
+                                             phascntr=0.5, \
+                                             typefileplot=typefileplot, \
+                                             #listxdatvert=listxdatvert, \
+                                             strgextn=strgextn, \
+                                             lablyaxi=lablyaxi, \
+                                             strgtitl=strgtitl, \
+                                             limtxaxi=limtxaxi, \
+                                             limtyaxi=[-500, None], \
+                                             epoc=epocmtra, \
+                                             peri=peri, \
+                                             typeplotback=typeplotback, \
+                                             #typesigncode='ephesos', \
+                                            )
 
+                # full phase curve
+                strgextn = '%s_pcur' % (strgextnbasecomp)
+                pathplot = miletos.plot_tser(pathvisu, \
+                                             dictmodl=dictmodl, \
+                                             boolfold=True, \
+                                             phascntr=0.25, \
+                                             typefileplot=typefileplot, \
+                                             #listxdatvert=listxdatvert, \
+                                             strgextn=strgextn, \
+                                             lablyaxi=lablyaxi, \
+                                             strgtitl=strgtitl, \
+                                             epoc=epocmtra, \
+                                             peri=peri, \
+                                             typeplotback=typeplotback, \
+                                             #typesigncode='ephesos', \
+                                            )
+
+                # vertical zoom onto the full phase curve
+                strgextn = '%s_pcurzoom' % (strgextnbasecomp)
+                pathplot = miletos.plot_tser(pathvisu, \
+                                             dictmodl=dictmodl, \
+                                             boolfold=True, \
+                                             phascntr=0.25, \
+                                             typefileplot=typefileplot, \
+                                             #listxdatvert=listxdatvert, \
+                                             strgextn=strgextn, \
+                                             lablyaxi=lablyaxi, \
+                                             strgtitl=strgtitl, \
+                                             limtyaxi=[-500, None], \
+                                             epoc=epocmtra, \
+                                             peri=peri, \
+                                             typeplotback=typeplotback, \
+                                             #typesigncode='ephesos', \
+                                            )
+                
 
 def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
     '''
