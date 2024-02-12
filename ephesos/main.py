@@ -1459,13 +1459,11 @@ def eval_modl( \
             print('gdat.radistar')
             print(gdat.radistar)
     
-    gdat.radistar = 1.
+    #gdat.radistar = 1.
     
     if typeverb > 1:
         print('gdat.coeflmdk')
         print(gdat.coeflmdk)
-        print('gdat.radistar [RS]')
-        print(gdat.radistar)
         print('gdat.rsmacomp')
         print(gdat.rsmacomp)
         print('gdat.cosicomp')
@@ -1490,24 +1488,12 @@ def eval_modl( \
                 raise Exception('A brightness ratio (typebrgtcomp) cannot be provided when the companion is passively heated, which already determines typebrgtcomp.')
             gdat.ratibrgtcomp = (1. / gdat.smaxcomp)**2
         
-            print('temp: fudge factor due to passband in the IR')
-            gdat.ratibrgtcomp *= 5.
-            
         elif gdat.typebrgtcomp == 'isot':
             if gdat.ratibrgtcomp is None:
                 gdat.ratibrgtcomp = 1.
         else:
             raise Exception('')
         
-        print('gdat.booldiag')
-        print(gdat.booldiag)
-        print('gdat.ratibrgtcomp')
-        print(gdat.ratibrgtcomp)
-        if gdat.booldiag:
-            if gdat.ratibrgtcomp is None:
-                raise Exception('')
-
-
     if gdat.masscomp is not None and gdat.massstar is not None:
         
         if gdat.typesyst == 'PlanetarySystemEmittingCompanion' or gdat.typesyst == 'PlanetarySystemEmittingCompanion':
@@ -1599,6 +1585,13 @@ def eval_modl( \
 
     gdat.duratrantotl = nicomedia.retr_duratrantotl(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, booldiag=gdat.booldiag) / 24.
     
+    print('gdat.rsmacomp')
+    print(gdat.rsmacomp)
+    print('gdat.cosicomp')
+    print(gdat.cosicomp)
+    print('gdat.duratrantotl [minutes]')
+    print(gdat.duratrantotl * 24 * 60)
+
     dictefes['duratrantotl'] = gdat.duratrantotl
         
     if gdat.typesyst == 'CompactObjectStellarCompanion':
@@ -2796,13 +2789,14 @@ def plot_tser_dictefes( \
 
     for j in indxcomp:
         listnamevarbcomp += ['pericom%d' % j, 'epocmtracom%d' % j, 'cosicom%d' % j, 'rsmacom%d' % j] 
-        listnamevarbcomp += ['radicom%d' % j]
+        #listnamevarbcomp += ['radicom%d' % j]
         listnamevarbcomp += ['typebrgtcom%d' % j]
         if dictefes['typesyst'] == 'PlanetarySystemEmittingCompanion':
             listnamevarbcomp += ['offsphascom%d' % j]
     
     listnamevarbsimu = ['tolerrat']#, 'diffphas']
-    listnamevarbstar = ['radistar']
+    listnamevarbstar = []
+    #listnamevarbstar += ['radistar']
     #listnamevarbstar += ['coeflmdklinr', 'coeflmdkquad']
     
     listnamevarbsyst = listnamevarbstar + listnamevarbcomp
@@ -2876,9 +2870,6 @@ def plot_tser_dictefes( \
     numbener = dictefes['rflx'].shape[1]
     indxener = np.arange(numbener)
     
-    print('indxener')
-    print(indxener)
-
     for e in indxener:
         
         if numbener > 0:
@@ -2995,7 +2986,7 @@ def retr_strgtitl(dictefesinpt, listnamevarbcomp, dictlabl):
     '''
     
     strgtitl = ''
-    if 'radistar' in dictefesinpt:
+    if 'radistar' in dictefesinpt and dictefesinpt['radistar'] is not None:
         strgtitl += '$R_*$ = %.1f $R_\odot$' % dictefesinpt['radistar']
     if dictefesinpt['typesyst'] == 'CompactObjectStellarCompanion' and 'massstar' in dictefesinpt:
         if len(strgtitl) > 0 and strgtitl[-2:] != ', ':
