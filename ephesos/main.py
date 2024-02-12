@@ -264,6 +264,13 @@ def make_imag(gdat, t, typecolr='real', typemrkr='none', j=None):
                     axistser = figr.add_axes([0.2, 0.1, 0.6, 0.25], frameon=False)
                     
                     gdat.timeanimprev = 0.5 * (gdat.time[-1] - gdat.time[0])
+                    
+                    print('t')
+                    print(t)
+                    print('gdat.time')
+                    summgene(gdat.time)
+                    print('')
+
                     gdat.numbtimeprev = int(gdat.timeanimprev / (gdat.time[t] - gdat.time[t-1]))
                     if j is None:
                         indxtimeinit = max(0, t - gdat.numbtimeprev)
