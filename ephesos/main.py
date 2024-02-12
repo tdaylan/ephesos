@@ -2486,7 +2486,7 @@ def eval_modl( \
                     raise Exception('Time array is not sorted.')
 
             # plot the contents of the Efes dictionary
-            plot_tser_dictefes(gdat.pathvisu, dictefes, '%s' % strgextn, lablunittime)
+            plot_tser_dictefes(gdat.pathvisu, dictefes, '%s' % gdat.strgextn, lablunittime)
         
     if gdat.boolmakeimaglfov and len(rratcomp) > 0:
         
@@ -2868,6 +2868,10 @@ def plot_tser_dictefes( \
         
     numbener = dictefes['rflx'].shape[1]
     indxener = np.arange(numbener)
+    
+    print('indxener')
+    print(indxener)
+
     for e in indxener:
         
         if numbener > 0:
@@ -2901,10 +2905,10 @@ def plot_tser_dictefes( \
                 peri = dictefes['pericomp'][j]
                 duratrantotl = dictefes['duratrantotl'][j]
                 
-                print('Calling miletos.plot_tser() from ephesos.main for primary with boolfold=True and nophascntr specified.')
+                print('Calling miletos.plot_tser() from ephesos.main for primary with boolfold=True and nophascntr specified. Companion %d, Energy %d' % (j, e))
                 # horizontal zoom around the primary
                 strgextn = '%s_prim' % (strgextnbasecomp)
-                limtxaxi = np.array([-duratrantotl, duratrantotl])
+                limtxaxi = np.array([-duratrantotl, duratrantotl]) / peri
                 pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              boolfold=True, \
@@ -2920,9 +2924,10 @@ def plot_tser_dictefes( \
                                              #typesigncode='ephesos', \
                                             )
                 
-                print('Calling miletos.plot_tser() from ephesos.main for secondary with boolfold=True and phascntr 0.5.')
+                print('Calling miletos.plot_tser() from ephesos.main for secondary with boolfold=True and phascntr 0.5. Companion %d, Energy %d' % (j, e))
                 # horizontal zoom around the secondary
                 strgextn = '%s_seco' % (strgextnbasecomp)
+                limtxaxi = 0.5 + np.array([-duratrantotl, duratrantotl]) / peri
                 pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              boolfold=True, \
@@ -2933,7 +2938,7 @@ def plot_tser_dictefes( \
                                              lablyaxi=lablyaxi, \
                                              strgtitl=strgtitl, \
                                              limtxaxi=limtxaxi, \
-                                             limtyaxi=[-500, None], \
+                                             limtyaxi=[-0.2 * np.max(dictmodl['eval']['tser']), None], \
                                              epoc=epocmtra, \
                                              peri=peri, \
                                              typeplotback=typeplotback, \
@@ -2941,6 +2946,7 @@ def plot_tser_dictefes( \
                                             )
 
                 # full phase curve
+                print('Calling miletos.plot_tser() from ephesos.main for full phase curve with boolfold=True and phascntr 0.25 specified. Companion %d, Energy %d' % (j, e))
                 strgextn = '%s_pcur' % (strgextnbasecomp)
                 pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
