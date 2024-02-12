@@ -2309,7 +2309,8 @@ def eval_modl( \
                                             print('')
                                             print('gdat.lumisyst')
                                             summgene(gdat.lumisyst)
-                                            raise Exception('')
+                                            print('temp: suppressing the exception')
+                                            #raise Exception('')
         
                         else:
                             gdat.lumisyst = np.full_like(gdat.phascomp[j], gdat.lumistarnocc)
@@ -2321,7 +2322,8 @@ def eval_modl( \
                     print('')
                     print('gdat.lumisyst')
                     summgene(gdat.lumisyst)
-                    raise Exception('')
+                    print('temp: suppressing the exception')
+                    #raise Exception('')
     
             # normalize the light curve
             if typenorm != 'none':
@@ -2458,7 +2460,8 @@ def eval_modl( \
                 print('')
                 print('dictefes[rflx]')
                 summgene(dictefes['rflx'])
-                raise Exception('')
+                print('temp: suppressing the exception')
+                #raise Exception('')
         
         if gdat.pathvisu is not None:
             
