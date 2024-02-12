@@ -2901,6 +2901,7 @@ def plot_tser_dictefes( \
                 peri = dictefes['pericomp'][j]
                 duratrantotl = dictefes['duratrantotl'][j]
                 
+                print('Calling miletos.plot_tser() from ephesos.main for primary with boolfold=True and nophascntr specified.')
                 # horizontal zoom around the primary
                 strgextn = '%s_prim' % (strgextnbasecomp)
                 limtxaxi = np.array([-duratrantotl, duratrantotl])
@@ -2919,6 +2920,7 @@ def plot_tser_dictefes( \
                                              #typesigncode='ephesos', \
                                             )
                 
+                print('Calling miletos.plot_tser() from ephesos.main for secondary with boolfold=True and phascntr 0.5.')
                 # horizontal zoom around the secondary
                 strgextn = '%s_seco' % (strgextnbasecomp)
                 pathplot = miletos.plot_tser(pathvisu, \
