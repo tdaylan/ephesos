@@ -2426,7 +2426,7 @@ def eval_modl( \
         if dictefes['rflx'].ndim == 1:
             dictefes['rflx'] = dictefes['rflx'][:, None]
         
-        if (dictefes['rflx'] == 1).all() and (gdat.time[-1] - gdat.time[0] > gdat.pericomp).any() or (dictefes['rflx'] == 0).all():
+        if (dictefes['rflx'] == 0).all():
             print('')
             print('')
             print('')
@@ -2449,7 +2449,7 @@ def eval_modl( \
             for j in gdat.indxcomp:
                 print('gdat.lumisysteval[j]')
                 summgene(gdat.lumisysteval[j])
-            print('(dictefes[rflx]')
+            print('dictefes[rflx]')
             summgene(dictefes['rflx'])
             raise Exception('')
 
