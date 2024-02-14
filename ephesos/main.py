@@ -1,38 +1,30 @@
 import sys
 import os
 
-import numpy as np
-
 from tqdm import tqdm
 
-import json
-
-import time as timemodu
-
-from numba import jit, prange
-
-import astropy
-import astropy as ap
-from astropy.io import fits
-from astropy.io import fits
-import astropy.timeseries
+import time as modutime
 
 import multiprocessing
+
+import numpy as np
 
 import scipy as sp
 import scipy.interpolate
 
-import miletos
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+
+import astropy
+import astropy as ap
+import astropy.timeseries
 
 import astroquery
 import astroquery.mast
 
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-
+import miletos
 import nicomedia
 import chalcedon
-
 import tdpy
 from tdpy import summgene
 
@@ -1111,7 +1103,7 @@ def eval_modl( \
     Calculate the flux of a system of potentially lensing and transiting stars, planets, and compact objects.
     When limb-darkening and/or moons are turned on, the result is interpolated based on star-to-companion radius, companion-to-moon radius.
     '''
-    timeinit = timemodu.time()
+    timeinit = modutime.time()
     
     # construct global object
     gdat = tdpy.gdatstrt()
@@ -1585,13 +1577,6 @@ def eval_modl( \
 
     gdat.duratrantotl = nicomedia.retr_duratrantotl(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, booldiag=gdat.booldiag) / 24.
     
-    print('gdat.rsmacomp')
-    print(gdat.rsmacomp)
-    print('gdat.cosicomp')
-    print(gdat.cosicomp)
-    print('gdat.duratrantotl [minutes]')
-    print(gdat.duratrantotl * 24 * 60)
-
     dictefes['duratrantotl'] = gdat.duratrantotl
         
     if gdat.typesyst == 'CompactObjectStellarCompanion':
@@ -2607,7 +2592,7 @@ def eval_modl( \
                                              lablyaxi='Minimum planet-planet distance [R$_*$]', \
                                         )
         
-    dictefes['timetotl'] = timemodu.time() - timeinit
+    dictefes['timetotl'] = modutime.time() - timeinit
     dictefes['timeredu'] = dictefes['timetotl'] / gdat.numbtime
 
     if gdat.booldiag and dictefes['timeredu'] > 1e-1 and not gdat.boolmakeanim:
@@ -2660,7 +2645,7 @@ def eval_modl( \
 def proc_time(gdat, t):
     
     if gdat.boolproftime:
-        timeinit = timemodu.time()
+        timeinit = modutime.time()
     
     # Boolean flag to evaluate the flux at this time
     gdat.boolevalflux = False
@@ -2737,7 +2722,7 @@ def proc_time(gdat, t):
         make_imag(gdat, t)
    
     if gdat.boolproftime:
-        timeexec = timemodu.time() - timeinit
+        timeexec = modutime.time() - timeinit
         print('proc_time() took %s seconds.' % timeexec)
                     
     if gdat.boolstopproftime:
