@@ -1689,6 +1689,9 @@ def eval_modl( \
     
     if gdat.typeverb > 0:
         if gdat.boolsystpsys and not (gdat.rratcomp > gdat.tolerrat).all():
+            print('')
+            print('')
+            print('')
             print('gdat.tolerrat')
             print(gdat.tolerrat)
             print('gdat.rratcomp')
@@ -1755,6 +1758,13 @@ def eval_modl( \
             elif (gdat.rratcomp <= gdat.tolerrat).any():
                 gdat.diffgrid = 0.001
                 if gdat.booldiag:
+                    print('')
+                    print('')
+                    print('')
+                    print('gdat.tolerrat')
+                    print(gdat.tolerrat)
+                    print('gdat.rratcomp')
+                    print(gdat.rratcomp)
                     raise Exception('Warning! Radius ratio smaller than the tolerance!')
             else:
             
