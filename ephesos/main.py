@@ -2885,6 +2885,7 @@ def plot_tser_dictefes( \
                                      dictmodl=dictmodl, \
                                      typefileplot=typefileplot, \
                                      timeoffs=timeoffs, \
+                                     ydatcntr=0., \
                                      #listxdatvert=listxdatvert, \
                                     
                                      strgextn=strgextn, \
