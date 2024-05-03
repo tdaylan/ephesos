@@ -1941,38 +1941,44 @@ def eval_modl( \
                     
                     gdat.xposgridcomp[j], gdat.yposgridcomp[j] = np.meshgrid(arrycompypos, arrycompxpos)
                     
-                    gdat.xposgridsphr[j] = gdat.xposgridcomp[j]
-                    gdat.zposgridsphr[j] = gdat.yposgridcomp[j]
-                    gdat.yposgridsphr[j] = np.sqrt(gdat.rratcomp[j]**2 - gdat.xposgridsphr[j]**2 - gdat.zposgridsphr[j]**2)
+                    if gdat.typebrgtcomp != 'dark':
+                        gdat.xposgridsphr[j] = gdat.xposgridcomp[j]
+                        gdat.zposgridsphr[j] = gdat.yposgridcomp[j]
+                        gdat.yposgridsphr[j] = np.empty_like(gdat.xposgridsphr[j])
                     
-                    # maybe to be deleted
-                    #gdat.latigridcomp[j] = gdat.yposgridcomp[j] / gdat.rratcomp[j]
-                    #gdat.latigridcomp[j] = np.sqrt(1. - gdat.latisinugridcomp[j]**2)
-                    #gdat.zposgridcomp[j] = np.sqrt(gdat.rratcomp[j]*2 - gdat.xposgridcomp[j]**2  - gdat.yposgridcomp[j]**2)
-                    
-                    gdat.latigridsphr[j] = -0.5 * np.pi + \
-                                            np.arccos(gdat.zposgridsphr[j] / np.sqrt(gdat.xposgridsphr[j]**2 + gdat.yposgridsphr[j]**2 + gdat.zposgridsphr[j]**2))
-                    gdat.longgridsphr[j] = np.arctan2(gdat.yposgridsphr[j], gdat.xposgridsphr[j])
-                    
-                    #print('gdat.xposgridsphr[j]')
-                    #summgene(gdat.xposgridsphr[j])
-                    #print('gdat.yposgridsphr[j]')
-                    #summgene(gdat.yposgridsphr[j])
-                    #print('gdat.zposgridsphr[j]')
-                    #summgene(gdat.zposgridsphr[j])
-                    #print('gdat.longgridsphr[j]')
-                    #summgene(gdat.longgridsphr[j])
-                    #print('gdat.latigridsphr[j]')
-                    #summgene(gdat.latigridsphr[j])
-                    if gdat.tmptsliccomp is None:
-                        gdat.tmptsliccomp = np.maximum(0.2 * np.random.randn(16) + 0.9, np.zeros(16))
-                    
-                    if gdat.typesyst == 'PlanetarySystemEmittingCompanion' and gdat.tmptsliccomp is None and gdat.typebrgtcomp == 'heated_sliced':
-                        raise Exception('')
+                        temp = gdat.rratcomp[j]**2 - gdat.xposgridsphr[j]**2 - gdat.zposgridsphr[j]**2
+                        # indices of companion grid where this will not produce NaNs due to being outside of the companion
+                        indxinsd = np.where(temp >= 0)
+                        gdat.yposgridsphr[j][indxinsd] = np.sqrt(temp[indxinsd])
+                        
+                        # maybe to be deleted
+                        #gdat.latigridcomp[j] = gdat.yposgridcomp[j] / gdat.rratcomp[j]
+                        #gdat.latigridcomp[j] = np.sqrt(1. - gdat.latisinugridcomp[j]**2)
+                        #gdat.zposgridcomp[j] = np.sqrt(gdat.rratcomp[j]*2 - gdat.xposgridcomp[j]**2  - gdat.yposgridcomp[j]**2)
+                        
+                        gdat.latigridsphr[j] = -0.5 * np.pi + \
+                                                np.arccos(gdat.zposgridsphr[j] / np.sqrt(gdat.xposgridsphr[j]**2 + gdat.yposgridsphr[j]**2 + gdat.zposgridsphr[j]**2))
+                        gdat.longgridsphr[j] = np.arctan2(gdat.yposgridsphr[j], gdat.xposgridsphr[j])
+                        
+                        #print('gdat.xposgridsphr[j]')
+                        #summgene(gdat.xposgridsphr[j])
+                        #print('gdat.yposgridsphr[j]')
+                        #summgene(gdat.yposgridsphr[j])
+                        #print('gdat.zposgridsphr[j]')
+                        #summgene(gdat.zposgridsphr[j])
+                        #print('gdat.longgridsphr[j]')
+                        #summgene(gdat.longgridsphr[j])
+                        #print('gdat.latigridsphr[j]')
+                        #summgene(gdat.latigridsphr[j])
+                        if gdat.tmptsliccomp is None:
+                            gdat.tmptsliccomp = np.maximum(0.2 * np.random.randn(16) + 0.9, np.zeros(16))
+                        
+                        if gdat.typesyst == 'PlanetarySystemEmittingCompanion' and gdat.tmptsliccomp is None and gdat.typebrgtcomp == 'heated_sliced':
+                            raise Exception('')
 
-                    if gdat.tmptsliccomp is not None:
-                        gdat.numbslic = len(gdat.tmptsliccomp)
-                        gdat.brgtsliccomp = gdat.tmptsliccomp**4
+                        if gdat.tmptsliccomp is not None:
+                            gdat.numbslic = len(gdat.tmptsliccomp)
+                            gdat.brgtsliccomp = gdat.tmptsliccomp**4
 
                     gdat.distfromcompgridcomp[j] = np.sqrt(gdat.xposgridcomp[j]**2 + gdat.yposgridcomp[j]**2)
                     
