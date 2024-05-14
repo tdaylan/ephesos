@@ -1025,11 +1025,8 @@ def eval_modl( \
               ## phase interval between phase samples elsewhere
               diffphaspcur=None, \
 
-              ## minimum radius ratio tolerated
-              tolerrat=None, \
-
-              ## the spatial resolution of the grid over which the planet's brightness and occultation are evaluated
-              resoplan=None, \
+              ## the spatial resolution of the companion grid
+              diffgridcomp=None, \
               
               # Boolean flag to check if the computation can be accelerated
               boolfast=True, \
@@ -1188,9 +1185,6 @@ def eval_modl( \
         else:
             gdat.typebrgtcomp = 'dark'
 
-    if gdat.tolerrat is None:
-        gdat.tolerrat = 3e-3
-    
     if gdat.typecoor is None:
         if gdat.numbcomp == 1 and gdat.typesyst != 'PlanetarySystemWithMoons' or not gdat.boolmodlplancros:
             gdat.typecoor = 'comp'
@@ -1227,16 +1221,6 @@ def eval_modl( \
             print(gdat.diffphaspcur)
             raise Exception('')
 
-        if tolerrat is not None and not isinstance(tolerrat, float):
-            print('tolerrat')
-            print(tolerrat)
-            raise Exception('')
-
-        if resoplan is not None and not isinstance(resoplan, float):
-            print('resoplan')
-            print(resoplan)
-            raise Exception('')
-        
         if np.isscalar(gdat.rratcomp):
             raise Exception('')
         
@@ -1687,25 +1671,13 @@ def eval_modl( \
             print('gdat.phascomp[j]')
             summgene(gdat.phascomp[j])
     
-    if gdat.typeverb > 0:
-        if gdat.boolsystpsys and not (gdat.rratcomp > gdat.tolerrat).all():
-            print('')
-            print('')
-            print('')
-            print('gdat.tolerrat')
-            print(gdat.tolerrat)
-            print('gdat.rratcomp')
-            print(gdat.rratcomp)
-            print('WARNING! At least one of the occulter radii is smaller than the grid resolution. The output will be unreliable.')
-    
+    if gdat.booldiag:
         if gdat.boolsystpsys and len(gdat.rratcomp) == 0:
             print('')
             print('')
             print('')
             print('gdat.typesyst')
             print(gdat.typesyst)
-            print('gdat.tolerrat')
-            print(gdat.tolerrat)
             print('gdat.rratcomp')
             print(gdat.rratcomp)
             raise Exception('gdat.rratcomp is empty.')
@@ -1722,7 +1694,8 @@ def eval_modl( \
             
             if gdat.boolmakeanim:
                 gdat.diffgridstar = 1e-3
-                gdat.diffgridcomp = 5e-4
+                if gdat.diffgridcomp is None:
+                    gdat.diffgridcomp = 5e-4
 
             elif gdat.typesyst == 'CompactObjectStellarCompanion':
                 
@@ -1755,25 +1728,8 @@ def eval_modl( \
                     if gdat.numbcomp > 1:
                         raise Exception('')
 
-            elif (gdat.rratcomp <= gdat.tolerrat).any():
-                gdat.diffgrid = 0.001
-                if gdat.booldiag:
-                    print('')
-                    print('')
-                    print('')
-                    print('gdat.tolerrat')
-                    print(gdat.tolerrat)
-                    print('gdat.rratcomp')
-                    print(gdat.rratcomp)
-                    raise Exception('Warning! Radius ratio smaller than the tolerance!')
             else:
             
-                if gdat.resoplan is None:
-                    if gdat.typecoor == 'comp' and gdat.boolmakeanim:
-                        gdat.resoplan = 0.01
-                    else:
-                        gdat.resoplan = 0.1
-                
                 gdat.diffgridstar = 1e-3
                 
                 if gdat.booldiag:
@@ -1785,33 +1741,43 @@ def eval_modl( \
                         print(gdat.typesyst)
                         print('gdat.rratcomp')
                         print(gdat.rratcomp)
-                        print('gdat.tolerrat')
-                        print(gdat.tolerrat)
-                        print('gdat.rratcomp > gdat.tolerrat')
-                        print(gdat.rratcomp > gdat.tolerrat)
                         raise Exception('len(gdat.rratcomp) == 0')
 
-                gdat.diffgridcomp = min(0.02, gdat.resoplan * np.amin(gdat.rratcomp[gdat.rratcomp > gdat.tolerrat]))
+                if gdat.diffgridcomp is None:
+                    gdat.diffgridcomp = 0.02
             
             if gdat.booldiag:
                 if (gdat.rratcomp > 1).any():
                     print('At least one of the radius ratios is larger than unity.')
                     print('gdat.rratcomp')
                     print(gdat.rratcomp)
-                if gdat.diffgridstar > 0.1 or gdat.typecoor == 'comp' and gdat.diffgridcomp > 0.1:
+                
+                if gdat.diffgridstar > 0.01:
                     print('')
                     print('')
                     print('')
-                    print('The companion grid resolution is too low.')
-                    print('gdat.tolerrat')
-                    print(gdat.tolerrat)
+                    print('Warning! The star grid resolution is too low.')
                     print('gdat.rratcomp')
                     print(gdat.rratcomp)
-                    print('gdat.resoplan')
-                    print(gdat.resoplan)
-                    print('gdat.diffgrid')
-                    print(gdat.diffgrid)
-                    raise Exception('')
+                    #raise Exception('')
+                    
+                if gdat.typecoor == 'star' and (gdat.diffgridstar > 0.1 or gdat.diffgridstar > 0.2 * np.amin(gdat.rratcomp)):
+                    print('')
+                    print('')
+                    print('')
+                    print('Warning! The star grid resolution is too low to resolve the smallest occultor.')
+                    print('gdat.rratcomp')
+                    print(gdat.rratcomp)
+                    #raise Exception('')
+                    
+                if gdat.typecoor == 'comp' and gdat.diffgridcomp > 0.1:
+                    print('')
+                    print('')
+                    print('')
+                    print('Warning! The companion grid resolution is too low.')
+                    print('gdat.diffgridcomp')
+                    print(gdat.diffgridcomp)
+                    #raise Exception('')
 
             if typeverb > 1:
                 print('gdat.diffgridstar')
@@ -1911,6 +1877,17 @@ def eval_modl( \
                         limtgridxpos = gdat.rratcomp[j]
                         limtgridypos = gdat.rratcomp[j]
                     
+                    if gdat.booldiag:
+                        if limtgridxpos / gdat.diffgridcomp > 1e4:
+                            print('')
+                            print('')
+                            print('')
+                            print('gdat.typesyst')
+                            print(gdat.typesyst)
+                            print('gdat.rratcomp')
+                            print(gdat.rratcomp)
+                            raise Exception('limtgridxpos / gdat.diffgridcomp > 1e4')
+                    
                     if gdat.boolmakeanim:
                         if gdat.diffgridcomp / limtgridxpos > 3e-2:
                             print('')
@@ -1928,8 +1905,6 @@ def eval_modl( \
                             print(limtgridxpos)
                             print('gdat.boolmakeanim')
                             print(gdat.boolmakeanim)
-                            print('gdat.resoplan')
-                            print(gdat.resoplan)
                             print('gdat.diffgridcomp / limtgridxpos')
                             print(gdat.diffgridcomp / limtgridxpos)
                             #raise Exception('Images could be made, but the companion grid resolution is too low.')
@@ -2239,9 +2214,6 @@ def eval_modl( \
                             if not np.isfinite(gdat.duratrantotl[j]) or gdat.duratrantotl[j] == 0.:
                                 continue
                             
-                            if gdat.boolsystpsys and gdat.rratcomp[j] < gdat.tolerrat:
-                                continue
-                            
                             if gdat.booltqdm:
                                 objttemp = tqdm(range(gdat.numbphaseval[j]))
                             else:
@@ -2492,6 +2464,15 @@ def eval_modl( \
             # plot the contents of the Efes dictionary
             plot_tser_dictefes(gdat.pathvisu, dictefes, '%s' % gdat.strgextn, lablunittime)
         
+    if gdat.booldiag:
+        if gdat.typecoor == 'star' and gdat.boolsystpsys and not (gdat.rratcomp > gdat.diffgridstar).all():
+            print('')
+            print('')
+            print('')
+            print('gdat.rratcomp')
+            print(gdat.rratcomp)
+            print('WARNING! At least one of the occulter radii is smaller than the grid resolution. The output will be unreliable.')
+    
     if gdat.boolmakeimaglfov and len(rratcomp) > 0:
         
         gdat.maxmsmaxcomp = np.amax(gdat.smaxcomp)
@@ -2798,7 +2779,7 @@ def plot_tser_dictefes( \
         if dictefes['typesyst'] == 'PlanetarySystemEmittingCompanion':
             listnamevarbcomp += ['offsphascom%d' % j]
     
-    listnamevarbsimu = ['tolerrat']#, 'diffphas']
+    listnamevarbsimu = []
     listnamevarbstar = []
     #listnamevarbstar += ['radistar']
     #listnamevarbstar += ['coeflmdklinr', 'coeflmdkquad']
