@@ -2168,9 +2168,23 @@ def eval_modl( \
                     
                     if gdat.booldiag:
                         if (gdat.listphaseval[j] - np.sort(gdat.listphaseval[j]) != 0).any():
+                            print('')
+                            print('')
+                            print('')
+                            print('phasingr[j]')
+                            print(phasingr[j])
+                            print('deltphasineghalf[j]')
+                            print(deltphasineghalf[j])
+                            print('gdat.diffphasineg')
+                            print(gdat.diffphasineg)
+                            print('gdat.diffphaspcur')
+                            print(gdat.diffphaspcur)
+                            print('gdat.diffphasintr[j]')
+                            print(gdat.diffphasintr[j])
                             print('gdat.listphaseval[j]')
-                            print(gdat.listphaseval[j])
-                            raise Exception('')
+                            for phaseval in gdat.listphaseval[j]:
+                                print(phaseval)
+                            print('Warning! gdat.listphaseval[j] are not sorted. Make sure this is not causing any issues down the pipeline.')
                     
                     gdat.numbphaseval[j] = gdat.listphaseval[j].size
                 gdat.listposiprimgridcompeval = [np.empty((gdat.numbphaseval[j], 3)) for j in gdat.indxcomp]
