@@ -1451,13 +1451,6 @@ def eval_modl( \
     
     if gdat.rsmacomp is not None:
         gdat.smaxcomp = (1. + gdat.rratcomp) / gdat.rsmacomp
-        print('gdat.rratcomp')
-        print(gdat.rratcomp)
-        print('gdat.rsmacomp')
-        print(gdat.rsmacomp)
-        print('gdat.smaxcomp')
-        print(gdat.smaxcomp)
-        raise Exception('')
     
     if gdat.typesyst == 'PlanetarySystemEmittingCompanion':
     
