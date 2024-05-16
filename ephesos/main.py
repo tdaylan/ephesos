@@ -1189,7 +1189,7 @@ def eval_modl( \
             gdat.typebrgtcomp = 'dark'
 
     if gdat.typecoor is None:
-        if (gdat.numbcomp == 1 and gdat.typesyst != 'PlanetarySystemWithMoons' or not gdat.boolmodlplancros) and not max(gdat.rratcomp) > 1:
+        if (gdat.numbcomp == 1 and gdat.typesyst != 'PlanetarySystemWithMoons' or not gdat.boolmodlplancros) and not max(gdat.rratcomp) > 2:
             gdat.typecoor = 'comp'
         else:
             gdat.typecoor = 'star'
@@ -1451,6 +1451,13 @@ def eval_modl( \
     
     if gdat.rsmacomp is not None:
         gdat.smaxcomp = (1. + gdat.rratcomp) / gdat.rsmacomp
+        print('gdat.rratcomp')
+        print(gdat.rratcomp)
+        print('gdat.rsmacomp')
+        print(gdat.rsmacomp)
+        print('gdat.smaxcomp')
+        print(gdat.smaxcomp)
+        raise Exception('')
     
     if gdat.typesyst == 'PlanetarySystemEmittingCompanion':
     
@@ -1558,10 +1565,13 @@ def eval_modl( \
             print('gdat.smaxcomp')
             print(gdat.smaxcomp)
             raise Exception(' gdat.rsmacomp is Non')
-
-    gdat.duratrantotl = nicomedia.retr_duratrantotl(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, booldiag=gdat.booldiag) / 24.
     
-    dictefes['duratrantotl'] = gdat.duratrantotl
+    # duration of total transit in hours
+    gdat.duratrantotlcomp = nicomedia.retr_duratrantotl(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, booldiag=gdat.booldiag)
+    gdat.dcyctrantotlcomp = gdat.duratrantotlcomp / gdat.pericomp / 24.
+
+    dictefes['duratrantotlcomp'] = gdat.duratrantotlcomp
+    dictefes['dcyctrantotlcomp'] = gdat.duratrantotlcomp
         
     if gdat.typesyst == 'CompactObjectStellarCompanion':
         if gdat.typemodllens == 'gaus':
@@ -1578,8 +1588,8 @@ def eval_modl( \
         timecomp = [[] for j in gdat.indxcomp]
     
         if typeverb > 1:
-            print('gdat.duratrantotl [days]')
-            print(gdat.duratrantotl)
+            print('gdat.duratrantotlcomp [hours]')
+            print(gdat.duratrantotlcomp)
 
         if gdat.boolsystpsys:
             if gdat.booldiag:
@@ -1606,12 +1616,14 @@ def eval_modl( \
                 rratcomp = gdat.meanrratcomp
             else:
                 rratcomp = gdat.rratcomp
-            gdat.duratranfull = nicomedia.retr_duratranfull(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, rratcomp) / 24.
-            dictefes['duratranfull'] = gdat.duratranfull
+            gdat.duratranfullcomp = nicomedia.retr_duratranfull(gdat.pericomp, gdat.rsmacomp, gdat.cosicomp, rratcomp)
+            dictefes['duratranfullcomp'] = gdat.duratranfullcomp
+            gdat.dcyctranfullcomp = gdat.duratranfullcomp / gdat.pericomp / 24.
+            dictefes['dcyctranfullcomp'] = gdat.dcyctranfullcomp
         
         if typeverb > 1:
-            print('gdat.duratranfull [days]')
-            print(gdat.duratranfull)
+            print('gdat.duratranfullcomp [hours]')
+            print(gdat.duratranfullcomp)
 
         if gdat.diffphasineg is None:
             if typesyst == 'CompactObjectStellarCompanion':
@@ -1628,13 +1640,13 @@ def eval_modl( \
         if gdat.diffphasintr is None:
             gdat.diffphasintr = np.empty(gdat.numbcomp)
             for j in gdat.indxcomp:
-                if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                     gdat.diffphasintr[j] = 0.0005
                 else:
                     gdat.diffphasintr[j] = 0.0001
         
         if typeverb > 1:
-            if np.isfinite(gdat.duratranfull):
+            if np.isfinite(gdat.duratranfullcomp):
                 print('gdat.diffphasineg')
                 print(gdat.diffphasineg)
             print('gdat.diffphasintr')
@@ -1685,7 +1697,7 @@ def eval_modl( \
     if gdat.boolcalclcur:
         if typecalc == 'simpboxx':
             for j in gdat.indxcomp:
-                indxtimetran = np.where((gdat.phascomp[j] < gdat.duratrantotl[j] / gdat.pericomp[j]) | (gdat.phascomp[j] > 1. -  gdat.duratrantotl[j] / gdat.pericomp[j]))[0]
+                indxtimetran = np.where((gdat.phascomp[j] < gdat.dcyctrantotlcomp[j]) | (gdat.phascomp[j] > 1. -  gdat.dcyctrantotlcomp[j]))[0]
                 rflxtranmodl = np.ones_like(gdat.phascomp)
                 rflxtranmodl[indxtimetran] -= gdat.rratcomp**2
         elif len(rratcomp) == 0:
@@ -2111,20 +2123,20 @@ def eval_modl( \
                 gdat.listphaseval = [[] for j in gdat.indxcomp]
                 gdat.numbphaseval = np.empty(gdat.numbcomp, dtype=int)
                 for j in gdat.indxcomp:
-                    if np.isfinite(gdat.duratrantotl[j]):
+                    if np.isfinite(gdat.duratrantotlcomp[j]):
                         
                         # array of durations of phase oversampled for the total transit
                         if gdat.typesyst.startswith('PlanetarySystemWithRings'):
-                            gdat.phastrantotl = 2. * gdat.duratrantotl / gdat.pericomp
+                            gdat.phastrantotl = 2. * gdat.dcycatrantotlcomp
                         else:
-                            gdat.phastrantotl = gdat.duratrantotl / gdat.pericomp
+                            gdat.phastrantotl = gdat.dcyctrantotlcomp
                         
-                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                             # array of durations of phase oversampled for the full transit
                             if gdat.typesyst.startswith('PlanetarySystemWithRings'):
-                                gdat.phastranfull = 2. * gdat.duratranfull / gdat.pericomp
+                                gdat.phastranfull = 2. * gdat.dcyctranfullcomp
                             else:
-                                gdat.phastranfull = gdat.duratranfull / gdat.pericomp
+                                gdat.phastranfull = gdat.dcyctranfullcomp
                             
                             # array of durations of phase oversampled for the ingress and egress, inlcluding a fudge factor
                             deltphasineg = 1.1 * (gdat.phastrantotl - gdat.phastranfull) / 2.
@@ -2142,24 +2154,24 @@ def eval_modl( \
                         gdat.listphaseval[j] = [np.arange(-0.25, -phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur)]
                         
                         # ingress
-                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                             gdat.listphaseval[j].append(np.arange(-phasingr[j] - deltphasineghalf[j], -phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                         
                         # in transit, after ingress
                         gdat.listphaseval[j].append(np.arange(-phasingr[j] + deltphasineghalf[j], phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
                         
                         # 
-                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                             gdat.listphaseval[j].append(np.arange(phasingr[j] - deltphasineghalf[j], phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                         
                         gdat.listphaseval[j].append(np.arange(phasingr[j] + deltphasineghalf[j], 0.5 - phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur))
                         
-                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                             gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] - deltphasineghalf[j], 0.5 - phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                                                        
                         gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] + deltphasineghalf[j], 0.5 + phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
                                                        
-                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfull[j]):
+                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                             gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] - deltphasineghalf[j], 0.5 + phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                         
                         gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] + deltphasineghalf[j], 0.75 + gdat.diffphaspcur, gdat.diffphaspcur))
@@ -2227,7 +2239,7 @@ def eval_modl( \
                         
                         for j in gdat.indxcomp:
                             
-                            if not np.isfinite(gdat.duratrantotl[j]) or gdat.duratrantotl[j] == 0.:
+                            if not np.isfinite(gdat.duratrantotlcomp[j]) or gdat.duratrantotlcomp[j] == 0.:
                                 continue
                             
                             if gdat.booltqdm:
@@ -2270,7 +2282,7 @@ def eval_modl( \
                     
                     for j in gdat.indxcomp:
                         
-                        if not np.isfinite(gdat.duratrantotl[j]) or gdat.duratrantotl[j] == 0.:
+                        if not np.isfinite(gdat.duratrantotlcomp[j]) or gdat.duratrantotlcomp[j] == 0.:
                             continue
                         
                         if gdat.listphaseval[j].size > 1:
@@ -2433,8 +2445,8 @@ def eval_modl( \
             print(gdat.rsmacomp)
             print('gdat.cosicomp')
             print(gdat.cosicomp)
-            print('gdat.duratrantotl')
-            print(gdat.duratrantotl)
+            print('gdat.duratrantotlcomp')
+            print(gdat.duratrantotlcomp)
             print('gdat.time')
             summgene(gdat.time)
             for j in gdat.indxcomp:
@@ -2645,8 +2657,8 @@ def eval_modl( \
             print(gdat.cosicomp)
             print('gdat.rsmacomp')
             print(gdat.rsmacomp)
-            print('gdat.duratrantotl')
-            print(gdat.duratrantotl)
+            print('gdat.duratrantotlcomp')
+            print(gdat.duratrantotlcomp)
             raise Exception('')
     
     if typeverb > 0:
@@ -2791,7 +2803,7 @@ def plot_tser_dictefes( \
     listnamevarbcomp = []
 
     for j in indxcomp:
-        listnamevarbcomp += ['pericom%d' % j, 'epocmtracom%d' % j, 'cosicom%d' % j, 'rsmacom%d' % j] 
+        listnamevarbcomp += ['pericom%d' % j, 'smaxcom%d' % j, 'epocmtracom%d' % j, 'cosicom%d' % j, 'rsmacom%d' % j, 'duratrantotlcom%d' % j, 'duratranfullcom%d' % j] 
         #listnamevarbcomp += ['radicom%d' % j]
         listnamevarbcomp += ['typebrgtcom%d' % j]
         if dictefes['typesyst'] == 'PlanetarySystemEmittingCompanion':
@@ -2847,11 +2859,11 @@ def plot_tser_dictefes( \
     
     listcolr = np.array(['g', 'b', 'firebrick', 'orange', 'olive'])
 
-    duratrantotl = nicomedia.retr_duratrantotl(dictefes['pericomp'], dictefes['rsmacomp'], dictefes['cosicomp']) / 24. # [days]
+    duratrantotlcomp = nicomedia.retr_duratrantotl(dictefes['pericomp'], dictefes['rsmacomp'], dictefes['cosicomp']) # [hours]
     
-    listxdatvert = [-0.5 * 24. * dictefes['duratrantotl'], 0.5 * 24. * dictefes['duratrantotl']] 
-    if 'duratranfull' in dictefes:
-        listxdatvert += [-0.5 * 24. * dictefes['duratranfull'], 0.5 * 24. * dictefes['duratranfull']]
+    listxdatvert = [-0.5 * dictefes['duratrantotlcomp'], 0.5 * dictefes['duratrantotlcomp']] # [hours]
+    if 'duratranfullcomp' in dictefes:
+        listxdatvert += [-0.5 * dictefes['duratranfullcomp'], 0.5 * dictefes['duratranfullcomp']] # [hours]
     listxdatvert = np.array(listxdatvert)
     
     # title for the plots
@@ -2905,12 +2917,13 @@ def plot_tser_dictefes( \
                 
                 epocmtra = dictefes['epocmtracomp'][j]
                 peri = dictefes['pericomp'][j]
-                duratrantotl = dictefes['duratrantotl'][j]
+                duratrantotlcomp = dictefes['duratrantotlcomp'][j]
+                dcyctrantotlcomp = dictefes['dcyctrantotlcomp'][j]
                 
                 print('Calling miletos.plot_tser() from ephesos.main for primary with boolfold=True and nophascntr specified. Companion %d, Energy %d' % (j, e))
                 # horizontal zoom around the primary
                 strgextn = '%s_prim' % (strgextnbasecomp)
-                limtxaxi = np.array([-duratrantotl, duratrantotl]) / peri
+                limtxaxi = np.array([-dcyctrantotlcomp, dcyctrantotlcomp])
                 pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              boolfold=True, \
@@ -2929,7 +2942,7 @@ def plot_tser_dictefes( \
                 print('Calling miletos.plot_tser() from ephesos.main for secondary with boolfold=True and phascntr 0.5. Companion %d, Energy %d' % (j, e))
                 # horizontal zoom around the secondary
                 strgextn = '%s_seco' % (strgextnbasecomp)
-                limtxaxi = 0.5 + np.array([-duratrantotl, duratrantotl]) / peri
+                limtxaxi = 0.5 + np.array([-dcyctrantotlcomp, dcyctrantotlcomp])
                 pathplot = miletos.plot_tser(pathvisu, \
                                              dictmodl=dictmodl, \
                                              boolfold=True, \
