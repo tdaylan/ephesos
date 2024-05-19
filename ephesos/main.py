@@ -2508,7 +2508,7 @@ def eval_modl( \
         indxtimeimaglfov = np.linspace(0., maxm, numbimaglfov).astype(int)
         
         # if the computation was done in the companion grids over the evaluation times, then also calculate the positions in the global time grid
-        if gdat.typecoor == 'comp':
+        if gdat.typecoor == 'star':
             print('Original computation was done in the companion grids over the evaluation times. Additionally calculating the positions in the global time grid...')
             for t in gdat.indxtime:
                 for j in gdat.indxcomp:
