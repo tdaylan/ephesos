@@ -97,11 +97,17 @@ def retr_boolgridouts(gdat, j, typecoor, typeoccu='comp'):
     return boolnocccomp
 
 
-def retr_lumistartran(gdat, typecoor, boolrofi, j=None):
+def retr_lumistartran(gdat, typecoor, boolrofi=None, indxpixlrofi=None, j=None):
     '''
     Calculate the total flux of a star on the grid
     '''
-    indxgridrofi = np.where(boolrofi)
+    
+    if indxpixlrofi is not None and boolrofi is not None:
+        raise Exception('')
+
+    if indxpixlrofi is None:
+        indxgridrofi = np.where(boolrofi)
+    
     lumistartran = retr_lumistartranrofi(gdat, typecoor, indxgridrofi, j)
     
     lumistartran = np.sum(lumistartran)
@@ -126,9 +132,13 @@ def retr_lumistartranrofi(gdat, typecoor, indxgridrofi, j=None):
             dist = dist[indxgridrofi]
 
         cosg = np.sqrt(1. - dist**2)
+        
         fluxstartran = nicomedia.retr_brgtlmdk(cosg, gdat.coeflmdk, typelmdk=gdat.typelmdk) * areapixl
         
         if gdat.booldiag and (abs(fluxstartran) > 1e10).any() or not np.isfinite(fluxstartran).all():
+            print('')
+            print('')
+            print('')
             print('dist')
             summgene(dist)
             print('fluxstartran')
@@ -411,7 +421,7 @@ def calc_brgtprimgridcomp(gdat, j, t):
 def retr_brgtlens(gdat, t):
     
     # brightness in the sources plane
-    gdat.brgtgridsour = retr_lumistartran(gdat, 'sour', gdat.indxgridsourstar)
+    gdat.brgtgridsour = retr_lumistartran(gdat, 'sour', indxpixlrofi=gdat.indxgridsourstar)
     print('gdat.brgtgridsour')
     summgene(gdat.brgtgridsour)
 
@@ -602,35 +612,38 @@ def retr_diststarcompfromphas_efes(gdat, j, t, phas):
     
 
 def retr_boolevalflux(gdat, j):
-
-    if gdat.typesyst == 'PlanetarySystemEmittingCompanion':
-        
-        boolevalflux = True
-
+    
+    if not gdat.boolcalclcur:
+        boolevalflux = False
     else:
-        # this is neeed because the pre-ingress is undersampled
-        factfudg = 1.2
+        if gdat.typesyst == 'PlanetarySystemEmittingCompanion':
+            
+            boolevalflux = True
 
-        if gdat.typecoor == 'comp':
-            if gdat.typesyst.startswith('PlanetarySystemWithRings') and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + 30. * gdat.rratcomp[j]):
-                boolevalflux = True
-            elif gdat.boolsystpsys and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + factfudg * gdat.rratcomp[j]):
-                boolevalflux = True
-            elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.wdthslen[j]):
-                boolevalflux = True
-            else:
-                boolevalflux = False
-        elif gdat.typecoor == 'star':
-            if gdat.typesyst.startswith('PlanetarySystemWithRings') and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + 3. * gdat.rratcomp[j]):
-                boolevalflux = True
-            elif gdat.boolsystpsys and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + factfudg * gdat.rratcomp[j]):
-                boolevalflux = True
-            elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.wdthslen[j]):
-                boolevalflux = True
-            else:
-                boolevalflux = False
         else:
-            raise Exception('')
+            # this is neeed because the pre-ingress is undersampled
+            factfudg = 1.2
+
+            if gdat.typecoor == 'comp':
+                if gdat.typesyst.startswith('PlanetarySystemWithRings') and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + 30. * gdat.rratcomp[j]):
+                    boolevalflux = True
+                elif gdat.boolsystpsys and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + factfudg * gdat.rratcomp[j]):
+                    boolevalflux = True
+                elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposstargridcomp[j]**2 + gdat.yposstargridcomp[j]**2) < 1. + gdat.wdthslen[j]):
+                    boolevalflux = True
+                else:
+                    boolevalflux = False
+            elif gdat.typecoor == 'star':
+                if gdat.typesyst.startswith('PlanetarySystemWithRings') and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + 3. * gdat.rratcomp[j]):
+                    boolevalflux = True
+                elif gdat.boolsystpsys and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + factfudg * gdat.rratcomp[j]):
+                    boolevalflux = True
+                elif gdat.typesyst == 'CompactObjectStellarCompanion' and (np.sqrt(gdat.xposcompgridstar[j]**2 + gdat.yposcompgridstar[j]**2) < 1. + gdat.wdthslen[j]):
+                    boolevalflux = True
+                else:
+                    boolevalflux = False
+            else:
+                raise Exception('')
     
     if gdat.typeverb > 1:
         print('boolevalflux')
@@ -638,51 +651,76 @@ def retr_boolevalflux(gdat, j):
 
     return boolevalflux
 
-
-def proc_time(gdat, t):
     
+def proc_modl(gdat, boolevalphas, j, t):
+    '''
+    Compute the system brightness either in the star or companion grid
+    '''
+
     if gdat.boolproftime:
         timeinit = modutime.time()
     
-    # Boolean flag to evaluate the flux at this time
-    gdat.boolevalflux = False
-    
-    if gdat.boolcalclcur:
+    if gdat.typecoor == 'star':
         gdat.boolgridstarlght = np.copy(gdat.boolgridstarinsdstar)
 
-    for j in gdat.indxcomp:
+    if boolevalphas:
+        xpos, ypos, zpos, anommean, anomecce, anomtrue = retr_diststarcompfromphas_efes(gdat, j, t, gdat.listphaseval[j][t])
         
-        if gdat.typeverb > 1:
-            print('j')
-            print(j)
+        if gdat.typecoor == 'star':
+            # position of the primary in the grid of the companion j
+            gdat.xposcompgridstar[j] = xpos
+            gdat.yposcompgridstar[j] = ypos
+            gdat.zposcompgridstar[j] = zpos
         
-        xpos, ypos, zpos, anommean, anomecce, anomtrue = retr_diststarcompfromphas_efes(gdat, j, t, gdat.phascomp[j][t])
+        if gdat.typecoor == 'comp':
+            # position of the primary in the grid of the companion j
+            gdat.xposstargridcomp[j] = -xpos
+            gdat.yposstargridcomp[j] = -ypos
+            gdat.zposstargridcomp[j] = -zpos
         
-        gdat.xposcompgridstar[j] = xpos
-        gdat.yposcompgridstar[j] = ypos
-        gdat.zposcompgridstar[j] = zpos
-        
-        gdat.dictvarborbt['posicompgridprim'][t, j, 0] = gdat.xposcompgridstar[j]
-        gdat.dictvarborbt['posicompgridprim'][t, j, 1] = gdat.yposcompgridstar[j]
-        gdat.dictvarborbt['posicompgridprim'][t, j, 2] = gdat.zposcompgridstar[j]
-        gdat.dictvarborbt['anomtrue'][t, j] = anomtrue
-        
-        if gdat.perimoon is not None:
-            for jj in indxmoon[j]:
-                listposimoonfromcomp = retr_diststarcompfromphas_efes(gdat, j, t, gdat.phasmoon[jj][t])
-                gdat.xposmoon[j][jj] = gdat.xposcompgridstar[j] + \
-                                smaxmoon[j][jj] * np.cos(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
-                gdat.yposmoon[j][jj] = gdat.yposcompgridstar[j] + \
-                                smaxmoon[j][jj] * np.sin(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
+            gdat.listposiprimgridcompeval[j][t, 0] = gdat.xposstargridcomp[j]
+            gdat.listposiprimgridcompeval[j][t, 1] = gdat.yposstargridcomp[j]
+            gdat.listposiprimgridcompeval[j][t, 2] = gdat.zposstargridcomp[j]
+    else:
+        for j in gdat.indxcomp:
+            
+            xpos, ypos, zpos, anommean, anomecce, anomtrue = retr_diststarcompfromphas_efes(gdat, j, t, gdat.phascomp[j][t])
+            
+            gdat.xposcompgridstar[j] = xpos
+            gdat.yposcompgridstar[j] = ypos
+            gdat.zposcompgridstar[j] = zpos
+            
+            gdat.dictvarborbt['posicompgridprim'][t, j, 0] = gdat.xposcompgridstar[j]
+            gdat.dictvarborbt['posicompgridprim'][t, j, 1] = gdat.yposcompgridstar[j]
+            gdat.dictvarborbt['posicompgridprim'][t, j, 2] = gdat.zposcompgridstar[j]
+            gdat.dictvarborbt['anomtrue'][t, j] = anomtrue
+            
+    # Boolean flag to evaluate the flux
+    if boolevalphas:
+        gdat.boolevalflux = retr_boolevalflux(gdat, j)
+    else:
+        gdat.boolevalflux = False
 
-        
-        if gdat.boolcalclcur:
-
-            if abs(gdat.phascomp[j][t]) < 0.25:# or (gdat.boolmakeimaglfov or gdat.boolmakeanim):
+    if boolevalphas:
+        if gdat.typecoor == 'comp':
+            # start with the brightness of the primary
+            gdat.lumisysteval[j][t] = gdat.lumistarnocc
     
-                gdat.boolevalflux = gdat.boolevalflux or retr_boolevalflux(gdat, j)
+    else:
+        for j in gdat.indxcomp:
+            if gdat.perimoon is not None:
+                for jj in indxmoon[j]:
+                    listposimoonfromcomp = retr_diststarcompfromphas_efes(gdat, j, t, gdat.phasmoon[jj][t])
+                    gdat.xposmoon[j][jj] = gdat.xposcompgridstar[j] + \
+                                    smaxmoon[j][jj] * np.cos(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
+                    gdat.yposmoon[j][jj] = gdat.yposcompgridstar[j] + \
+                                    smaxmoon[j][jj] * np.sin(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
+            
+            gdat.boolevalflux = gdat.boolevalflux or retr_boolevalflux(gdat, j)
 
-                if gdat.perimoon is not None and a == 0:
+            if gdat.boolevalflux:
+                
+                if gdat.perimoon is not None:
 
                     for jj in indxmoon[j]:
                         
@@ -697,88 +735,14 @@ def proc_time(gdat, t):
                             boolnoccmoon = distmoon > rratmoon[j][jj]
                             
                             gdat.boolgridstarlght = gdat.boolgridstarlght & boolnoccmoon
-    
-                if gdat.boolevalflux:
-                    
-                    if gdat.typecoor == 'comp':
-                        gdat.boolgridcompoutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
-                        gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
-                    elif gdat.typecoor == 'star':
-                        gdat.boolgridstaroutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
-                        gdat.boolgridstarlght = gdat.boolgridstarlght & gdat.boolgridstaroutscomp
-                    else:
-                        raise Exception('')
-            
-    if gdat.boolevalflux:
-        if gdat.typecoor == 'comp':
-            gdat.lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, gdat.boolgridcomplght, j)
-        elif gdat.typecoor == 'star':
-            gdat.lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, gdat.boolgridstarlght)
         
-    if gdat.boolmakeanim:
-        make_imag(gdat, t)
-   
-    if gdat.boolproftime:
-        timeexec = modutime.time() - timeinit
-        if gdat.typeverb > 1:
-            print('proc_time() took %s seconds.' % timeexec)
-                    
-    if gdat.boolstopproftime:
-        if timeexec > 10.:
-            print('')
-            print('')
-            print('')
-            print('gdat.typesyst')
-            print(gdat.typesyst)
-            print('gdat.numbcomp')
-            print(gdat.numbcomp)
-            print('gdat.typecoor')
-            print(gdat.typecoor)
-            print('gdat.numbpixlgridstar')
-            print(gdat.numbpixlgridstar)
-            print('gdat.boolintp')
-            print(gdat.boolintp)
-            print('timeexec')
-            print(timeexec)
-            print('gdat.numbtime')
-            print(gdat.numbtime)
-            print('gdat.numbtime * timeexec')
-            print(gdat.numbtime * timeexec)
-            raise Exception('Computation has taken too long.')
+                if gdat.typecoor == 'comp':
+                    gdat.boolgridcompoutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
+                    gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
+                elif gdat.typecoor == 'star':
+                    gdat.boolgridstaroutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
+                    gdat.boolgridstarlght = gdat.boolgridstarlght & gdat.boolgridstaroutscomp
 
-                            
-def proc_phaseval(gdat, j, t):
-    '''
-    Compute the system brightness at index t of the evaluation time axis using the companion grid for companion j
-    '''
-
-    if gdat.boolproftime:
-        timeinit = modutime.time()
-    
-    xpos, ypos, zpos, anommean, anomecce, anomtrue = retr_diststarcompfromphas_efes(gdat, j, t, gdat.listphaseval[j][t])
-    
-    if gdat.typecoor == 'star':
-        # position of the primary in the grid of the companion j
-        gdat.xposcompgridstar[j] = xpos
-        gdat.yposcompgridstar[j] = ypos
-        gdat.zposcompgridstar[j] = zpos
-    
-    if gdat.typecoor == 'comp':
-        # position of the primary in the grid of the companion j
-        gdat.xposstargridcomp[j] = -xpos
-        gdat.yposstargridcomp[j] = -ypos
-        gdat.zposstargridcomp[j] = -zpos
-    
-        gdat.listposiprimgridcompeval[j][t, 0] = gdat.xposstargridcomp[j]
-        gdat.listposiprimgridcompeval[j][t, 1] = gdat.yposstargridcomp[j]
-        gdat.listposiprimgridcompeval[j][t, 2] = gdat.zposstargridcomp[j]
-
-        # start with the brightness of the primary
-        gdat.lumisysteval[j][t] = gdat.lumistarnocc
-    
-    # decide whether to evaluate brightness terms due to companions or moons
-    gdat.boolevalflux = retr_boolevalflux(gdat, j)
-    
     if gdat.boolevalflux:
         
         if gdat.typecoor == 'comp':
@@ -791,14 +755,14 @@ def proc_phaseval(gdat, j, t):
         
         if gdat.boolsystpsys:
             
-            if abs(gdat.listphaseval[j][t]) < 0.25 or (gdat.boolmakeimaglfov or gdat.boolmakeanim):
+            if gdat.boolcalcdiff:
+                if abs(gdat.listphaseval[j][t]) < 0.25 or (gdat.boolmakeimaglfov or gdat.boolmakeanim):
                 
-                if gdat.typecoor == 'comp':
                     # Booleans indicating whether companion grid points are inside the star and occulted
                     gdat.boolgridcompstaroccu = gdat.boolgridcompinsdprim & gdat.boolgridcompinsdcomp[j]
                 
                     # stellar flux occulted
-                    deltlumi = -retr_lumistartran(gdat, 'comp', gdat.boolgridcompstaroccu, j)
+                    deltlumi = -retr_lumistartran(gdat, 'comp', boolrofi=gdat.boolgridcompstaroccu, j=j)
                 
                     if gdat.booldiag:
                         if gdat.typesyst == 'PlanetarySystem':
@@ -810,7 +774,9 @@ def proc_phaseval(gdat, j, t):
                     
                     if abs(gdat.listphaseval[j][t]) < 0.25:
                         gdat.lumisysteval[j][t] += deltlumi
-                
+            else:
+                gdat.lumisysteval[j][t] = gdat.lumistarnocc
+        
         # brightness of the companion
         if gdat.typebrgtcomp != 'dark':
             
@@ -904,7 +870,7 @@ def proc_phaseval(gdat, j, t):
             
             # calculate the brightness inside the companion grid
             gdat.indxgridcompinsdprim = np.where(gdat.boolgridcompinsdprim)
-            gdat.lumistarplan = np.sum(retr_lumistartran(gdat, 'comp', gdat.indxgridcompinsdprim, j))
+            gdat.lumistarplan = np.sum(retr_lumistartran(gdat, 'comp', indxgridrofi=gdat.indxgridcompinsdprim, j=j))
             
             print('gdat.lumistarplan')
             print(gdat.lumistarplan)
@@ -959,6 +925,16 @@ def proc_phaseval(gdat, j, t):
                 summgene(gdat.lumisysteval[j][t])
                 raise Exception('not np.isfinite(gdat.lumisysteval[j][t])')
         
+    if gdat.boolevalflux:
+        if not boolevalphas:
+            if gdat.typecoor == 'star':
+                gdat.lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, boolrofi=gdat.boolgridstarlght)
+            if gdat.typecoor == 'comp':
+                gdat.lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, boolrofi=gdat.boolgridcomplght)
+
+    if gdat.boolmakeanim:
+        make_imag(gdat, t)
+   
     if gdat.booldiag:
         if not isinstance(gdat.lumisysteval[j][t], float):
             print('gdat.lumisysteval[j][t]')
@@ -975,6 +951,34 @@ def proc_phaseval(gdat, j, t):
                 print('gdat.lumistarnocc')
                 print(gdat.lumistarnocc)
                 raise Exception('gdat.lumisysteval[j][t] > gdat.lumistarnocc or gdat.lumisysteval[j][t] < gdat.lumistarnocc - 3 * gdat.lumistarnocc * np.amax(gdat.rratcomp)**2')
+
+    if gdat.boolproftime:
+        timeexec = modutime.time() - timeinit
+        if gdat.typeverb > 1:
+            print('proc_modl() took %s seconds.' % timeexec)
+
+    if gdat.boolstopproftime:
+        if timeexec > 10.:
+            print('')
+            print('')
+            print('')
+            print('gdat.typesyst')
+            print(gdat.typesyst)
+            print('gdat.numbcomp')
+            print(gdat.numbcomp)
+            print('gdat.typecoor')
+            print(gdat.typecoor)
+            print('gdat.numbpixlgridstar')
+            print(gdat.numbpixlgridstar)
+            print('gdat.boolintp')
+            print(gdat.boolintp)
+            print('timeexec')
+            print(timeexec)
+            print('gdat.numbtime')
+            print(gdat.numbtime)
+            print('gdat.numbtime * timeexec')
+            print(gdat.numbtime * timeexec)
+            raise Exception('Computation has taken too long.')
 
 
 def eval_modl( \
@@ -1154,7 +1158,7 @@ def eval_modl( \
               # the maximum factor by which the primary will get tidally deformed
               maxmfactellp=None, \
 
-              # Boolean flag to calculate the light curve of the system
+              # Boolean flag to calculate the light curve of the system instead of just a geometric simulation
               boolcalclcur=True, \
               
               # Boolean flag to additionally calculate the angular distance between the companions
@@ -2200,6 +2204,9 @@ def eval_modl( \
                 if gdat.pathvisu is not None:
                     gdat.maxmbrgtsour = nicomedia.retr_brgtlmdk(1., gdat.coeflmdk, typelmdk=gdat.typelmdk) * gdat.areapixlsour
             
+            # Boolean flag to indicate that flux will be calculated differentially 
+            gdat.boolcalcdiff = gdat.typecoor == 'comp'
+
             # maximum stellar brightness for planet and star grids
             if gdat.boolmakeanim or gdat.boolmakeimaglfov:
                 gdat.maxmlumistar = nicomedia.retr_brgtlmdk(1., gdat.coeflmdk, typelmdk=gdat.typelmdk) * gdat.areapixlstar
@@ -2359,8 +2366,7 @@ def eval_modl( \
                             
                             for t in objttemp:
                                 
-                                # this function should work for both star and companion grids
-                                proc_phaseval(gdat, j, t)
+                                proc_modl(gdat, True, j, t)
                                 
                                 if gdat.boolmakeanim:
                                     make_imag(gdat, t, gdat.typecoor, j=j)
@@ -2373,8 +2379,7 @@ def eval_modl( \
                             objttemp = range(gdat.numbtime)
                         
                         for t in objttemp:
-                            # this function should work for both star and companion grids
-                            proc_time(gdat, t)
+                            proc_modl(gdat, False, t)
 
                     if gdat.boolmakeanim:
                         
@@ -2628,8 +2633,8 @@ def eval_modl( \
             maxm = gdat.numbphaseval[0] - 1
         indxtimeimaglfov = np.linspace(0., maxm, numbimaglfov).astype(int)
         
-        # if the computation was done in the companion grids over the evaluation times, then also calculate the positions in the global time grid
-        if gdat.typecoor == 'star':
+        # if the computation was done in over the evaluation times, then also calculate the positions in the global time grid
+        if gdat.boolintp:
             print('Original computation was done in the companion grids over the evaluation times. Additionally calculating the positions in the global time grid...')
             for t in gdat.indxtime:
                 for j in gdat.indxcomp:
