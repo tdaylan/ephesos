@@ -2666,7 +2666,7 @@ def eval_modl( \
         
             if gdat.typecoor == 'star':
                 for j in gdat.indxcomp:
-                    if gdat.xposcompgridstar[j].size:
+                    if gdat.xposcompgridstar[j].size == 0:
                         print('')
                         print('')
                         print('')
