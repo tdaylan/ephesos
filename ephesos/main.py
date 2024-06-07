@@ -2576,14 +2576,37 @@ def eval_modl( \
             raise Exception('')
 
         if gdat.booldiag:
+            if gdat.numbcomp == 1 and 1.1 * np.where(dictefes['rflx'] == 1)[0].size < (1. - gdat.dcyctrantotlcomp) * gdat.numbtime:
+                print('')
+                print('')
+                print('')
+                print('dictefes[rflx]')
+                summgene(dictefes['rflx'])
+                raise Exception('')
+        
             if not np.isfinite(dictefes['rflx']).all() or (dictefes['rflx'] < 0).any():
                 print('')
                 print('')
                 print('')
                 print('dictefes[rflx]')
                 summgene(dictefes['rflx'])
-                print('temp: suppressing the exception')
-                #raise Exception('')
+                raise Exception('')
+        
+            if (gdat.numbcomp == 1 and gdat.rratcomp[0] < 1.) and (dictefes['rflx'] == 0).any():
+                print('')
+                print('')
+                print('')
+                print('dictefes[rflx]')
+                summgene(dictefes['rflx'])
+                raise Exception('')
+        
+            if (gdat.typesyst != 'CompactObjectStellarCompanion' and gdat.typesyst != 'PlanetarySystemEmittingCompanion') and (dictefes['rflx'] > 1).any():
+                print('')
+                print('')
+                print('')
+                print('dictefes[rflx]')
+                summgene(dictefes['rflx'])
+                raise Exception('')
         
         if gdat.pathvisu is not None:
             
@@ -2785,12 +2808,6 @@ def eval_modl( \
         print('')
 
     return dictefes
-
-
-
-
-
-
 
 
 def plot_tser_dictefes( \
