@@ -77,7 +77,7 @@ def retr_boolgridouts(gdat, j, typecoor, typeoccu='comp'):
                 boolnocccomp = gdat.distfromprimgridcomp[j] > 1.
             else:
                 raise Exception('')
-    elif gdat.typesyst == 'turkey':
+    elif gdat.typesyst == 'occuarbt':
         positemp = np.vstack([gdat.xposgridshft.flatten(), gdat.yposgridshft.flatten()]).T
         indx = np.where((abs(positemp[:, 0]) < gdat.maxmxposturkmesh) & (abs(positemp[:, 1]) < gdat.maxmyposturkmesh))[0]
 
@@ -1916,46 +1916,7 @@ def eval_modl( \
             if gdat.typecoor == 'comp':
                 gdat.areapixlcomp = gdat.diffgridcomp**2
             
-            if gdat.typesyst == 'turkey':
-                if gdat.numbcomp != 1:
-                    raise Exception('')
-                path = os.environ['EPHESOS_DATA_PATH'] + '/data/LightCurve/turkey.csv'
-                print('Reading from %s...' % path)
-                gdat.positurk = np.loadtxt(path, delimiter=',')
-                
-                print('Scaling and centering the template coordinates...')
-                for a in range(2):
-                    gdat.positurk[:, a] -= np.amin(gdat.positurk[:, a])
-                # half of the diagonal of the rectangle
-                halfdiag = 0.5 * np.sqrt((np.amax(gdat.positurk[:, 0]))**2 + (np.amax(gdat.positurk[:, 1]))**2)
-                # normalize
-                gdat.positurk *= gdat.rratcomp[0] / halfdiag
-                # center
-                gdat.positurk -= 0.5 * np.amax(gdat.positurk, 0)[None, :]
-                
-                diffturk = 1. * gdat.diffgrid
-                diffturksmth = 2. * diffturk
-                gdat.xposturk = np.arange(-5 * diffturk + np.amin(gdat.positurk[:, 0]), np.amax(gdat.positurk[:, 0]) + 5. * diffturk, diffturk)
-                gdat.yposturk = np.arange(-5 * diffturk + np.amin(gdat.positurk[:, 1]), np.amax(gdat.positurk[:, 1]) + 5. * diffturk, diffturk)
-                gdat.maxmxposturkmesh = np.amax(gdat.xposturk)
-                gdat.maxmyposturkmesh = np.amax(gdat.yposturk)
-
-                gdat.xposturkmesh, gdat.yposturkmesh = np.meshgrid(gdat.xposturk, gdat.yposturk)
-                gdat.xposturkmeshflat = gdat.xposturkmesh.flatten()
-                gdat.yposturkmeshflat = gdat.yposturkmesh.flatten()
-                gdat.positurkmesh = np.vstack([gdat.xposturkmeshflat, gdat.yposturkmeshflat]).T
-                
-                gdat.valuturkmesh = np.exp(-((gdat.positurk[:, 0, None] - gdat.xposturkmeshflat[None, :]) / diffturksmth)**2 \
-                                          - ((gdat.positurk[:, 1, None] - gdat.yposturkmeshflat[None, :]) / diffturksmth)**2)
-                gdat.valuturkmesh = np.sum(gdat.valuturkmesh, 0)
-                
-                if not np.isfinite(gdat.valuturkmesh).all():
-                    print('gdat.xposturkmeshflat')
-                    summgene(gdat.xposturkmeshflat)
-                    print('gdat.yposturkmeshflat')
-                    summgene(gdat.yposturkmeshflat)
-                    print('')
-                    raise Exception('')
+            
             
             if gdat.typecoor == 'star' and gdat.boolmakeanim or gdat.boolmakeimaglfov:
                 if gdat.diffgridstar < 1e-3:
@@ -2580,6 +2541,16 @@ def eval_modl( \
                 print('')
                 print('')
                 print('')
+                print('gdat.typecoor')
+                print(gdat.typecoor)
+                print('gdat.boolintp')
+                print(gdat.boolintp)
+                print('gdat.dcyctrantotlcomp')
+                print((gdat.dcyctrantotlcomp))
+                print('np.where(dictefes[rflx] == 1)[0].size')
+                print(np.where(dictefes['rflx'] == 1)[0].size)
+                print('(1. - gdat.dcyctrantotlcomp) * gdat.numbtime')
+                print((1. - gdat.dcyctrantotlcomp) * gdat.numbtime)
                 print('dictefes[rflx]')
                 summgene(dictefes['rflx'])
                 raise Exception('')
