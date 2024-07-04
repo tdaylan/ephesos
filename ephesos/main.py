@@ -779,13 +779,6 @@ def proc_modl(gdat, typeeval, j, t):
                     gdat.boolgridstarlght = gdat.boolgridstarlght & boolnoccmoon
     
         if gdat.typecoor == 'comp':
-            gdat.boolgridcompoutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
-            gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
-        elif gdat.typecoor == 'star':
-            gdat.boolgridstaroutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
-            gdat.boolgridstarlght = gdat.boolgridstarlght & gdat.boolgridstaroutscomp
-
-        if gdat.typecoor == 'comp':
             # distance to the primary in the grid of the companion j
             gdat.distfromprimgridcomp[j] = np.sqrt((gdat.xposgridcomp[j] - gdat.xposstargridcomp[j])**2 + \
                                                    (gdat.yposgridcomp[j] - gdat.yposstargridcomp[j])**2)
@@ -793,6 +786,13 @@ def proc_modl(gdat, typeeval, j, t):
             # Booleans indicating whether the points in the grid of the companion j, are inside the primary
             gdat.boolgridcompinsdprim = gdat.distfromprimgridcomp[j] < 1.
         
+        if gdat.typecoor == 'comp':
+            gdat.boolgridcompoutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
+            gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
+        elif gdat.typecoor == 'star':
+            gdat.boolgridstaroutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
+            gdat.boolgridstarlght = gdat.boolgridstarlght & gdat.boolgridstaroutscomp
+
         # brightness of the occulted primary
         if gdat.boolsystpsys:
             if gdat.boolcalcdiff:
@@ -1248,7 +1248,7 @@ def eval_modl( \
     # construct global object
     gdat = tdpy.gdatstrt()
     
-    #typeverb = 3
+    typeverb = 3
 
     # copy locals (inputs) to the global object
     dictinpt = dict(locals())
@@ -1894,10 +1894,6 @@ def eval_modl( \
                     gdat.diffgridcomp = 0.02
             
             if gdat.booldiag:
-                if (gdat.rratcomp > 1).any():
-                    print('At least one of the radius ratios is larger than unity.')
-                    print('gdat.rratcomp')
-                    print(gdat.rratcomp)
                 
                 if gdat.diffgridstar > 0.01:
                     print('')
@@ -2563,7 +2559,7 @@ def eval_modl( \
             raise Exception('')
 
         if gdat.booldiag:
-            if gdat.numbcomp == 1 and 1.1 * np.where(dictefes['rflx'] == 1)[0].size < (1. - gdat.dcyctrantotlcomp) * gdat.numbtime:
+            if gdat.numbcomp == 1 and 1.1 * np.where(dictefes['rflx'] == 1)[0].size < (1. - gdat.dcyctrantotlcomp[0]) * gdat.numbtime:
                 print('')
                 print('')
                 print('')
@@ -2581,7 +2577,7 @@ def eval_modl( \
                 print((1. - gdat.dcyctrantotlcomp) * gdat.numbtime)
                 print('dictefes[rflx]')
                 summgene(dictefes['rflx'])
-                raise Exception('')
+                raise Exception('gdat.numbcomp == 1 and 1.1 * np.where(dictefes[rflx] == 1)[0].size < (1. - gdat.dcyctrantotlcomp[0]) * gdat.numbtime')
         
             if not np.isfinite(dictefes['rflx']).all() or (dictefes['rflx'] < 0).any():
                 print('')
