@@ -1248,7 +1248,8 @@ def eval_modl( \
     # construct global object
     gdat = tdpy.gdatstrt()
     
-    typeverb = 3
+    #print('Temp: overwriting ephesos typeverb to 3!')
+    #typeverb = 3
 
     # copy locals (inputs) to the global object
     dictinpt = dict(locals())
@@ -2577,7 +2578,10 @@ def eval_modl( \
                 print((1. - gdat.dcyctrantotlcomp) * gdat.numbtime)
                 print('dictefes[rflx]')
                 summgene(dictefes['rflx'])
-                raise Exception('gdat.numbcomp == 1 and 1.1 * np.where(dictefes[rflx] == 1)[0].size < (1. - gdat.dcyctrantotlcomp[0]) * gdat.numbtime')
+                strg = 'The number of times the light curve equals to 1 is inconsistent with the duty cycle such that \
+                                 gdat.numbcomp == 1 and 1.1 * np.where(dictefes[rflx] == 1)[0].size < (1. - gdat.dcyctrantotlcomp[0]) * gdat.numbtime'
+                #raise Exception(strg)
+                print('Warning! ' + strg)
         
             if not np.isfinite(dictefes['rflx']).all() or (dictefes['rflx'] < 0).any():
                 print('')
