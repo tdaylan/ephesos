@@ -724,6 +724,11 @@ def proc_modl(gdat, typeeval, j, t):
             gdat.dictvarborbt['posicompgridprim'][t, j, 0] = gdat.xposcompgridstar[j]
             gdat.dictvarborbt['posicompgridprim'][t, j, 1] = gdat.yposcompgridstar[j]
             gdat.dictvarborbt['posicompgridprim'][t, j, 2] = gdat.zposcompgridstar[j]
+            
+            if gdat.booldiag:
+                if abs(anomtrue) < 1e-20 or abs(anomtrue) > 1e20:
+                    raise Exception('')
+
             gdat.dictvarborbt['anomtrue'][t, j] = anomtrue
             
     # Boolean flag to evaluate the flux
@@ -1692,7 +1697,7 @@ def eval_modl( \
                 print(smaxmoontemp)
     
     if gdat.boolintp is None:
-        if gdat.typecoor == 'star' and gdat.numbcomp > 1 or gdat.perimoon is not None:
+        if gdat.typecoor == 'star' and gdat.numbcomp > 1 or gdat.perimoon is not None or not gdat.boolcalclcur:
             gdat.boolintp = False
         else:
             gdat.boolintp = True
@@ -1954,8 +1959,6 @@ def eval_modl( \
             if gdat.typecoor == 'comp':
                 gdat.areapixlcomp = gdat.diffgridcomp**2
             
-            
-            
             if gdat.typecoor == 'star':
                 if gdat.diffgridstar < 1e-3:
                     raise Exception('Images will be made, but the primary grid resolution is too low.')
@@ -2056,16 +2059,6 @@ def eval_modl( \
                                                 np.arccos(gdat.zposgridsphr[j] / np.sqrt(gdat.xposgridsphr[j]**2 + gdat.yposgridsphr[j]**2 + gdat.zposgridsphr[j]**2))
                         gdat.longgridsphr[j] = np.arctan2(gdat.yposgridsphr[j], gdat.xposgridsphr[j])
                         
-                        #print('gdat.xposgridsphr[j]')
-                        #summgene(gdat.xposgridsphr[j])
-                        #print('gdat.yposgridsphr[j]')
-                        #summgene(gdat.yposgridsphr[j])
-                        #print('gdat.zposgridsphr[j]')
-                        #summgene(gdat.zposgridsphr[j])
-                        #print('gdat.longgridsphr[j]')
-                        #summgene(gdat.longgridsphr[j])
-                        #print('gdat.latigridsphr[j]')
-                        #summgene(gdat.latigridsphr[j])
                         if gdat.tmptsliccomp is None:
                             gdat.tmptsliccomp = np.maximum(0.2 * np.random.randn(16) + 0.9, np.zeros(16))
                         
@@ -2324,14 +2317,9 @@ def eval_modl( \
             else:
                 for a in range(numbitermoon):
                     
-                    if a == 0:
-                        gdat.strgcompmoon = ''
-                    else:
-                        gdat.strgcompmoon = '_onlycomp'
-                    
                     if gdat.boolmakeanim:
                         for namevarbanim in gdat.listnamevarbfram:
-                            gdat.pathgiff[namevarbanim] = gdat.pathvisu + 'anim%s%s%s.gif' % (namevarbanim, gdat.strgextn, gdat.strgcompmoon)
+                            gdat.pathgiff[namevarbanim] = gdat.pathvisu + 'anim%s%s%s.gif' % (namevarbanim, gdat.strgextn)
                             gdat.cmndmakeanim[namevarbanim] = 'convert -delay 5 -density 200'
                             gdat.cmnddeleimag[namevarbanim] = 'rm'
                         
@@ -2712,12 +2700,14 @@ def eval_modl( \
             gdat.indxtimesegmfade[ou] = np.where(ou == gdat.indxsegmfadetime)[0]
             
         gdat.listalphline = [np.empty(gdat.numbsegmfade) for j in gdat.indxcomp]
+        print('gdat.boolintp')
+        print(gdat.boolintp)
         for j in gdat.indxcomp:
             
+            print('j')
+            print(j)
             print('gdat.dictvarborbt[anomtrue][:, j]')
             summgene(gdat.dictvarborbt['anomtrue'][:, j])
-            print('gdat.boolintp')
-            print(gdat.boolintp)
 
             for ou in gdat.indxsegmfade:
                 gdat.listalphline[j][ou] = np.mean(gdat.dictvarborbt['anomtrue'][gdat.indxtimesegmfade[ou], j])
