@@ -794,7 +794,7 @@ def proc_modl(gdat, typeeval, j, t):
         if gdat.boolsystpsys:
             if gdat.boolcalcdiff:
                 
-                if abs(gdat.listphaseval[j][t]) < 0.25 or gdat.boolmakeanimflux:
+                if abs(gdat.listphaseval[j][t]) < 0.25 or gdat.boolmakeanimsbrt:
                 
                     # Booleans indicating whether companion grid points are inside the star and occulted
                     gdat.boolgridcompstaroccu = gdat.boolgridcompinsdprim & gdat.boolgridcompinsdcomp[j]
@@ -951,7 +951,7 @@ def proc_modl(gdat, typeeval, j, t):
                 print(gdat.boolevalflux)
                 raise Exception('not np.isfinite(lumisyst[t])')
         
-    if gdat.boolmakeanimflux:
+    if gdat.boolmakeanimsbrt:
         make_imag(gdat, t)
    
     if gdat.booldiag:
@@ -1144,10 +1144,10 @@ def eval_modl( \
               lablunittime='BJD', \
 
               ## Boolean flag to make a diagram of the system showing the orbits
-              boolmakeanimdiag=False, \
+              boolmakeanimorbt=False, \
               
-              # Boolean flag to make an animation
-              boolmakeanimflux=False, \
+              # Boolean flag to make an animation of the surface brightness
+              boolmakeanimsbrt=False, \
               
               # Boolean flag to show the light curve on the animation
               boolshowlcuranim=True, \
@@ -1334,7 +1334,7 @@ def eval_modl( \
         else:
             gdat.typecoor = 'star'
     
-    gdat.boolmakeanim = gdat.boolmakeanimdiag or gdat.boolmakeanimflux
+    gdat.boolmakeanim = gdat.boolmakeanimorbt or gdat.boolmakeanimsbrt
 
     gdat.boolsystpsys = gdat.typesyst.startswith('PlanetarySystem')
     
@@ -1349,7 +1349,7 @@ def eval_modl( \
             
     # check inputs
     if gdat.booldiag:
-        if (gdat.boolmakeanim or gdat.boolmakeanimdiag) and gdat.pathvisu is None:
+        if (gdat.boolmakeanim or gdat.boolmakeanimorbt) and gdat.pathvisu is None:
             raise Exception('')
 
         if gdat.diffphasineg is not None and not isinstance(gdat.diffphasineg, float):
@@ -1471,7 +1471,7 @@ def eval_modl( \
         if boolcompmoon and gdat.boolintp:
             raise Exception('')
     
-    if gdat.boolmakeanimdiag:
+    if gdat.boolmakeanimorbt:
         gdat.listcolrcomp = ['b', 'r', 'g', 'orange', 'cyan', 'magenta', 'olive', 'yellow']
     
     if gdat.boolfast and gdat.boolsystpsys and gdat.rratcomp.ndim == 2:
@@ -1571,11 +1571,11 @@ def eval_modl( \
             gdat.cmnddeleimag = dict()
         
         if gdat.boolmakeanim:
-            if gdat.boolmakeanimflux:
+            if gdat.boolmakeanimsbrt:
                 gdat.listnamevarbfram = ['flux']
                 if gdat.typesyst == 'CompactObjectStellarCompanion':
                     gdat.listnamevarbfram += ['posifrstphotlens', 'posisecophotlens', 'fluxfrstlens', 'fluxsecolens']#, 'brgtgridsour' 'cntsfrstlens', 'cntssecolens']
-            if gdat.boolmakeanimdiag:
+            if gdat.boolmakeanimorbt:
                 gdat.listnamevarbfram = ['diag']
     
         if gdat.strgextn != '':
@@ -2345,7 +2345,7 @@ def eval_modl( \
                                 
                                 proc_modl(gdat, 'pcur', j, t)
                                 
-                                if gdat.boolmakeanimflux:
+                                if gdat.boolmakeanimsbrt:
                                     make_imag(gdat, t, gdat.typecoor, j=j)
                             
                     else:
