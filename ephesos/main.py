@@ -106,8 +106,9 @@ def retr_lumistartran(gdat, typecoor, boolrofi=None, indxpixlrofi=None, j=None):
         raise Exception('')
 
     if indxpixlrofi is None:
-        indxgridrofi = np.where(boolrofi)
-    
+        if boolrofi is not None:
+            indxgridrofi = np.where(boolrofi)
+
     if gdat.typeverb > 1:
         print('retr_lumistartran()')
         print('indxgridrofi[0]')
@@ -161,30 +162,31 @@ def retr_lumistartranrofi(gdat, typecoor, indxgridrofi, j=None):
             raise Exception('')
 
     if typecoor == 'star':
-        fluxstartran = gdat.brgtprimgridprim[indxgridrofi]
+        fluxstartran = gdat.brgtprimgridprim
+        if indxgridrofi is not None:
+            fluxstartran = fluxstartran[indxgridrofi]
             
     return fluxstartran
 
 
-def retr_pathbaseanimfram(gdat, namevarbanim):
+def retr_pathrootanimfram(gdat, namevarbanim):
+    pathrootanimfram = gdat.pathvisu + '%s%s' % (namevarbanim, gdat.strgextn)
     
-    pathbaseanimfram = gdat.pathvisu + '%s%s%s' % (namevarbanim, gdat.strgextn, gdat.strgcompmoon)
-    
-    return pathbaseanimfram
+    return pathrootanimfram
    
    
 def retr_pathanimfram(gdat, namevarbanim, t, typevisu, j):
     
-    pathbaseanimfram = retr_pathbaseanimfram(gdat, namevarbanim)
+    pathrootanimfram = retr_pathrootanimfram(gdat, namevarbanim)
     
     if typevisu == 'diag':
-        path = pathbaseanimfram + '_Diagram%04d.%s' % (t, gdat.typefileplot)
+        path = '%s_Diagram%04d.%s' % (pathrootanimfram, t, gdat.typefileplot)
     else:
         if j is None:
             strgextn = ''
         else:
-            strgextn = '_co%02d' % j
-        path = pathbaseanimfram + '_%s%s_Frame%04d.%s' % (gdat.typecoor, strgextn, t, gdat.typefileplot)
+            strgextn = '_intpcomp%02d' % j
+        path = '%s_%s%s_Frame%04d.%s' % (pathrootanimfram, gdat.typecoor, strgextn, t, gdat.typefileplot)
     
     return path
    
@@ -237,7 +239,7 @@ def make_imag(gdat, t, typecolr='real', j=None):
         
             figr, axis = plt.subplots(figsize=(6, 6))
             
-            if namevarbanim == 'flux':
+            if namevarbanim == 'sbrt':
             
                 if gdat.booldiag:
                     if not hasattr(gdat, 'boolevalflux'):
@@ -301,12 +303,6 @@ def make_imag(gdat, t, typecolr='real', j=None):
                     
                     gdat.timeanimprev = 0.5 * (gdat.time[-1] - gdat.time[0])
                     
-                    print('t')
-                    print(t)
-                    print('gdat.time')
-                    summgene(gdat.time)
-                    print('')
-
                     gdat.numbtimeprev = int(gdat.timeanimprev / (gdat.time[t] - gdat.time[t-1]))
                     if j is None:
                         indxtimeinit = max(0, t - gdat.numbtimeprev)
@@ -459,9 +455,6 @@ def retr_brgtlens(gdat, t):
     
     flux = gdat.brgtintp# * gdat.magn
     
-    print('flux')
-    summgene(flux)
-
     if gdat.booldiag:
 
         if (not np.isfinite(flux).all() or (flux == 0.).all()):
@@ -748,14 +741,13 @@ def proc_modl(gdat, typeeval, j, t):
     else:
         lumisyst = gdat.lumisyst
 
-    for j in gdat.indxcomp:
-        if gdat.perimoon is not None:
-            for jj in indxmoon[j]:
-                listposimoonfromcomp = retr_diststarcompfromphas_efes(gdat, j, t, gdat.phasmoon[jj][t])
-                gdat.xposmoon[j][jj] = gdat.xposcompgridstar[j] + \
-                                smaxmoon[j][jj] * np.cos(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
-                gdat.yposmoon[j][jj] = gdat.yposcompgridstar[j] + \
-                                smaxmoon[j][jj] * np.sin(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
+       # if gdat.perimoon is not None:
+       #     for jj in indxmoon[j]:
+       #         listposimoonfromcomp = retr_diststarcompfromphas_efes(gdat, j, t, gdat.phasmoon[jj][t])
+       #         gdat.xposmoon[j][jj] = gdat.xposcompgridstar[j] + \
+       #                         smaxmoon[j][jj] * np.cos(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
+       #         gdat.yposmoon[j][jj] = gdat.yposcompgridstar[j] + \
+       #                         smaxmoon[j][jj] * np.sin(2. * np.pi * (gdat.time - epocmtramoon[j][jj]) / gdat.perimoon[j][jj]) / gdat.radistar * gdat.dictfact['aurs']
         
     if gdat.boolevalflux:
         
@@ -784,17 +776,21 @@ def proc_modl(gdat, typeeval, j, t):
             gdat.boolgridcompinsdprim = gdat.distfromprimgridcomp[j] < 1.
         
         if gdat.typecoor == 'comp':
-            gdat.boolgridcompoutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
-            gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
-        elif gdat.typecoor == 'star':
-            gdat.boolgridstaroutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
-            gdat.boolgridstarlght = gdat.boolgridstarlght & gdat.boolgridstaroutscomp
+            gdat.boolgridcomplght = None
+        
+        if abs(gdat.listphaseval[j][t]) < 0.25:
+            if gdat.typecoor == 'comp':
+                gdat.boolgridcompoutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
+                gdat.boolgridcomplght = gdat.boolgridcompinsdprim & gdat.boolgridcompoutscomp
+            elif gdat.typecoor == 'star':
+                gdat.boolgridstaroutscomp = retr_boolgridouts(gdat, j, gdat.typecoor, typeoccu='comp')
+                gdat.boolgridstarlght = gdat.boolgridstarlght & gdat.boolgridstaroutscomp
 
         # brightness of the occulted primary
         if gdat.boolsystpsys:
             if gdat.boolcalcdiff:
                 
-                if abs(gdat.listphaseval[j][t]) < 0.25 or gdat.boolmakeanimsbrt:
+                if abs(gdat.listphaseval[j][t]) < 0.25:
                 
                     # Booleans indicating whether companion grid points are inside the star and occulted
                     gdat.boolgridcompstaroccu = gdat.boolgridcompinsdprim & gdat.boolgridcompinsdcomp[j]
@@ -802,8 +798,7 @@ def proc_modl(gdat, typeeval, j, t):
                     # stellar flux occulted
                     deltlumi = -retr_lumistartran(gdat, 'comp', boolrofi=gdat.boolgridcompstaroccu, j=j)
                 
-                    if abs(gdat.listphaseval[j][t]) < 0.25:
-                        lumisyst[t] += deltlumi
+                    lumisyst[t] += deltlumi
                     
                     if gdat.booldiag:
                         if deltlumi < -3. * gdat.lumistarnocc * np.amax(gdat.rratcomp)**2:
@@ -813,10 +808,14 @@ def proc_modl(gdat, typeeval, j, t):
                             raise Exception('')
                     
             else:
-                if gdat.typecoor == 'star':
-                    lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, boolrofi=gdat.boolgridstarlght)
-                if gdat.typecoor == 'comp':
-                    lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, boolrofi=gdat.boolgridcomplght)
+                if abs(gdat.listphaseval[j][t]) < 0.25:
+                    if gdat.typecoor == 'star':
+                        lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, boolrofi=gdat.boolgridstarlght)
+                    if gdat.typecoor == 'comp':
+                        lumisyst[t] = retr_lumistartran(gdat, gdat.typecoor, boolrofi=gdat.boolgridcomplght)
+                else:
+                    lumisyst[t] = gdat.lumistarnocc
+
 
         # brightness of the companion
         if gdat.typebrgtcomp != 'dark':
@@ -950,9 +949,22 @@ def proc_modl(gdat, typeeval, j, t):
                 print('gdat.boolevalflux')
                 print(gdat.boolevalflux)
                 raise Exception('not np.isfinite(lumisyst[t])')
-        
+    
+    if gdat.booldiag:
+        if (lumisyst[t] < gdat.lumistarnocc) and (abs(gdat.listphaseval[j][t] - 0.5) < 0.2) and gdat.typebrgtcomp == 'dark':
+            print('')
+            print('')
+            print('')
+            print('gdat.typecoor')
+            print(gdat.typecoor)
+            print('gdat.boolcalcdiff')
+            print(gdat.boolcalcdiff)
+            print('gdat.listphaseval[j][t]')
+            print(gdat.listphaseval[j][t])
+            raise Exception('Light curve dropped during the secondary despite companion being dark!')
+
     if gdat.boolmakeanimsbrt:
-        make_imag(gdat, t)
+        make_imag(gdat, t, j=j)
    
     if gdat.booldiag:
         if not isinstance(lumisyst[t], float):
@@ -1110,6 +1122,9 @@ def eval_modl( \
               
               # mass of the host star in Solar mass
               massstar=None, \
+            
+              # temperature of the host star in Solar mass
+              tmptstar=None, \
             
               # String indicating the type of estimation
               ## 'intg': integrate the surface brightness
@@ -1302,6 +1317,18 @@ def eval_modl( \
     
     gdat.numbcomp = gdat.pericomp.size
     gdat.indxcomp = np.arange(gdat.numbcomp)
+    
+    gdat.dictfact = tdpy.retr_factconv()
+    
+    if gdat.rratcomp is not None:
+        gdat.radicomp = gdat.rratcomp
+        if gdat.radistar is not None:
+            raise Exception('')
+    else:
+        gdat.rratcomp = gdat.radicomp / gdat.radistar / gdat.dictfact['rsre']
+        if gdat.typeverb > 1:
+            print('gdat.radistar')
+            print(gdat.radistar)
     
     if gdat.loancomp is None:
         gdat.loancomp = np.full(gdat.numbcomp, fill_value=np.pi)
@@ -1556,8 +1583,6 @@ def eval_modl( \
 
     gdat.listposiprimgridcomp = np.empty((gdat.numbtime, gdat.numbcomp, 3))
     
-    gdat.dictfact = tdpy.retr_factconv()
-    
     if gdat.pathvisu is not None:
         
         # path for animations
@@ -1572,24 +1597,12 @@ def eval_modl( \
         
         if gdat.boolmakeanim:
             if gdat.boolmakeanimsbrt:
-                gdat.listnamevarbfram = ['flux']
+                gdat.listnamevarbfram = ['sbrt']
                 if gdat.typesyst == 'CompactObjectStellarCompanion':
                     gdat.listnamevarbfram += ['posifrstphotlens', 'posisecophotlens', 'fluxfrstlens', 'fluxsecolens']#, 'brgtgridsour' 'cntsfrstlens', 'cntssecolens']
-            if gdat.boolmakeanimorbt:
-                gdat.listnamevarbfram = ['diag']
     
         if gdat.strgextn != '':
             gdat.strgextn = '_' + gdat.strgextn
-    
-    if gdat.rratcomp is not None:
-        gdat.radicomp = gdat.rratcomp
-        if gdat.radistar is not None:
-            raise Exception('')
-    else:
-        gdat.rratcomp = gdat.radicomp / gdat.radistar / gdat.dictfact['rsre']
-        if gdat.typeverb > 1:
-            print('gdat.radistar')
-            print(gdat.radistar)
     
     #gdat.radistar = 1.
     
@@ -1697,6 +1710,9 @@ def eval_modl( \
                 print(smaxmoontemp)
     
     if gdat.boolintp is None:
+        # Boolean flag to indicate whether to calculate the light curve by:
+        # (False) directly evaluating the light curve at the specified times or 
+        # (True) first calculating the phase curve of the (single) companion and interpolating this phase curve
         if gdat.typecoor == 'star' and gdat.numbcomp > 1 or gdat.perimoon is not None or not gdat.boolcalclcur:
             gdat.boolintp = False
         else:
@@ -1777,26 +1793,26 @@ def eval_modl( \
             print('gdat.duratranfullcomp [hours]')
             print(gdat.duratranfullcomp)
 
+        # phase grating during ingress and egress
         if gdat.diffphasineg is None:
             if typesyst == 'CompactObjectStellarCompanion':
                 gdat.diffphasineg = 0.00005
             else:
-                if gdat.numbcomp == 1 and gdat.rratcomp[0] > 0.5:
-                    gdat.diffphasineg = 0.01
-                else:
-                    gdat.diffphasineg = 0.0003
+                gdat.diffphasineg = 0.1 * (dictefes['duratrantotlcomp'] - dictefes['duratranfullcomp']) / 24. / 2. / gdat.pericomp
+            if gdat.boolmakeanimsbrt:
+                gdat.diffphasineg *= 0.1
         
         if gdat.diffphaspcur is None:
             gdat.diffphaspcur = 0.02
         
         if gdat.diffphasintr is None:
-            gdat.diffphasintr = np.empty(gdat.numbcomp)
-            for j in gdat.indxcomp:
-                if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
-                    gdat.diffphasintr[j] = 0.0005
-                else:
-                    gdat.diffphasintr[j] = 0.0001
-        
+            if typesyst == 'CompactObjectStellarCompanion':
+                gdat.diffphasintr = np.full(gdat.numbcomp, 0.001)
+            else:
+                gdat.diffphasintr = 0.1 * dictefes['duratranfullcomp'] / 24. / gdat.pericomp
+            if gdat.boolmakeanimsbrt:
+                gdat.diffphasintr *= 0.1
+
         if gdat.typeverb > 1:
             if np.isfinite(gdat.duratranfullcomp):
                 print('gdat.diffphasineg')
@@ -2190,7 +2206,7 @@ def eval_modl( \
                 if gdat.pathvisu is not None:
                     gdat.maxmbrgtsour = nicomedia.retr_brgtlmdk(1., gdat.coeflmdk, typelmdk=gdat.typelmdk) * gdat.areapixlsour
             
-            # Boolean flag to indicate that flux will be calculated differentially 
+            # Boolean flag to indicate that flux will be calculated by adding/subtracting brightness occulted by the companion to the unocculted brightness of the star
             gdat.boolcalcdiff = gdat.typecoor == 'comp'
 
             # maximum stellar brightness for planet and star grids
@@ -2251,25 +2267,36 @@ def eval_modl( \
                         if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                             gdat.listphaseval[j].append(np.arange(-phasingr[j] - deltphasineghalf[j], -phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                         
-                        # in transit, after ingress
+                        # in primary transit, after ingress, before primary transit egress
                         gdat.listphaseval[j].append(np.arange(-phasingr[j] + deltphasineghalf[j], phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
                         
-                        # 
+                        # primary transit egress
                         if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
                             gdat.listphaseval[j].append(np.arange(phasingr[j] - deltphasineghalf[j], phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                         
-                        gdat.listphaseval[j].append(np.arange(phasingr[j] + deltphasineghalf[j], 0.5 - phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur))
+                        if gdat.typebrgtcomp != 'dark':
+                            # after primary transit egress, before secondary eclipse ingress
+                            gdat.listphaseval[j].append(np.arange(phasingr[j] + deltphasineghalf[j], 0.5 - phasingr[j] - deltphasineghalf[j], gdat.diffphaspcur))
                         
-                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
-                            gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] - deltphasineghalf[j], 0.5 - phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
-                                                       
-                        gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] + deltphasineghalf[j], 0.5 + phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
-                                                       
-                        if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
-                            gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] - deltphasineghalf[j], 0.5 + phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
+                            # secondary eclipse ingress
+                            if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
+                                gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] - deltphasineghalf[j], 0.5 - phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
+                                                           
+                            # in secondary eclipse
+                            gdat.listphaseval[j].append(np.arange(0.5 - phasingr[j] + deltphasineghalf[j], 0.5 + phasingr[j] - deltphasineghalf[j], gdat.diffphasintr[j]))
+                                                           
+                            # secondary eclipse egress
+                            if gdat.boolsystpsys and np.isfinite(gdat.duratranfullcomp[j]):
+                                gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] - deltphasineghalf[j], 0.5 + phasingr[j] + deltphasineghalf[j], gdat.diffphasineg))
                         
-                        gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] + deltphasineghalf[j], 0.75 + gdat.diffphaspcur, gdat.diffphaspcur))
+                            # after secondary eclipse
+                            gdat.listphaseval[j].append(np.arange(0.5 + phasingr[j] + deltphasineghalf[j], 0.75 + gdat.diffphaspcur, gdat.diffphaspcur))
                         
+                        else:
+                            
+                            # other times
+                            gdat.listphaseval[j].append(np.arange(phasingr[j] + deltphasineghalf[j], 0.75 + gdat.diffphaspcur, gdat.diffphaspcur))
+
                         gdat.listphaseval[j] = np.concatenate(gdat.listphaseval[j])
                     else:
                         gdat.listphaseval[j] = np.arange(-0.25, 0.75 + gdat.diffphaspcur, gdat.diffphaspcur)
@@ -2319,11 +2346,11 @@ def eval_modl( \
                     
                     if gdat.boolmakeanim:
                         for namevarbanim in gdat.listnamevarbfram:
-                            gdat.pathgiff[namevarbanim] = gdat.pathvisu + 'anim%s%s%s.gif' % (namevarbanim, gdat.strgextn)
+                            gdat.pathgiff[namevarbanim] = gdat.pathvisu + '%s%s.gif' % (namevarbanim, gdat.strgextn)
                             gdat.cmndmakeanim[namevarbanim] = 'convert -delay 5 -density 200'
                             gdat.cmnddeleimag[namevarbanim] = 'rm'
                         
-                            pathbasedele = retr_pathbaseanimfram(gdat, namevarbanim)
+                            pathbasedele = retr_pathrootanimfram(gdat, namevarbanim)
                             cmnd = 'rm %s*' % pathbasedele
                             print(cmnd)
                             os.system(cmnd)
@@ -2345,9 +2372,6 @@ def eval_modl( \
                                 
                                 proc_modl(gdat, 'pcur', j, t)
                                 
-                                if gdat.boolmakeanimsbrt:
-                                    make_imag(gdat, t, gdat.typecoor, j=j)
-                            
                     else:
                         
                         if gdat.booltqdm:
